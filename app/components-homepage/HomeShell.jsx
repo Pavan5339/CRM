@@ -139,6 +139,11 @@ export default function HomeShell() {
       return;
     }
 
+    if (moduleId === 'client-requirement') {
+      router.push('/client-requirement');
+      return;
+    }
+
     setIsOthersOpen(true);
     setSelectedModule(moduleId);
   };

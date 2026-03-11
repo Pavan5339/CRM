@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useRef } from "react";
 
 /* ─── TAILWIND via CDN injected globally ─────────────────────────── */
@@ -423,7 +425,7 @@ const RequirementsPanel = ({task,onUpdate,onExport,show,toast}) => {
           <div style={{textAlign:'center',padding:'40px 20px',color:T.b400}}>
             <div style={{fontSize:40,marginBottom:10,opacity:.4}}>📋</div>
             <div style={{fontSize:14,fontWeight:600,color:T.b600,marginBottom:4}}>No requirements yet</div>
-            <div style={{fontSize:12.5,color:T.b400}}>Click "Add Requirement" to start collecting client requirements</div>
+            <div style={{fontSize:12.5,color:T.b400}}>Click &quot;Add Requirement&quot; to start collecting client requirements</div>
           </div>
         )}
         {reqsByPriority.map((req,i)=>(
