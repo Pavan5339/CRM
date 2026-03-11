@@ -4,6 +4,22 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Send } from 'lucide-react';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
+import {
+  compactMessages,
+  loadWarmSnapshot,
+  mergeMessages,
+  readMessages,
+  readThreads,
+  readUsers,
+  removeMessage,
+  replaceMessage,
+  setLastActiveActor,
+  setLastSelectedThread,
+  upsertMessage,
+  writeMessages,
+  writeThreads,
+  writeUsers,
+} from '@/utils/chat-cache';
 
 function formatTime(value) {
   if (!value) return '';
@@ -42,20 +58,54 @@ function Avatar({ user }) {
   );
 }
 
+function mergeUsers(base = [], incoming = []) {
+  const map = new Map();
+  for (const user of base) {
+    if (user?.key) map.set(user.key, user);
+  }
+  for (const user of incoming) {
+    if (user?.key) map.set(user.key, { ...map.get(user.key), ...user });
+  }
+  return Array.from(map.values());
+}
+
+function mergeThreads(base = [], incoming = []) {
+  const map = new Map();
+  for (const thread of base) {
+    if (thread?.id) map.set(thread.id, thread);
+  }
+  for (const thread of incoming) {
+    if (thread?.id) map.set(thread.id, { ...map.get(thread.id), ...thread });
+  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    const aTs = String(a?.lastMessageAt || '');
+    const bTs = String(b?.lastMessageAt || '');
+    return bTs.localeCompare(aTs);
+  });
+}
+
 export default function ChatPanel() {
   const supabaseRef = useRef(null);
+  const selectedThreadIdRef = useRef('');
+  const actorKeyRef = useRef('');
+  const loadRequestRef = useRef(0);
+  const fallbackTimerRef = useRef(null);
+  const fallbackDelayRef = useRef(2000);
+  const isMountedRef = useRef(true);
+  const bottomRef = useRef(null);
+
   const [actor, setActor] = useState(null);
   const [threads, setThreads] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [selectedThreadId, setSelectedThreadId] = useState('');
   const [messages, setMessages] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [remoteSearchResults, setRemoteSearchResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [error, setError] = useState('');
-
-  const bottomRef = useRef(null);
 
   if (!supabaseRef.current) {
     supabaseRef.current = createClient();
@@ -66,109 +116,377 @@ export default function ChatPanel() {
     [threads, selectedThreadId]
   );
 
-  const refreshBootstrap = async () => {
+  const threadByPeerKey = useMemo(() => {
+    const map = new Map();
+    for (const thread of threads) {
+      if (thread?.peer?.key) {
+        map.set(thread.peer.key, thread);
+      }
+    }
+    return map;
+  }, [threads]);
+
+  const peopleList = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const localFiltered = !query
+      ? allUsers
+      : allUsers.filter((user) => {
+          const name = String(user?.name || '').toLowerCase();
+          const email = String(user?.email || '').toLowerCase();
+          return name.includes(query) || email.includes(query);
+        });
+
+    const mergedSource = query ? mergeUsers(localFiltered, remoteSearchResults) : allUsers;
+
+    return mergedSource
+      .map((user) => ({
+        ...user,
+        thread: threadByPeerKey.get(user.key) || null,
+      }))
+      .sort((a, b) => {
+        const aTime = a.thread?.lastMessageAt || '';
+        const bTime = b.thread?.lastMessageAt || '';
+        if (aTime && bTime) return bTime.localeCompare(aTime);
+        if (aTime) return -1;
+        if (bTime) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+  }, [allUsers, remoteSearchResults, searchQuery, threadByPeerKey]);
+
+  const fetchBootstrap = async () => {
     const response = await fetch('/api/chat/bootstrap', { method: 'GET' });
     const result = await response.json();
-
     if (!response.ok) {
       throw new Error(result.error || 'Failed to load chat');
     }
-
-    setActor(result.actor || null);
-    setThreads(result.threads || []);
-
-    const nextSelectedId = selectedThreadId && (result.threads || []).some((thread) => thread.id === selectedThreadId)
-      ? selectedThreadId
-      : (result.threads?.[0]?.id || '');
-
-    setSelectedThreadId(nextSelectedId);
-
-    return nextSelectedId;
+    return result;
   };
 
-  const loadMessages = async (threadId) => {
-    if (!threadId) {
-      setMessages([]);
-      return;
+  const fetchUsers = async (query = '') => {
+    const response = await fetch(`/api/chat/users?query=${encodeURIComponent(query)}`, { method: 'GET' });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to load users');
     }
+    return result.users || [];
+  };
 
+  const fetchMessages = async (threadId) => {
     const response = await fetch(`/api/chat/threads/${threadId}/messages`, { method: 'GET' });
     const result = await response.json();
-
     if (!response.ok) {
       throw new Error(result.error || 'Failed to load messages');
     }
-
-    setMessages(result.messages || []);
+    return result.messages || [];
   };
 
   const markRead = async (threadId) => {
     if (!threadId) return;
-
     try {
-      await fetch(`/api/chat/threads/${threadId}/read`, {
-        method: 'PATCH',
-      });
+      await fetch(`/api/chat/threads/${threadId}/read`, { method: 'PATCH' });
     } catch {
-      // no-op; unread gets repaired on next bootstrap
+      // no-op
     }
   };
 
-  const openThread = async (threadId) => {
-    setSelectedThreadId(threadId);
-    setError('');
-    try {
-      await loadMessages(threadId);
-      await markRead(threadId);
-      setThreads((prev) =>
-        prev.map((thread) =>
-          thread.id === threadId ? { ...thread, unreadCount: 0 } : thread
-        )
+  const applyThreads = async (nextThreads, source = 'unknown') => {
+    setThreads(nextThreads);
+    if (actorKeyRef.current) {
+      await writeThreads(actorKeyRef.current, nextThreads, source);
+      await compactMessages(
+        actorKeyRef.current,
+        nextThreads.slice(0, 40).map((thread) => thread.id)
       );
+    }
+  };
+
+  const applyUsers = async (nextUsers, source = 'unknown') => {
+    setAllUsers(nextUsers);
+    if (actorKeyRef.current) {
+      await writeUsers(actorKeyRef.current, nextUsers, source);
+    }
+  };
+
+  const applyMessagesForActiveThread = async (threadId, nextMessages, source = 'unknown') => {
+    if (selectedThreadIdRef.current === threadId) {
+      setMessages(nextMessages);
+    }
+
+    if (actorKeyRef.current && threadId) {
+      await writeMessages(actorKeyRef.current, threadId, nextMessages, source);
+      await setLastSelectedThread(actorKeyRef.current, threadId);
+    }
+  };
+
+  const syncActiveThreadFromNetwork = async (threadId) => {
+    if (!threadId) return;
+
+    const requestId = ++loadRequestRef.current;
+    const networkMessages = await fetchMessages(threadId);
+
+    if (requestId !== loadRequestRef.current) return;
+    if (selectedThreadIdRef.current !== threadId) return;
+
+    const cached = actorKeyRef.current ? await readMessages(actorKeyRef.current, threadId) : [];
+    const merged = mergeMessages(cached, networkMessages);
+    await applyMessagesForActiveThread(threadId, merged, 'network-sync');
+    await markRead(threadId);
+
+    setThreads((prev) => {
+      const next = prev.map((thread) => (thread.id === threadId ? { ...thread, unreadCount: 0 } : thread));
+      void applyThreads(next, 'mark-read-sync');
+      return next;
+    });
+  };
+
+  const openThread = async (threadId) => {
+    if (!threadId) return;
+
+    setError('');
+    setSelectedThreadId(threadId);
+    selectedThreadIdRef.current = threadId;
+    setMessages([]);
+
+    if (actorKeyRef.current) {
+      await setLastSelectedThread(actorKeyRef.current, threadId);
+      const cached = await readMessages(actorKeyRef.current, threadId);
+      if (selectedThreadIdRef.current === threadId && cached.length > 0) {
+        setMessages(cached);
+      }
+    }
+
+    try {
+      await syncActiveThreadFromNetwork(threadId);
     } catch (loadError) {
       setError(loadError.message || 'Failed to open thread');
     }
   };
 
-  useEffect(() => {
-    let mounted = true;
+  const createOrOpenThreadForUser = async (targetKey) => {
+    const existing = threadByPeerKey.get(targetKey);
+    if (existing) {
+      await openThread(existing.id);
+      return;
+    }
+
+    const response = await fetch('/api/chat/threads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetKey }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to start chat');
+    }
+
+    const thread = result.thread;
+    const nextThreads = mergeThreads(threads, [thread]);
+    await applyThreads(nextThreads, 'thread-create');
+    await openThread(thread.id);
+  };
+
+  const syncFromNetwork = async ({ preserveSelection = true } = {}) => {
+    const syncStart = performance.now();
+
+    const bootstrap = await fetchBootstrap();
+
+    const actorFromApi = bootstrap.actor || null;
+    const actorKey = actorFromApi?.key || '';
+
+    setActor(actorFromApi);
+    actorKeyRef.current = actorKey;
+
+    if (actorKey) {
+      await setLastActiveActor(actorKey);
+    }
+
+    const mergedThreads = mergeThreads([], bootstrap.threads || []);
+    await applyThreads(mergedThreads, 'bootstrap');
+
+    const networkUsers = await fetchUsers('');
+    const mergedUsers = mergeUsers([], networkUsers);
+    await applyUsers(mergedUsers, 'users-bootstrap');
+
+    const preferredThreadId = preserveSelection ? selectedThreadIdRef.current : '';
+    const nextSelected = preferredThreadId && mergedThreads.some((thread) => thread.id === preferredThreadId)
+      ? preferredThreadId
+      : (mergedThreads[0]?.id || '');
+
+    setSelectedThreadId(nextSelected);
+    selectedThreadIdRef.current = nextSelected;
+
+    if (nextSelected) {
+      const cached = actorKey ? await readMessages(actorKey, nextSelected) : [];
+      if (cached.length > 0) {
+        setMessages(cached);
+      }
+      await syncActiveThreadFromNetwork(nextSelected);
+    } else {
+      setMessages([]);
+    }
+
+    const syncMs = Math.round(performance.now() - syncStart);
+    console.debug('[chat-cache]', 'networkSyncMs', { syncMs });
+  };
+
+  const stopFallbackPolling = () => {
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+  };
+
+  const scheduleFallbackPolling = () => {
+    if (fallbackTimerRef.current) return;
 
     const run = async () => {
+      if (!isMountedRef.current) return;
+
+      try {
+        await syncFromNetwork({ preserveSelection: true });
+        fallbackDelayRef.current = 2000;
+      } catch {
+        fallbackDelayRef.current = Math.min(fallbackDelayRef.current * 2, 20000);
+      }
+
+      if (!isMountedRef.current) return;
+
+      fallbackTimerRef.current = setTimeout(run, fallbackDelayRef.current);
+    };
+
+    fallbackTimerRef.current = setTimeout(run, fallbackDelayRef.current);
+  };
+
+  const sendMessage = async () => {
+    const content = messageText.trim();
+    const currentThreadId = selectedThreadIdRef.current;
+
+    if (!content || !currentThreadId || sending) return;
+
+    setSending(true);
+    setError('');
+
+    const optimisticId = `temp-${Date.now()}`;
+    const optimisticMessage = {
+      id: optimisticId,
+      thread_id: currentThreadId,
+      sender_key: actor?.key,
+      sender_name: actor?.name,
+      sender_avatar_url: actor?.avatarUrl || '',
+      content,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => {
+      const next = [...prev, optimisticMessage];
+      void applyMessagesForActiveThread(currentThreadId, next, 'optimistic');
+      return next;
+    });
+    setMessageText('');
+
+    try {
+      const response = await fetch(`/api/chat/threads/${currentThreadId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send message');
+      }
+
+      const nextMessages = mergeMessages(messages, [result.message]);
+      setMessages((prev) => prev.map((msg) => (msg.id === optimisticId ? result.message : msg)));
+      await replaceMessage(actorKeyRef.current, currentThreadId, optimisticId, result.message);
+
+      setThreads((prev) => {
+        const next = prev.map((thread) =>
+          thread.id === currentThreadId
+            ? {
+                ...thread,
+                lastMessage: result.message,
+                lastMessageAt: result.message.created_at,
+                unreadCount: 0,
+              }
+            : thread
+        );
+        void applyThreads(next, 'send-message');
+        return next;
+      });
+
+      await applyMessagesForActiveThread(currentThreadId, nextMessages, 'send-message');
+    } catch (sendError) {
+      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+      await removeMessage(actorKeyRef.current, currentThreadId, optimisticId);
+      setMessageText(content);
+      setError(sendError.message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    const boot = async () => {
+      const hydrateStart = performance.now();
       setLoading(true);
       setError('');
+
       try {
-        const threadId = await refreshBootstrap();
-        if (mounted && threadId) {
-          await loadMessages(threadId);
-          await markRead(threadId);
-          setThreads((prev) =>
-            prev.map((thread) =>
-              thread.id === threadId ? { ...thread, unreadCount: 0 } : thread
-            )
-          );
-        }
-      } catch (loadError) {
-        if (mounted) {
-          setError(loadError.message || 'Failed to load chat');
-        }
-      } finally {
-        if (mounted) {
+        const warm = await loadWarmSnapshot();
+
+        if (warm) {
+          actorKeyRef.current = warm.actorKey || '';
+          const warmActor = warm.actorKey
+            ? {
+                key: warm.actorKey,
+                type: warm.actorKey.startsWith('admin:') ? 'admin' : 'employee',
+                name: 'Loading...',
+                email: '',
+                avatarUrl: '',
+              }
+            : null;
+
+          setActor(warmActor);
+          setThreads(warm.threads || []);
+          setAllUsers(warm.users || []);
+          setSelectedThreadId(warm.selectedThreadId || '');
+          selectedThreadIdRef.current = warm.selectedThreadId || '';
+          setMessages(warm.messages || []);
+
+          const hydrateMs = Math.round(performance.now() - hydrateStart);
+          console.debug('[chat-cache]', 'hydrateMs', { hydrateMs, warmThreads: warm.threads.length, warmUsers: warm.users.length });
+
           setLoading(false);
         }
+
+        await syncFromNetwork({ preserveSelection: true });
+        setLoading(false);
+      } catch (loadError) {
+        setError(loadError.message || 'Failed to load chat');
+        setLoading(false);
       }
     };
 
-    run();
+    void boot();
 
     return () => {
-      mounted = false;
+      isMountedRef.current = false;
+      stopFallbackPolling();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
+    selectedThreadIdRef.current = selectedThreadId;
+  }, [selectedThreadId]);
+
+  useEffect(() => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+      setRemoteSearchResults([]);
       return;
     }
 
@@ -183,7 +501,13 @@ export default function ChatPanel() {
         if (!response.ok) {
           throw new Error(result.error || 'Failed to search users');
         }
-        setSearchResults(result.users || []);
+
+        if (!isMountedRef.current) return;
+
+        const users = result.users || [];
+        setRemoteSearchResults(users);
+        const merged = mergeUsers(allUsers, users);
+        await applyUsers(merged, 'search-revalidate');
       } catch (searchError) {
         if (searchError.name !== 'AbortError') {
           setError(searchError.message || 'Failed to search users');
@@ -195,36 +519,12 @@ export default function ChatPanel() {
       controller.abort();
       clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   useEffect(() => {
     const supabase = supabaseRef.current;
     let channel = null;
-    let fallbackTimer = null;
-    let mounted = true;
-
-    const startFallbackPolling = () => {
-      if (fallbackTimer) return;
-      fallbackTimer = setInterval(async () => {
-        if (!mounted) return;
-        try {
-          const currentSelected = selectedThreadId;
-          await refreshBootstrap();
-          if (currentSelected) {
-            await loadMessages(currentSelected);
-          }
-        } catch {
-          // Silent fallback retry loop.
-        }
-      }, 5000);
-    };
-
-    const stopFallbackPolling = () => {
-      if (fallbackTimer) {
-        clearInterval(fallbackTimer);
-        fallbackTimer = null;
-      }
-    };
 
     const setupRealtime = async () => {
       const {
@@ -233,7 +533,7 @@ export default function ChatPanel() {
 
       const accessToken = session?.access_token;
       if (!accessToken) {
-        startFallbackPolling();
+        scheduleFallbackPolling();
         return;
       }
 
@@ -241,53 +541,53 @@ export default function ChatPanel() {
 
       channel = supabase
         .channel('chat-messages-feed')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-          async (payload) => {
-            const incoming = payload.new;
-            if (!incoming?.thread_id) return;
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, async (payload) => {
+          const incoming = payload.new;
+          if (!incoming?.thread_id) return;
 
-            setThreads((prev) => {
-              const exists = prev.some((thread) => thread.id === incoming.thread_id);
-              if (!exists) return prev;
+          await upsertMessage(actorKeyRef.current, incoming.thread_id, incoming, 'realtime');
 
-              return prev.map((thread) => {
-                if (thread.id !== incoming.thread_id) return thread;
+          setThreads((prev) => {
+            const exists = prev.some((thread) => thread.id === incoming.thread_id);
+            if (!exists) return prev;
 
-                const isMine = incoming.sender_key === actor?.key;
-                const nextUnread =
-                  incoming.thread_id === selectedThreadId || isMine
-                    ? 0
-                    : (thread.unreadCount || 0) + 1;
+            const next = prev.map((thread) => {
+              if (thread.id !== incoming.thread_id) return thread;
 
-                return {
-                  ...thread,
-                  lastMessage: incoming,
-                  lastMessageAt: incoming.created_at,
-                  unreadCount: nextUnread,
-                };
-              });
+              const isMine = incoming.sender_key === actorKeyRef.current;
+              const isActive = incoming.thread_id === selectedThreadIdRef.current;
+              const nextUnread = isActive || isMine ? 0 : (thread.unreadCount || 0) + 1;
+
+              return {
+                ...thread,
+                lastMessage: incoming,
+                lastMessageAt: incoming.created_at,
+                unreadCount: nextUnread,
+              };
             });
 
-            if (incoming.thread_id === selectedThreadId) {
-              setMessages((prev) => {
-                const exists = prev.some((message) => message.id === incoming.id);
-                if (exists) return prev;
-                return [...prev, incoming];
-              });
-              await markRead(incoming.thread_id);
-            }
+            void applyThreads(next, 'realtime');
+            return next;
+          });
+
+          if (incoming.thread_id === selectedThreadIdRef.current) {
+            setMessages((prev) => {
+              const next = mergeMessages(prev, [incoming]);
+              void applyMessagesForActiveThread(incoming.thread_id, next, 'realtime-active');
+              return next;
+            });
+            await markRead(incoming.thread_id);
           }
-        )
+        })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             stopFallbackPolling();
+            fallbackDelayRef.current = 2000;
             return;
           }
 
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            startFallbackPolling();
+            scheduleFallbackPolling();
           }
         });
     };
@@ -300,106 +600,20 @@ export default function ChatPanel() {
       }
     });
 
-    setupRealtime();
+    void setupRealtime();
 
     return () => {
-      mounted = false;
-      stopFallbackPolling();
       authSubscription.unsubscribe();
       if (channel) {
         supabase.removeChannel(channel);
       }
     };
-  }, [actor?.key, selectedThreadId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const startChatWithUser = async (targetKey) => {
-    try {
-      const response = await fetch('/api/chat/threads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetKey }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to start chat');
-      }
-
-      const thread = result.thread;
-      setThreads((prev) => {
-        const exists = prev.some((item) => item.id === thread.id);
-        if (exists) return prev;
-        return [thread, ...prev];
-      });
-      setSearchQuery('');
-      setSearchResults([]);
-      await openThread(thread.id);
-    } catch (threadError) {
-      setError(threadError.message || 'Failed to start chat');
-    }
-  };
-
-  const sendMessage = async () => {
-    const content = messageText.trim();
-    if (!content || !selectedThreadId || sending) return;
-
-    setSending(true);
-    setError('');
-
-    const optimisticId = `temp-${Date.now()}`;
-    const optimisticMessage = {
-      id: optimisticId,
-      thread_id: selectedThreadId,
-      sender_key: actor?.key,
-      sender_name: actor?.name,
-      sender_avatar_url: actor?.avatarUrl || '',
-      content,
-      created_at: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, optimisticMessage]);
-    setMessageText('');
-
-    try {
-      const response = await fetch(`/api/chat/threads/${selectedThreadId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to send message');
-      }
-
-      setMessages((prev) =>
-        prev.map((message) => (message.id === optimisticId ? result.message : message))
-      );
-
-      setThreads((prev) =>
-        prev.map((thread) =>
-          thread.id === selectedThreadId
-            ? {
-                ...thread,
-                lastMessage: result.message,
-                lastMessageAt: result.message.created_at,
-                unreadCount: 0,
-              }
-            : thread
-        )
-      );
-    } catch (sendError) {
-      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
-      setMessageText(content);
-      setError(sendError.message || 'Failed to send message');
-    } finally {
-      setSending(false);
-    }
-  };
 
   if (loading) {
     return <div className="p-8 text-slate-500">Loading chat...</div>;
@@ -408,7 +622,7 @@ export default function ChatPanel() {
   return (
     <div className="h-[calc(100vh-0px)] bg-slate-50 p-6">
       <div className="mx-auto grid h-full max-w-7xl gap-4 rounded-xl border border-slate-200 bg-white p-4 lg:grid-cols-[320px_1fr]">
-        <aside className="flex h-full flex-col border-r border-slate-100 pr-3">
+        <aside className="flex h-full min-h-0 flex-col border-r border-slate-100 pr-3">
           <h2 className="mb-3 text-lg font-semibold text-slate-900">Chat</h2>
 
           <div className="relative mb-3">
@@ -421,55 +635,40 @@ export default function ChatPanel() {
             />
           </div>
 
-          {searchResults.length > 0 && (
-            <div className="mb-3 max-h-44 space-y-2 overflow-y-auto rounded-lg border border-slate-100 p-2">
-              {searchResults.map((user) => (
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+            {peopleList.map((user) => {
+              const thread = user.thread;
+              const isActive = !!thread && thread.id === selectedThreadId;
+
+              return (
                 <button
                   type="button"
                   key={user.key}
-                  onClick={() => startChatWithUser(user.key)}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-slate-50"
+                  onClick={() => createOrOpenThreadForUser(user.key)}
+                  className={`w-full rounded-lg border px-2 py-2 text-left transition-colors ${
+                    isActive ? 'border-[#7F40EE]/40 bg-[#7F40EE]/5' : 'border-transparent hover:bg-slate-50'
+                  }`}
                 >
-                  <Avatar user={user} />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-800">{user.name}</p>
-                    <p className="truncate text-xs text-slate-500">{user.email || user.type}</p>
+                  <div className="flex items-center gap-2">
+                    <Avatar user={user} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-sm font-semibold text-slate-900">{user.name || 'Unknown'}</p>
+                        <span className="text-[10px] text-slate-400">{formatThreadTime(thread?.lastMessageAt)}</span>
+                      </div>
+                      <p className="truncate text-xs text-slate-500">{thread?.lastMessage?.content || user.email || 'No messages yet'}</p>
+                    </div>
+                    {(thread?.unreadCount || 0) > 0 && (
+                      <span className="rounded-full bg-[#7F40EE] px-2 py-0.5 text-[10px] font-semibold text-white">
+                        {thread.unreadCount}
+                      </span>
+                    )}
                   </div>
                 </button>
-              ))}
-            </div>
-          )}
+              );
+            })}
 
-          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-            {threads.map((thread) => (
-              <button
-                type="button"
-                key={thread.id}
-                onClick={() => openThread(thread.id)}
-                className={`w-full rounded-lg border px-2 py-2 text-left transition-colors ${
-                  selectedThreadId === thread.id
-                    ? 'border-[#7F40EE]/40 bg-[#7F40EE]/5'
-                    : 'border-transparent hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Avatar user={thread.peer} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-semibold text-slate-900">{thread.peer?.name || 'Unknown'}</p>
-                      <span className="text-[10px] text-slate-400">{formatThreadTime(thread.lastMessageAt)}</span>
-                    </div>
-                    <p className="truncate text-xs text-slate-500">{thread.lastMessage?.content || 'No messages yet'}</p>
-                  </div>
-                  {thread.unreadCount > 0 && (
-                    <span className="rounded-full bg-[#7F40EE] px-2 py-0.5 text-[10px] font-semibold text-white">
-                      {thread.unreadCount}
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
-            {threads.length === 0 && <p className="px-2 py-4 text-sm text-slate-500">No threads yet.</p>}
+            {peopleList.length === 0 && <p className="px-2 py-4 text-sm text-slate-500">No users found.</p>}
           </div>
         </aside>
 
@@ -515,13 +714,13 @@ export default function ChatPanel() {
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' && !event.shiftKey) {
                       event.preventDefault();
-                      sendMessage();
+                      void sendMessage();
                     }
                   }}
                 />
                 <button
                   type="button"
-                  onClick={sendMessage}
+                  onClick={() => void sendMessage()}
                   disabled={sending || !messageText.trim()}
                   className="inline-flex h-10 items-center justify-center rounded-lg bg-[#7F40EE] px-4 text-white hover:bg-[#6A31D1] disabled:opacity-60"
                 >

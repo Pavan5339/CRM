@@ -4,10 +4,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
-export function Navbar() {
+export function Navbar({ isOthersOpen = false, onToggleOthers = () => {} }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -17,10 +20,59 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    const supabase = createClient();
+
+    const loadAuthState = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!isMounted) {
+        return;
+      }
+
+      setIsAuthenticated(Boolean(user));
+
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/admin/me', { method: 'GET', credentials: 'include' });
+
+        if (isMounted) {
+          setIsAdmin(response.ok);
+        }
+      } catch {
+        if (isMounted) {
+          setIsAdmin(false);
+        }
+      }
+    };
+
+    loadAuthState();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      loadAuthState();
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const workspaceHref = isAdmin ? '/admin' : isAuthenticated ? '/dashboard' : '/login';
+  const workspaceLabel = isAuthenticated ? 'Workspace' : 'Login';
+
   const navLinks = [
     { name: 'Home', href: '#', external: true },
-    { name: 'Login', href: '/dashboard', external: false },
-    { name: 'Admin', href: '/admin', external: false },
+    { name: workspaceLabel, href: workspaceHref, external: false },
   ];
 
   return (
@@ -67,6 +119,15 @@ export function Navbar() {
                 </Link>
               )
             ))}
+            <button
+              type="button"
+              onClick={onToggleOthers}
+              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+                isOthersOpen ? 'bg-dark text-white' : 'text-dark hover:bg-dark hover:text-white'
+              }`}
+            >
+              Others
+            </button>
           </div>
 
           <button
@@ -101,6 +162,18 @@ export function Navbar() {
               </Link>
             )
           ))}
+          <button
+            type="button"
+            className={`text-left text-base font-medium py-2 px-4 rounded-lg transition-colors ${
+              isOthersOpen ? 'bg-dark text-white' : 'text-dark hover:bg-gray-50'
+            }`}
+            onClick={() => {
+              onToggleOthers();
+              setIsMobileMenuOpen(false);
+            }}
+          >
+            Others
+          </button>
         </div>
       )}
     </nav>

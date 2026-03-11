@@ -102,7 +102,12 @@ export async function GET(request) {
       })
     );
 
-    return NextResponse.json({ success: true, actor: chatActor.user, threads: threadModels });
+    return NextResponse.json({
+      success: true,
+      actor: chatActor.user,
+      threads: threadModels,
+      serverTime: new Date().toISOString(),
+    });
   } catch (error) {
     console.error('Error loading chat bootstrap:', error);
     return NextResponse.json({ error: 'Failed to load chat data' }, { status: 500 });
