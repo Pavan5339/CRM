@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { FileDown, Plus } from 'lucide-react';
+import { FileDown, Pencil, Plus } from 'lucide-react';
 import { useData } from './DataContext';
 
 export default function TeamMembers() {
+  const router = useRouter();
   const { users, tasks, loading, error, refreshData, isAdminMode } = useData();
   const [selectedUser, setSelectedUser] = useState(null);
   const [form, setForm] = useState({
@@ -39,6 +41,11 @@ export default function TeamMembers() {
       inProgress: userTasks.filter((t) => t.status === 'In Progress').length,
       completed: userTasks.filter((t) => t.status === 'Completed').length,
     };
+  };
+
+  const handleOpenAnalytics = (userId) => {
+    if (!isAdminMode || !userId) return;
+    router.push(`/admin/team/${userId}`);
   };
 
   const closeModal = () => {
@@ -258,15 +265,35 @@ export default function TeamMembers() {
             const avatarSrc = user?.avatar || null;
             const fallbackInitial = user?.name?.trim()?.charAt(0)?.toUpperCase() || 'U';
             return (
-              <button
+              <div
                 key={user.id}
-                type="button"
-                onClick={() => openMemberDetails(user.id)}
-                disabled={!isAdminMode}
+                role={isAdminMode ? 'button' : undefined}
+                tabIndex={isAdminMode ? 0 : undefined}
+                onClick={() => handleOpenAnalytics(user.id)}
+                onKeyDown={(event) => {
+                  if (!isAdminMode) return;
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleOpenAnalytics(user.id);
+                  }
+                }}
                 className={`relative bg-white p-6 rounded-xl shadow-sm flex flex-col items-center text-center ${
                   isAdminMode ? 'cursor-pointer hover:shadow-md transition-shadow' : ''
                 }`}
               >
+                {isAdminMode && (
+                  <button
+                    type="button"
+                    aria-label={`Edit ${user.name}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openMemberDetails(user.id);
+                    }}
+                    className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-900"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                )}
                 <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-4 border-[#7F40EE]/10 bg-slate-200 text-slate-700 text-xl font-semibold flex items-center justify-center">
                   {avatarSrc ? (
                     <Image src={avatarSrc} alt={user.name} width={80} height={80} className="w-full h-full object-cover" unoptimized />
@@ -291,7 +318,7 @@ export default function TeamMembers() {
                     <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Completed</div>
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
