@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { adminClient } from '@/utils/supabase/admin';
-import { getActor } from '@/utils/api-helpers';
+import {
+  findEmployeeById,
+  getActor,
+  insertAssignmentActivityRows,
+} from '@/utils/api-helpers';
 
 async function getEmployeeActor(request) {
   const actor = await getActor(request);
@@ -111,10 +115,11 @@ export async function PATCH(request) {
     }
 
     const employee = actorData.employee;
-    const { taskId, status, subtaskTitle, subtaskId, isCompleted } = await request.json();
+    const { taskId, status, subtaskTitle, subtaskId, isCompleted, assignedEmployeeId } = await request.json();
 
     if (taskId && subtaskTitle) {
       const cleanTitle = String(subtaskTitle).trim();
+      const nextAssignedEmployeeId = assignedEmployeeId || null;
 
       if (!cleanTitle) {
         return NextResponse.json({ error: 'subtaskTitle is required' }, { status: 400 });
@@ -131,19 +136,42 @@ export async function PATCH(request) {
         return NextResponse.json({ error: 'Task is not assigned to you' }, { status: 403 });
       }
 
+      if (nextAssignedEmployeeId) {
+        const employeeRecord = await findEmployeeById(nextAssignedEmployeeId, adminClient);
+        if (!employeeRecord) {
+          return NextResponse.json({ error: 'Assigned employee not found' }, { status: 400 });
+        }
+      }
+
       const { data: subtask, error: subtaskInsertError } = await adminClient
         .from('task_subtasks')
         .insert({
           task_id: taskId,
           title: cleanTitle,
           is_completed: false,
-          assigned_employee_id: employee.id,
+          assigned_employee_id: nextAssignedEmployeeId,
         })
         .select()
         .single();
 
       if (subtaskInsertError) {
         return NextResponse.json({ error: subtaskInsertError.message }, { status: 500 });
+      }
+
+      if (nextAssignedEmployeeId) {
+        await insertAssignmentActivityRows([
+          {
+            task_id: taskId,
+            subtask_id: subtask.id,
+            entity_type: 'subtask',
+            action: 'assigned',
+            assigned_by_actor_type: 'employee',
+            assigned_by_admin_user_id: null,
+            assigned_by_employee_id: employee.id,
+            from_employee_id: null,
+            to_employee_id: nextAssignedEmployeeId,
+          },
+        ], adminClient);
       }
 
       return NextResponse.json({ success: true, subtask });

@@ -3,6 +3,45 @@ import { createClient } from '@/utils/supabase/server';
 import { adminClient } from '@/utils/supabase/admin';
 
 const SESSION_COOKIE = 'employee_session';
+const EMPLOYEE_DIRECTORY_SELECT = 'id, name, email, role, profile_picture_url';
+const ASSIGNMENT_ACTIVITY_SELECT = `
+  id,
+  entity_type,
+  action,
+  assigned_by_actor_type,
+  created_at,
+  subtask_id,
+  subtask:task_subtasks!task_assignment_activity_subtask_id_fkey (
+    id,
+    title
+  ),
+  from_employee:employees!task_assignment_activity_from_employee_id_fkey (
+    id,
+    name,
+    email,
+    role,
+    profile_picture_url
+  ),
+  to_employee:employees!task_assignment_activity_to_employee_id_fkey (
+    id,
+    name,
+    email,
+    role,
+    profile_picture_url
+  ),
+  assigned_by_employee:employees!task_assignment_activity_assigned_by_employee_id_fkey (
+    id,
+    name,
+    email,
+    role,
+    profile_picture_url
+  ),
+  assigned_by_admin:profiles!task_assignment_activity_assigned_by_admin_user_id_fkey (
+    id,
+    full_name,
+    email
+  )
+`;
 
 export function getActorKey(actor) {
   if (!actor) return null;
@@ -145,6 +184,149 @@ export async function hasTaskAccess(taskId, actor) {
     .single();
 
   return !error && !!assignment;
+}
+
+export async function fetchEmployeeDirectory(supabase = adminClient) {
+  const { data, error } = await supabase
+    .from('employees')
+    .select(EMPLOYEE_DIRECTORY_SELECT)
+    .order('name', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
+
+export async function findEmployeeById(employeeId, supabase = adminClient) {
+  if (!employeeId) return null;
+
+  const { data, error } = await supabase
+    .from('employees')
+    .select(EMPLOYEE_DIRECTORY_SELECT)
+    .eq('id', employeeId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || null;
+}
+
+export async function getTaskAssignmentEmployeeIds(taskId, supabase = adminClient) {
+  const { data, error } = await supabase
+    .from('task_assignments')
+    .select('employee_id')
+    .eq('task_id', taskId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data || []).map((row) => row.employee_id).filter(Boolean);
+}
+
+export function getAssignmentActivityActorPayload(actor) {
+  if (!actor?.type) {
+    throw new Error('Assignment activity actor is required');
+  }
+
+  if (actor.type === 'admin') {
+    if (!actor.userId) {
+      throw new Error('Admin actor is missing userId');
+    }
+
+    return {
+      assigned_by_actor_type: 'admin',
+      assigned_by_admin_user_id: actor.userId,
+      assigned_by_employee_id: null,
+    };
+  }
+
+  if (actor.type === 'employee') {
+    if (!actor.employeeId) {
+      throw new Error('Employee actor is missing employeeId');
+    }
+
+    return {
+      assigned_by_actor_type: 'employee',
+      assigned_by_admin_user_id: null,
+      assigned_by_employee_id: actor.employeeId,
+    };
+  }
+
+  throw new Error(`Unsupported actor type: ${actor.type}`);
+}
+
+export function getAssignmentActivityAction(fromEmployeeId, toEmployeeId) {
+  const fromId = fromEmployeeId || null;
+  const toId = toEmployeeId || null;
+
+  if (fromId === toId) {
+    return null;
+  }
+
+  if (!fromId && toId) {
+    return 'assigned';
+  }
+
+  if (fromId && !toId) {
+    return 'unassigned';
+  }
+
+  if (fromId && toId) {
+    return 'reassigned';
+  }
+
+  return null;
+}
+
+export async function insertAssignmentActivityRows(rows, supabase = adminClient) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from('task_assignment_activity')
+    .insert(rows);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function fetchAssignmentActivity(taskId, supabase = adminClient) {
+  const { data, error } = await supabase
+    .from('task_assignment_activity')
+    .select(ASSIGNMENT_ACTIVITY_SELECT)
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data || []).map((row) => ({
+    id: row.id,
+    entityType: row.entity_type,
+    action: row.action,
+    createdAt: row.created_at,
+    subtaskId: row.subtask_id,
+    subtaskTitle: row.subtask?.title || null,
+    fromEmployee: row.from_employee || null,
+    toEmployee: row.to_employee || null,
+    actor: row.assigned_by_actor_type === 'employee'
+      ? row.assigned_by_employee || null
+      : {
+          id: row.assigned_by_admin?.id || null,
+          name: row.assigned_by_admin?.full_name || row.assigned_by_admin?.email || null,
+          email: row.assigned_by_admin?.email || '',
+          role: 'admin',
+          profile_picture_url: null,
+        },
+  }));
 }
 
 export function normalizeDueDate(input) {

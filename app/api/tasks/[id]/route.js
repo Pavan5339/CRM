@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import { adminClient } from '@/utils/supabase/admin';
-import { getActor, hasTaskAccess, normalizeDueDate } from '@/utils/api-helpers';
+import {
+  fetchAssignmentActivity,
+  fetchEmployeeDirectory,
+  findEmployeeById,
+  getActor,
+  getAssignmentActivityAction,
+  getAssignmentActivityActorPayload,
+  hasTaskAccess,
+  normalizeDueDate,
+  insertAssignmentActivityRows,
+} from '@/utils/api-helpers';
 
 const TASK_FILES_BUCKET_CANDIDATES = ['task-files', 'task_files'];
 
@@ -152,6 +162,11 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
+    const [employees, assignmentActivity] = await Promise.all([
+      fetchEmployeeDirectory(adminClient),
+      fetchAssignmentActivity(taskId, adminClient),
+    ]);
+
     const viewer = {
       type: actor.type,
       employeeId: actor.type === 'employee' ? actor.employeeId : null,
@@ -160,7 +175,7 @@ export async function GET(request, { params }) {
       canComment: actor.type === 'admin' || actor.type === 'employee',
     };
 
-    return NextResponse.json({ success: true, task, viewer });
+    return NextResponse.json({ success: true, task, viewer, employees, assignmentActivity });
   } catch (error) {
     console.error('Error fetching task detail:', error);
     return NextResponse.json({ error: 'Failed to fetch task detail' }, { status: 500 });
@@ -185,11 +200,7 @@ export async function PATCH(request, { params }) {
     }
 
     const body = await request.json();
-    const { data: taskAssignments } = await adminClient
-      .from('task_assignments')
-      .select('employee_id')
-      .eq('task_id', taskId);
-    const assignableEmployeeIds = new Set((taskAssignments || []).map((row) => row.employee_id));
+    const actorPayload = getAssignmentActivityActorPayload(actor);
 
     if (body?.subtaskId && typeof body?.isCompleted === 'boolean') {
       if (actor.type === 'employee') {
@@ -243,12 +254,32 @@ export async function PATCH(request, { params }) {
 
     if (body?.subtaskId && Object.prototype.hasOwnProperty.call(body, 'assignedEmployeeId')) {
       const assignedEmployeeId = body.assignedEmployeeId || null;
+      const [nextEmployee, existingSubtask] = await Promise.all([
+        assignedEmployeeId ? findEmployeeById(assignedEmployeeId, adminClient) : Promise.resolve(null),
+        adminClient
+          .from('task_subtasks')
+          .select('id, title, assigned_employee_id')
+          .eq('id', body.subtaskId)
+          .eq('task_id', taskId)
+          .maybeSingle(),
+      ]);
 
-      if (assignedEmployeeId && !assignableEmployeeIds.has(assignedEmployeeId)) {
-        return NextResponse.json(
-          { error: 'Subtask can only be assigned to task members' },
-          { status: 400 }
-        );
+      if (assignedEmployeeId && !nextEmployee) {
+        return NextResponse.json({ error: 'Assigned employee not found' }, { status: 400 });
+      }
+
+      if (existingSubtask.error) {
+        return NextResponse.json({ error: existingSubtask.error.message }, { status: 500 });
+      }
+
+      if (!existingSubtask.data) {
+        return NextResponse.json({ error: 'Subtask not found' }, { status: 404 });
+      }
+
+      const previousAssigneeId = existingSubtask.data.assigned_employee_id || null;
+      const action = getAssignmentActivityAction(previousAssigneeId, assignedEmployeeId);
+      if (!action) {
+        return NextResponse.json({ success: true, message: 'Subtask assignee unchanged' });
       }
 
       const { data: updatedSubtask, error: updateError } = await adminClient
@@ -269,6 +300,18 @@ export async function PATCH(request, { params }) {
       if (!updatedSubtask) {
         return NextResponse.json({ error: 'Subtask not found' }, { status: 404 });
       }
+
+      await insertAssignmentActivityRows([
+        {
+          task_id: taskId,
+          subtask_id: body.subtaskId,
+          entity_type: 'subtask',
+          action,
+          from_employee_id: previousAssigneeId,
+          to_employee_id: assignedEmployeeId,
+          ...actorPayload,
+        },
+      ], adminClient);
 
       return NextResponse.json({ success: true, message: 'Subtask assignee updated' });
     }
@@ -334,11 +377,11 @@ export async function PATCH(request, { params }) {
         return NextResponse.json({ error: 'Subtask title is required' }, { status: 400 });
       }
 
-      if (assignedEmployeeId && !assignableEmployeeIds.has(assignedEmployeeId)) {
-        return NextResponse.json(
-          { error: 'Subtask can only be assigned to task members' },
-          { status: 400 }
-        );
+      if (assignedEmployeeId) {
+        const employee = await findEmployeeById(assignedEmployeeId, adminClient);
+        if (!employee) {
+          return NextResponse.json({ error: 'Assigned employee not found' }, { status: 400 });
+        }
       }
 
       const { data: subtask, error: insertError } = await adminClient
@@ -354,6 +397,20 @@ export async function PATCH(request, { params }) {
 
       if (insertError) {
         return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
+
+      if (assignedEmployeeId) {
+        await insertAssignmentActivityRows([
+          {
+            task_id: taskId,
+            subtask_id: subtask.id,
+            entity_type: 'subtask',
+            action: 'assigned',
+            from_employee_id: null,
+            to_employee_id: assignedEmployeeId,
+            ...actorPayload,
+          },
+        ], adminClient);
       }
 
       return NextResponse.json({ success: true, message: 'Subtask added', subtask });

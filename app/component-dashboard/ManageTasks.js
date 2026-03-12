@@ -7,9 +7,14 @@ import { useData } from './DataContext';
 
 export default function ManageTasks() {
   const { tasks, users, isAdminMode } = useData();
-  const [filter, setFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [priorityFilter, setPriorityFilter] = useState('All');
 
-  const displayTasks = filter === 'All' ? tasks : tasks.filter((t) => t.status === filter);
+  const displayTasks = tasks.filter((task) => {
+    const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
+    const matchesPriority = priorityFilter === 'All' || task.priority === priorityFilter;
+    return matchesStatus && matchesPriority;
+  });
 
   const getPriorityColor = (p) => {
     switch (p) {
@@ -54,18 +59,39 @@ export default function ManageTasks() {
             {['All', 'Pending', 'In Progress', 'Completed'].map((tab) => (
               <button
                 key={tab}
-                onClick={() => setFilter(tab)}
+                onClick={() => setStatusFilter(tab)}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap ${
-                  filter === tab ? 'bg-[#7F40EE] text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
+                  statusFilter === tab ? 'bg-[#7F40EE] text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {tab}
                 <span
                   className={`ml-2 text-xs py-0.5 px-1.5 rounded-full ${
-                    filter === tab ? 'bg-white/20 text-white' : 'bg-gray-100 text-slate-600'
+                    statusFilter === tab ? 'bg-white/20 text-white' : 'bg-gray-100 text-slate-600'
                   }`}
                 >
                   {tab === 'All' ? tasks.length : tasks.filter((t) => t.status === tab).length}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex bg-white p-1 rounded-lg shadow-sm overflow-x-auto">
+            {['All', 'High', 'Medium', 'Low'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setPriorityFilter(tab)}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap ${
+                  priorityFilter === tab ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {tab === 'All' ? 'All Priorities' : tab}
+                <span
+                  className={`ml-2 text-xs py-0.5 px-1.5 rounded-full ${
+                    priorityFilter === tab ? 'bg-white/20 text-white' : 'bg-gray-100 text-slate-600'
+                  }`}
+                >
+                  {tab === 'All' ? tasks.length : tasks.filter((t) => t.priority === tab).length}
                 </span>
               </button>
             ))}
@@ -78,6 +104,11 @@ export default function ManageTasks() {
         </div>
       </div>
 
+      {displayTasks.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500">
+          No tasks match the selected status and priority filters.
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayTasks.map((task) => (
           <div
@@ -185,6 +216,7 @@ export default function ManageTasks() {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

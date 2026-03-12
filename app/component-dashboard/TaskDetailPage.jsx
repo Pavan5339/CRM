@@ -47,6 +47,70 @@ const formatDate = (value) => {
   });
 };
 
+const getDisplayName = (person, fallback = 'Unknown user') => {
+  if (!person) return fallback;
+  return person.name || person.full_name || person.email || fallback;
+};
+
+const buildAssignmentActivityText = (item) => {
+  const actorName = getDisplayName(item.actor, 'Unknown actor');
+  const targetLabel = item.entityType === 'subtask'
+    ? (item.subtaskTitle || 'Untitled subtask')
+    : 'the task';
+  const fromName = getDisplayName(item.fromEmployee, 'Former assignee');
+  const toName = getDisplayName(item.toEmployee, 'Unknown assignee');
+
+  if (item.action === 'assigned') {
+    return `${actorName} assigned ${targetLabel} to ${toName}`;
+  }
+
+  if (item.action === 'reassigned') {
+    return `${actorName} reassigned ${targetLabel} from ${fromName} to ${toName}`;
+  }
+
+  if (item.action === 'unassigned') {
+    return `${actorName} unassigned ${targetLabel} from ${fromName}`;
+  }
+
+  return `${actorName} updated ${targetLabel}`;
+};
+
+const getActivityAccent = (action) => {
+  if (action === 'assigned') {
+    return {
+      rail: 'from-emerald-500 to-teal-500',
+      badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      dot: 'bg-emerald-500',
+      label: 'Assigned',
+    };
+  }
+
+  if (action === 'reassigned') {
+    return {
+      rail: 'from-amber-500 to-orange-500',
+      badge: 'bg-amber-50 text-amber-700 border-amber-200',
+      dot: 'bg-amber-500',
+      label: 'Reassigned',
+    };
+  }
+
+  if (action === 'unassigned') {
+    return {
+      rail: 'from-rose-500 to-pink-500',
+      badge: 'bg-rose-50 text-rose-700 border-rose-200',
+      dot: 'bg-rose-500',
+      label: 'Unassigned',
+    };
+  }
+
+  return {
+    rail: 'from-slate-400 to-slate-500',
+    badge: 'bg-slate-50 text-slate-700 border-slate-200',
+    dot: 'bg-slate-500',
+    label: 'Updated',
+  };
+};
+
 function Avatar({ name, src, size = 'w-9 h-9' }) {
   const initial = name?.trim()?.charAt(0)?.toUpperCase() || 'U';
 
@@ -65,9 +129,143 @@ function Avatar({ name, src, size = 'w-9 h-9' }) {
   return <Image src={src} alt={name || 'User avatar'} width={36} height={36} className={`${size} rounded-full object-cover`} unoptimized />;
 }
 
+function AssigneePicker({
+  value,
+  onChange,
+  options,
+  disabled = false,
+  compact = false,
+  placeholder = 'Unassigned',
+}) {
+  const selected = options.find((option) => String(option.id) === String(value));
+  const triggerSize = compact ? 'w-6 h-6' : 'w-7 h-7';
+
+  const handlePick = (nextValue, event) => {
+    onChange(nextValue);
+    event.currentTarget.closest('details')?.removeAttribute('open');
+  };
+
+  return (
+    <details className='relative min-w-[180px]' data-assignee-picker>
+      <summary
+        className={`flex list-none items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-sm text-slate-700 shadow-sm transition marker:content-none ${
+          disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-slate-300'
+        }`}
+      >
+        <span className='flex min-w-0 items-center gap-2'>
+          {selected ? (
+            <>
+              <Avatar
+                name={selected.name}
+                src={selected.profile_picture_url || selected.avatar}
+                size={triggerSize}
+              />
+              <span className='truncate text-xs font-medium text-slate-700'>{selected.name}</span>
+            </>
+          ) : (
+            <span className='text-xs text-slate-500'>{placeholder}</span>
+          )}
+        </span>
+        <span className='text-[10px] text-slate-400'>▼</span>
+      </summary>
+      {!disabled && (
+        <div className='absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl'>
+          <button
+            type='button'
+            onClick={(event) => handlePick('', event)}
+            className='flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-slate-600 transition hover:bg-slate-50'
+          >
+            <div className='flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500'>
+              -
+            </div>
+            <span>{placeholder}</span>
+          </button>
+          {options.map((option) => (
+            <button
+              key={option.id}
+              type='button'
+              onClick={(event) => handlePick(option.id, event)}
+              className='flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50'
+            >
+              <Avatar
+                name={option.name}
+                src={option.profile_picture_url || option.avatar}
+                size='w-8 h-8'
+              />
+              <div className='min-w-0'>
+                <div className='truncate font-medium text-slate-800'>{option.name}</div>
+                <div className='truncate text-xs text-slate-500'>{option.email || option.role || 'Team member'}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </details>
+  );
+}
+
+function AssignmentActivityItem({ item }) {
+  const actorName = getDisplayName(item.actor, 'Unknown actor');
+  const targetLabel = item.entityType === 'subtask'
+    ? (item.subtaskTitle || 'Untitled subtask')
+    : 'Task assignment';
+  const toName = getDisplayName(item.toEmployee, 'Unknown assignee');
+  const fromName = getDisplayName(item.fromEmployee, 'Former assignee');
+  const accent = getActivityAccent(item.action);
+
+  return (
+    <div className='group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(15,23,42,0.1)]'>
+      <div className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${accent.rail}`}></div>
+      <div className='absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(148,163,184,0.08),transparent_38%)] pointer-events-none'></div>
+      <div className='relative'>
+        <div className='flex items-start gap-3'>
+          <div className='relative mt-0.5'>
+            <Avatar
+              name={actorName}
+              src={item.actor?.profile_picture_url}
+              size='w-10 h-10'
+            />
+            <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${accent.dot}`}></span>
+          </div>
+          <div className='min-w-0 flex-1'>
+            <div className='flex flex-wrap items-center gap-2'>
+              <p className='text-sm font-semibold tracking-tight text-slate-900'>{actorName}</p>
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${accent.badge}`}>
+                {accent.label}
+              </span>
+            </div>
+            <p className='mt-1 text-sm leading-6 text-slate-700'>{buildAssignmentActivityText(item)}</p>
+            <div className='mt-3 flex flex-wrap items-center gap-2'>
+              <span className='rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600'>
+                {item.entityType === 'subtask' ? 'Subtask' : 'Task'}
+              </span>
+              <span className='max-w-full truncate rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700'>
+                {targetLabel}
+              </span>
+              {item.action !== 'unassigned' && (
+                <span className='rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700'>
+                  To {toName}
+                </span>
+              )}
+              {item.action === 'reassigned' && (
+                <span className='rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700'>
+                  From {fromName}
+                </span>
+              )}
+            </div>
+            <p className='mt-3 text-xs font-medium text-slate-500'>{formatDate(item.createdAt)}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TaskDetailPage({ taskId, mode = 'employee' }) {
   const [task, setTask] = useState(null);
   const [viewer, setViewer] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [assignmentActivity, setAssignmentActivity] = useState([]);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -97,8 +295,13 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
   const canManageStatus = viewer?.type === 'admin' || viewer?.type === 'employee';
 
   const subtaskAssignees = useMemo(
-    () => (task?.task_assignments || []).map((assignment) => assignment.employee).filter(Boolean),
-    [task]
+    () => employees.filter(Boolean),
+    [employees]
+  );
+
+  const employeeDirectoryById = useMemo(
+    () => new Map(subtaskAssignees.map((employee) => [employee.id, employee])),
+    [subtaskAssignees]
   );
 
   const completion = useMemo(() => {
@@ -137,6 +340,8 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
           : 0
       );
       setViewer(taskJson.viewer || null);
+      setEmployees(taskJson.employees || []);
+      setAssignmentActivity(taskJson.assignmentActivity || []);
       setComments(commentsJson.comments || []);
       setEditForm({
         taskName: fetchedTask.task_name || '',
@@ -278,18 +483,9 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
         throw new Error(result.error || 'Failed to add checklist item');
       }
 
-      if (result.subtask) {
-        setTask((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            task_subtasks: [...(prev.task_subtasks || []), result.subtask],
-          };
-        });
-      }
-
       setNewSubtaskTitle('');
       setNewSubtaskAssigneeId('');
+      await loadTaskData();
     } catch (err) {
       setError(err.message || 'Failed to add checklist item');
     } finally {
@@ -441,6 +637,8 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
       if (!response.ok) {
         throw new Error(result.error || 'Failed to assign subtask');
       }
+
+      await loadTaskData();
     } catch (err) {
       setTask((prev) => (prev ? { ...prev, task_subtasks: previousSubtasks } : prev));
       setError(err.message || 'Failed to assign subtask');
@@ -554,7 +752,7 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
         <div className='flex items-center justify-between'>
           <div>
             <Link href={backHref} className='text-sm font-medium text-[#7F40EE] hover:underline'>
-              ← Back to tasks
+              Back to tasks
             </Link>
             <h1 className='mt-2 text-2xl font-bold text-slate-900'>{task.task_name}</h1>
             <p className='mt-1 text-sm text-slate-500'>Created {formatDate(task.created_at)}</p>
@@ -696,18 +894,11 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
                     }}
                   />
                   {canManageSubtasks && (
-                    <select
+                    <AssigneePicker
                       value={newSubtaskAssigneeId}
-                      onChange={(event) => setNewSubtaskAssigneeId(event.target.value)}
-                      className='rounded-lg border border-slate-200 px-3 py-2 text-sm'
-                    >
-                      <option value=''>Unassigned</option>
-                      {subtaskAssignees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                          {employee.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setNewSubtaskAssigneeId}
+                      options={subtaskAssignees}
+                    />
                   )}
                   <button
                     type='button'
@@ -771,28 +962,29 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
                       </button>
                     )}
                     {canManageSubtasks ? (
-                      <select
+                      <AssigneePicker
                         value={subtask.assigned_employee_id || ''}
-                        onChange={(event) => updateSubtaskAssignee(subtask.id, event.target.value)}
+                        onChange={(value) => updateSubtaskAssignee(subtask.id, value)}
                         disabled={saving || pendingSubtaskTitleIds.includes(subtask.id)}
-                        className='rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700'
-                      >
-                        <option value=''>Unassigned</option>
-                        {subtaskAssignees.map((employee) => (
-                          <option key={employee.id} value={employee.id}>
-                            {employee.name}
-                          </option>
-                        ))}
-                      </select>
+                        options={subtaskAssignees}
+                        compact
+                      />
                     ) : (
-                      <span className='text-xs text-slate-500'>
-                        {(() => {
-                          const assigned = subtaskAssignees.find(
-                            (employee) => employee.id === subtask.assigned_employee_id
-                          );
-                          return assigned ? `Assigned: ${assigned.name}` : 'Unassigned';
-                        })()}
-                      </span>
+                      (() => {
+                        const assigned = employeeDirectoryById.get(subtask.assigned_employee_id);
+                        return assigned ? (
+                          <div className='flex items-center gap-2 rounded-full bg-slate-50 px-2 py-1'>
+                            <Avatar
+                              name={assigned.name}
+                              src={assigned.profile_picture_url || assigned.avatar}
+                              size='w-6 h-6'
+                            />
+                            <span className='text-xs font-medium text-slate-600'>{assigned.name}</span>
+                          </div>
+                        ) : (
+                          <span className='text-xs text-slate-500'>Unassigned</span>
+                        );
+                      })()
                     )}
                   </div>
                 ))}
@@ -841,6 +1033,29 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
                 })}
                 {(!task.task_assignments || task.task_assignments.length === 0) && (
                   <p className='text-sm text-slate-500'>No assignees.</p>
+                )}
+              </div>
+            </section>
+
+            <section className='overflow-hidden rounded-[28px] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.95))] p-5 shadow-[0_18px_55px_rgba(15,23,42,0.08)]'>
+              <div className='mb-4 flex items-start justify-between gap-3'>
+                <div>
+                  <h3 className='text-sm font-semibold uppercase tracking-[0.18em] text-slate-500'>Assignment Activity</h3>
+                  <p className='mt-1 text-sm text-slate-600'>Latest delegation and assignment changes for this task.</p>
+                </div>
+                <div className='rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white'>
+                  {assignmentActivity.length}
+                </div>
+              </div>
+              <div className='space-y-3'>
+                {assignmentActivity.map((item) => (
+                  <AssignmentActivityItem key={item.id} item={item} />
+                ))}
+                {assignmentActivity.length === 0 && (
+                  <div className='rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-6 text-center'>
+                    <p className='text-sm font-medium text-slate-700'>No assignment activity yet.</p>
+                    <p className='mt-1 text-xs text-slate-500'>New task and subtask assignee changes will appear here.</p>
+                  </div>
                 )}
               </div>
             </section>

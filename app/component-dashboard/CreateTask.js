@@ -59,6 +59,59 @@ export default function CreateTask({ onCancel }) {
     );
   };
 
+  const renderAssigneePicker = ({ value, onChange, options, placeholder = 'Unassigned' }) => {
+    const selectedUser = options.find((user) => String(user.id) === String(value));
+
+    const handlePick = (nextValue, event) => {
+      onChange(nextValue);
+      event.currentTarget.closest('details')?.removeAttribute('open');
+    };
+
+    return (
+      <details className="relative w-full md:w-52">
+        <summary className="flex list-none items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-slate-700 cursor-pointer">
+          <span className="flex min-w-0 items-center gap-2">
+            {selectedUser ? (
+              <>
+                {renderUserAvatar(selectedUser, 'w-7 h-7 rounded-full')}
+                <span className="truncate text-sm">{selectedUser.name}</span>
+              </>
+            ) : (
+              <span className="text-slate-500">{placeholder}</span>
+            )}
+          </span>
+          <span className="text-[10px] text-slate-400">▼</span>
+        </summary>
+        <div className="absolute left-0 z-20 mt-2 w-full min-w-[220px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+          <button
+            type="button"
+            onClick={(event) => handlePick('', event)}
+            className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-slate-600 hover:bg-gray-50"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500">
+              -
+            </div>
+            <span>{placeholder}</span>
+          </button>
+          {options.map((user) => (
+            <button
+              key={user.id}
+              type="button"
+              onClick={(event) => handlePick(user.id, event)}
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50"
+            >
+              {renderUserAvatar(user, 'w-8 h-8 rounded-full')}
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium text-slate-800">{user.name}</div>
+                <div className="truncate text-xs text-slate-500">{user.email}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </details>
+    );
+  };
+
   const handleAddChecklistItem = () => {
     setChecklist([...checklist, { title: '', assignedEmployeeId: '' }]);
   };
@@ -296,22 +349,13 @@ export default function CreateTask({ onCancel }) {
                   placeholder={index === 0 ? 'Create Product Card' : 'Add item...'}
                   className="min-w-[220px] flex-1 px-4 py-2 rounded-lg bg-gray-50 border-none focus:ring-1 focus:ring-[#7F40EE] outline-none text-sm"
                 />
-                <select
-                  value={item.assignedEmployeeId}
-                  onChange={(event) => handleChecklistAssigneeChange(index, event.target.value)}
-                  className="w-full md:w-52 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-slate-700"
-                >
-                  <option value="">Unassigned</option>
-                  {assignees.map((uid) => {
-                    const u = users.find((user) => user.id === uid);
-                    if (!u) return null;
-                    return (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    );
-                  })}
-                </select>
+                {renderAssigneePicker({
+                  value: item.assignedEmployeeId,
+                  onChange: (nextValue) => handleChecklistAssigneeChange(index, nextValue),
+                  options: assignees
+                    .map((uid) => users.find((user) => user.id === uid))
+                    .filter(Boolean),
+                })}
                 <button onClick={() => handleRemoveChecklistItem(index)} className="text-red-400 hover:text-red-600 p-2">
                   <Trash2 size={18} />
                 </button>

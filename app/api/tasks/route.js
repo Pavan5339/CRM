@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { requireAdmin, requireTaskManager, normalizeDueDate, normalizeSubtasks, syncTaskSubtasks } from '@/utils/api-helpers';
+import {
+  fetchEmployeeDirectory,
+  getAssignmentActivityActorPayload,
+  normalizeDueDate,
+  normalizeSubtasks,
+  requireAdmin,
+  requireTaskManager,
+  syncTaskSubtasks,
+  insertAssignmentActivityRows,
+} from '@/utils/api-helpers';
 
 
 export async function GET() {
@@ -48,6 +57,22 @@ export async function POST(request) {
     const { taskName, description, priority, dueDate, assignedMembers, attachments, subtasks } = body;
     const normalizedSubtasks = normalizeSubtasks(subtasks);
     const normalizedDueDate = normalizeDueDate(dueDate);
+    const actorPayload = getAssignmentActivityActorPayload(actor);
+    const employeeDirectory = await fetchEmployeeDirectory(supabase);
+    const validEmployeeIds = new Set(employeeDirectory.map((employee) => employee.id));
+    const invalidAssignments = (assignedMembers || []).filter((employeeId) => !validEmployeeIds.has(employeeId));
+
+    if (invalidAssignments.length > 0) {
+      return NextResponse.json({ error: 'One or more assigned members were not found' }, { status: 400 });
+    }
+
+    const invalidSubtaskAssignees = normalizedSubtasks
+      .map((subtask) => subtask.assigned_employee_id)
+      .filter((employeeId) => employeeId && !validEmployeeIds.has(employeeId));
+
+    if (invalidSubtaskAssignees.length > 0) {
+      return NextResponse.json({ error: 'One or more subtask assignees were not found' }, { status: 400 });
+    }
 
     // Insert task
     const { data: task, error: taskError } = await supabase
@@ -87,6 +112,7 @@ export async function POST(request) {
     }
 
     // Insert task subtasks
+    let createdSubtasks = [];
     if (normalizedSubtasks.length > 0) {
       const subtaskRecords = normalizedSubtasks.map((subtask) => ({
         task_id: task.id,
@@ -95,12 +121,15 @@ export async function POST(request) {
         assigned_employee_id: subtask.assigned_employee_id || null,
       }));
 
-      const { error: subtaskError } = await supabase
+      const { data: insertedSubtasks, error: subtaskError } = await supabase
         .from('task_subtasks')
-        .insert(subtaskRecords);
+        .insert(subtaskRecords)
+        .select('id, assigned_employee_id');
 
       if (subtaskError) {
         console.error('Error inserting subtasks:', subtaskError);
+      } else {
+        createdSubtasks = insertedSubtasks || [];
       }
     }
 
@@ -121,7 +150,33 @@ export async function POST(request) {
         return NextResponse.json({ error: assignmentError.message }, { status: 500 });
       }
 
+      await insertAssignmentActivityRows(
+        assignedMembers.map((employeeId) => ({
+          task_id: task.id,
+          subtask_id: null,
+          entity_type: 'task',
+          action: 'assigned',
+          from_employee_id: null,
+          to_employee_id: employeeId,
+          ...actorPayload,
+        })),
+        supabase
+      );
     }
+
+    const subtaskActivityRows = createdSubtasks
+      .filter((subtask) => subtask.assigned_employee_id)
+      .map((subtask) => ({
+        task_id: task.id,
+        subtask_id: subtask.id,
+        entity_type: 'subtask',
+        action: 'assigned',
+        from_employee_id: null,
+        to_employee_id: subtask.assigned_employee_id,
+        ...actorPayload,
+      }));
+
+    await insertAssignmentActivityRows(subtaskActivityRows, supabase);
 
     return NextResponse.json({ task, success: true });
   } catch (error) {
@@ -137,7 +192,7 @@ export async function PUT(request) {
   try {
     const auth = await requireTaskManager(request);
     if (auth.error) return auth.error;
-    const { supabase } = auth;
+    const { supabase, actor } = auth;
 
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('id');
@@ -150,6 +205,22 @@ export async function PUT(request) {
     const { taskName, description, priority, status, dueDate, assignedMembers, removedAttachments, newAttachments, subtasks } = body;
     const normalizedSubtasks = normalizeSubtasks(subtasks);
     const normalizedDueDate = normalizeDueDate(dueDate);
+    const actorPayload = getAssignmentActivityActorPayload(actor);
+    const employeeDirectory = await fetchEmployeeDirectory(supabase);
+    const validEmployeeIds = new Set(employeeDirectory.map((employee) => employee.id));
+    const invalidAssignments = (assignedMembers || []).filter((employeeId) => !validEmployeeIds.has(employeeId));
+
+    if (invalidAssignments.length > 0) {
+      return NextResponse.json({ error: 'One or more assigned members were not found' }, { status: 400 });
+    }
+
+    const invalidSubtaskAssignees = normalizedSubtasks
+      .map((subtask) => subtask.assigned_employee_id)
+      .filter((employeeId) => employeeId && !validEmployeeIds.has(employeeId));
+
+    if (invalidSubtaskAssignees.length > 0) {
+      return NextResponse.json({ error: 'One or more subtask assignees were not found' }, { status: 400 });
+    }
 
     // Get old task data for employee count updates
     const { data: oldTask } = await supabase
@@ -191,6 +262,19 @@ export async function PUT(request) {
         .delete()
         .eq('task_id', taskId)
         .in('employee_id', toRemove);
+
+      await insertAssignmentActivityRows(
+        toRemove.map((employeeId) => ({
+          task_id: taskId,
+          subtask_id: null,
+          entity_type: 'task',
+          action: 'unassigned',
+          from_employee_id: employeeId,
+          to_employee_id: null,
+          ...actorPayload,
+        })),
+        supabase
+      );
     }
 
     // Add new assignments
@@ -203,6 +287,19 @@ export async function PUT(request) {
       await supabase
         .from('task_assignments')
         .insert(assignments);
+
+      await insertAssignmentActivityRows(
+        toAdd.map((employeeId) => ({
+          task_id: taskId,
+          subtask_id: null,
+          entity_type: 'task',
+          action: 'assigned',
+          from_employee_id: null,
+          to_employee_id: employeeId,
+          ...actorPayload,
+        })),
+        supabase
+      );
     }
 
     // Remove attachments
