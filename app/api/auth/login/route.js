@@ -4,8 +4,6 @@ import { createClient } from '@/utils/supabase/server';
 import { adminClient } from '@/utils/supabase/admin';
 import {
   ensureEmployeeAuthUser,
-  getResetRedirectUrl,
-  sendEmployeeResetPasswordEmail,
   syncEmployeePasswordToAuth,
 } from '@/utils/employee-auth';
 
@@ -52,7 +50,7 @@ async function tryAdminLogin(email, password) {
   };
 }
 
-async function tryEmployeeLogin(request, email, password) {
+async function tryEmployeeLogin(email, password) {
   const supabase = await createClient();
 
   const normalizedIdentifier = String(email).trim().toLowerCase();
@@ -91,12 +89,7 @@ async function tryEmployeeLogin(request, email, password) {
     const isOldPassword = await bcrypt.compare(password, employee.password_hash || '');
 
     if (isOldPassword) {
-      await sendEmployeeResetPasswordEmail(employee.email, getResetRedirectUrl(request));
-      return {
-        ok: false,
-        resetRequired: true,
-        message: 'Password reset required. We sent a reset link to your email.',
-      };
+      await syncEmployeePasswordToAuth(employee, password);
     }
 
     const { data, error } = await attemptSupabaseSignIn();
@@ -187,17 +180,7 @@ export async function POST(request) {
       return response;
     }
 
-    const employeeResult = await tryEmployeeLogin(request, email, password);
-
-    if (employeeResult.resetRequired) {
-      return NextResponse.json(
-        {
-          error: employeeResult.message,
-          code: 'PASSWORD_RESET_REQUIRED',
-        },
-        { status: 403 }
-      );
-    }
+    const employeeResult = await tryEmployeeLogin(email, password);
 
     if (!employeeResult.ok) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });

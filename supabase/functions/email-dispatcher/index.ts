@@ -44,10 +44,11 @@ function renderEmail(row: OutboxRow) {
     const username = String(row.payload?.username ?? '');
     const tempPassword = String(row.payload?.temp_password ?? '');
     const loginUrl = getLoginUrl();
+    const settingsUrl = `${getAppRootUrl()}/dashboard`;
     return {
       subject: 'Your TaskFlow account credentials',
-      text: `Hi ${employeeName}, your account is ready.\nUsername: ${username}\nTemporary password: ${tempPassword}\nLogin: ${loginUrl}`,
-      html: `<p>Hi ${employeeName},</p><p>Your account is ready.</p><p><strong>Username:</strong> ${username}<br/><strong>Temporary password:</strong> ${tempPassword}</p><p>Login: <a href="${loginUrl}">${loginUrl}</a></p>`,
+      text: `Hi ${employeeName}, your account is ready.\nUsername: ${username}\nTemporary password: ${tempPassword}\nLogin: ${loginUrl}\nAfter signing in, you can change your password from Settings by entering your current temporary password and your new password.\nDashboard: ${settingsUrl}`,
+      html: `<p>Hi ${employeeName},</p><p>Your account is ready.</p><p><strong>Username:</strong> ${username}<br/><strong>Temporary password:</strong> ${tempPassword}</p><p>Login: <a href="${loginUrl}">${loginUrl}</a></p><p>After signing in, you can change your password from Settings by entering your current temporary password and your new password.</p><p>Dashboard: <a href="${settingsUrl}">${settingsUrl}</a></p>`,
     };
   }
 

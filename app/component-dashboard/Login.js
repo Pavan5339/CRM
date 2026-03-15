@@ -1,18 +1,89 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from 'next/image';
 import Link from 'next/link';
 import { Eye, EyeOff } from "lucide-react";
 import { useData } from "./DataContext";
+import { createClient as createSupabaseClient } from '@/utils/supabase/client';
+
+const supabase = createSupabaseClient();
 
 export default function Login({ onSuccess }) {
   const { login } = useData();
   const [showPassword, setShowPassword] = useState(false);
+  const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
+  const [showRecoveryConfirmPassword, setShowRecoveryConfirmPassword] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [recoveryReady, setRecoveryReady] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const setupRecoverySession = async () => {
+      if (typeof window === 'undefined') return;
+
+      const currentUrl = new URL(window.location.href);
+      const searchParams = currentUrl.searchParams;
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const recoveryType = searchParams.get('type') || hashParams.get('type');
+      const code = searchParams.get('code');
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+
+      if (recoveryType !== 'recovery' && !code && !accessToken) {
+        return;
+      }
+
+      if (!active) return;
+
+      setIsRecoveryMode(true);
+      setRecoveryReady(false);
+      setError('');
+      setInfo('Validating your reset link...');
+
+      let authError = null;
+
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        authError = exchangeError;
+      } else if (accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        authError = sessionError;
+      } else {
+        authError = new Error('This password reset link is incomplete.');
+      }
+
+      if (!active) return;
+
+      if (authError) {
+        setError(authError.message || 'This password reset link is invalid or expired.');
+        setInfo('');
+        setRecoveryReady(false);
+        return;
+      }
+
+      window.history.replaceState({}, '', '/login?recovery=1');
+      setRecoveryReady(true);
+      setInfo('Reset link verified. Set a new password to finish signing in.');
+    };
+
+    setupRecoverySession();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -27,6 +98,46 @@ export default function Login({ onSuccess }) {
     }
 
     onSuccess();
+  };
+
+  const handleRecoverySubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError('');
+    setInfo('');
+
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters.');
+      setLoading(false);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      setLoading(false);
+      return;
+    }
+
+    const response = await fetch('/api/auth/employee-recovery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setError(result.error || 'Failed to update password.');
+      setLoading(false);
+      return;
+    }
+
+    setInfo(result.message || 'Password updated successfully.');
+    setLoading(false);
+
+    if (typeof window !== 'undefined') {
+      window.location.href = '/dashboard';
+    }
   };
 
   return (
@@ -44,48 +155,117 @@ export default function Login({ onSuccess }) {
         <div className="mb-10">
           <h1 className="text-2xl font-bold text-black mb-10">Task Manager</h1>
           <h2 className="text-3xl font-bold text-slate-900 mb-2">
-            Welcome Back
+            {isRecoveryMode ? 'Reset Password' : 'Welcome Back'}
           </h2>
-          <p className="text-slate-500">Please enter your details to log in</p>
+          <p className="text-slate-500">
+            {isRecoveryMode
+              ? 'Create a new password to finish your first sign-in.'
+              : 'Please enter your details to log in'}
+          </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6 max-w-md">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Email or Username
-            </label>
-            <input
-              type="text"
-              value={identifier}
-              onChange={(event) => setIdentifier(event.target.value)}
-              required
-              placeholder="john@example.com or john123"
-              className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-black"
-            />
-          </div>
+        <form
+          onSubmit={isRecoveryMode ? handleRecoverySubmit : handleLogin}
+          className="space-y-6 max-w-md"
+        >
+          {!isRecoveryMode ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Email or Username
+                </label>
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                  required
+                  placeholder="john@example.com or john123"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-black"
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-                placeholder="Min 8 Characters"
-                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-black"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                    placeholder="Min 8 Characters"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-black"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showRecoveryPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    required
+                    minLength={8}
+                    disabled={!recoveryReady || loading}
+                    placeholder="Minimum 8 characters"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-black disabled:bg-slate-50 disabled:text-slate-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRecoveryPassword(!showRecoveryPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showRecoveryPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showRecoveryConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    required
+                    minLength={8}
+                    disabled={!recoveryReady || loading}
+                    placeholder="Repeat your new password"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-black disabled:bg-slate-50 disabled:text-slate-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRecoveryConfirmPassword(!showRecoveryConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showRecoveryConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {info && (
+            <div className='text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2'>
+              {info}
             </div>
-          </div>
+          )}
 
           {error && (
             <div className='text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2'>
@@ -95,19 +275,23 @@ export default function Login({ onSuccess }) {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full cursor-pointer bg-[#7F40EE] hover:bg-[#671aec] text-white font-bold py-3 rounded-lg transition-colors shadow-lg shadow-blue-200"
+            disabled={loading || (isRecoveryMode && !recoveryReady)}
+            className="w-full cursor-pointer bg-[#7F40EE] hover:bg-[#671aec] text-white font-bold py-3 rounded-lg transition-colors shadow-lg shadow-blue-200 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
           >
-            {loading ? 'LOGGING IN...' : 'LOGIN'}
+            {isRecoveryMode
+              ? (loading ? 'UPDATING PASSWORD...' : 'SET NEW PASSWORD')
+              : (loading ? 'LOGGING IN...' : 'LOGIN')}
           </button>
         </form>
 
-        <p className="mt-6 text-slate-600">
-          Don&apos;t have an account?{" "}
-          <a href="#" className="text-[#7733ec] hover:underline font-medium">
-            Sign Up
-          </a>
-        </p>
+        {!isRecoveryMode && (
+          <p className="mt-6 text-slate-600">
+            Don&apos;t have an account?{" "}
+            <a href="#" className="text-[#7733ec] hover:underline font-medium">
+              Sign Up
+            </a>
+          </p>
+        )}
       </div>
 
       {/* Right Side - Design & Connections */}

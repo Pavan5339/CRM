@@ -1,4 +1,5 @@
 import { adminClient } from '@/utils/supabase/admin';
+import { getLoginUrl } from '@/utils/app-url';
 
 function randomBootstrapPassword() {
   return `${crypto.randomUUID()}${crypto.randomUUID()}`;
@@ -94,7 +95,6 @@ export async function sendEmployeeResetPasswordEmail(email, redirectTo) {
   }
 }
 
-export function getResetRedirectUrl(request) {
-  const url = new URL(request.url);
-  return `${url.origin}/login`;
+export function getResetRedirectUrl() {
+  return getLoginUrl();
 }
