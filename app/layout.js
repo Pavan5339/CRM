@@ -25,6 +25,11 @@ const dmSans = DM_Sans({
 export const metadata = {
   title: "TaskFlow — Internal Task Management",
   description: "Secure task management built for internal teams",
+  icons: {
+    icon: "/assets/favicon.jpeg",
+    shortcut: "/assets/favicon.jpeg",
+    apple: "/assets/favicon.jpeg",
+  },
 };
 
 export default function RootLayout({ children }) {

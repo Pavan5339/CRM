@@ -86,13 +86,13 @@ export function Navbar({ isOthersOpen = false, onToggleOthers = () => {} }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
         <div className="flex items-center justify-between">
           <a href="#" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 flex items-center justify-center bg-transparent transform transition-transform group-hover:rotate-12">
+            <div className="w-15 h-15 flex items-center justify-center bg-transparent transform transition-transform group-hover:rotate-12">
               <Image
-                src="/assets/bnc.svg"
+                src="/assets/logo_color.png"
                 alt="BNC logo"
-                width={50}
-                height={50}
-                className="w-full h-full object-contain"
+                width={100}
+                height={100}
+                className="w-full h-full object-cover"
                 priority
               />
             </div>
