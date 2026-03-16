@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const DISPATCHER_SHARED_SECRET = Deno.env.get('DISPATCHER_SHARED_SECRET') ?? '';
 const DEFAULT_APP_BASE_URL = 'https://tasks.bncglobal.in/login';
 let APP_BASE_URL = Deno.env.get('APP_BASE_URL') ?? DEFAULT_APP_BASE_URL;
 const EMAIL_NOTIFICATIONS_ENABLED = (Deno.env.get('EMAIL_NOTIFICATIONS_ENABLED') ?? 'true').trim().toLowerCase() === 'true';
@@ -113,15 +114,15 @@ Deno.serve(async (req) => {
     return jsonResponse(500, { error: 'Missing Supabase service configuration' });
   }
 
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const expected = `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`;
-  if (authHeader !== expected) {
-    return jsonResponse(401, { error: 'Unauthorized' });
-  }
-
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const expected = `Bearer ${DISPATCHER_SHARED_SECRET.trim()}`;
+  if (!DISPATCHER_SHARED_SECRET.trim() || authHeader !== expected) {
+    return jsonResponse(401, { error: 'Unauthorized' });
+  }
 
   const requestBody = await req.json().catch(() => ({}));
   const requestEnabledFlag = String(requestBody?.email_notifications_enabled ?? '').trim().toLowerCase();
