@@ -14,6 +14,7 @@ export default function Login({ onSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
   const [showRecoveryConfirmPassword, setShowRecoveryConfirmPassword] = useState(false);
+  const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -45,6 +46,7 @@ export default function Login({ onSuccess }) {
       if (!active) return;
 
       setIsRecoveryMode(true);
+      setIsForgotPasswordMode(false);
       setRecoveryReady(false);
       setError('');
       setInfo('Validating your reset link...');
@@ -100,6 +102,38 @@ export default function Login({ onSuccess }) {
     onSuccess();
   };
 
+  const handleForgotPasswordSubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError('');
+    setInfo('');
+
+    const normalizedIdentifier = identifier.trim();
+
+    if (!normalizedIdentifier) {
+      setError('Email or username is required.');
+      setLoading(false);
+      return;
+    }
+
+    const response = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: normalizedIdentifier }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setError(result.error || 'Failed to send password reset link.');
+      setLoading(false);
+      return;
+    }
+
+    setInfo(result.message || 'If an account exists, we sent a password reset link.');
+    setLoading(false);
+  };
+
   const handleRecoverySubmit = async (event) => {
     event.preventDefault();
     setLoading(true);
@@ -136,7 +170,7 @@ export default function Login({ onSuccess }) {
     setLoading(false);
 
     if (typeof window !== 'undefined') {
-      window.location.href = '/dashboard';
+      window.location.href = '/login';
     }
   };
 
@@ -155,20 +189,28 @@ export default function Login({ onSuccess }) {
         <div className="mb-10">
           <h1 className="text-2xl font-bold text-black mb-10">Task Manager</h1>
           <h2 className="text-3xl font-bold text-slate-900 mb-2">
-            {isRecoveryMode ? 'Reset Password' : 'Welcome Back'}
+            {isRecoveryMode ? 'Reset Password' : isForgotPasswordMode ? 'Forgot Password' : 'Welcome Back'}
           </h2>
           <p className="text-slate-500">
             {isRecoveryMode
               ? 'Create a new password to finish your first sign-in.'
-              : 'Please enter your details to log in'}
+              : isForgotPasswordMode
+                ? 'Enter your email or username and we will send a reset link if the account exists.'
+                : 'Please enter your details to log in'}
           </p>
         </div>
 
         <form
-          onSubmit={isRecoveryMode ? handleRecoverySubmit : handleLogin}
+          onSubmit={
+            isRecoveryMode
+              ? handleRecoverySubmit
+              : isForgotPasswordMode
+                ? handleForgotPasswordSubmit
+                : handleLogin
+          }
           className="space-y-6 max-w-md"
         >
-          {!isRecoveryMode ? (
+          {!isRecoveryMode && !isForgotPasswordMode ? (
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -207,6 +249,20 @@ export default function Login({ onSuccess }) {
                 </div>
               </div>
             </>
+          ) : !isRecoveryMode ? (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Email or Username
+              </label>
+              <input
+                type="text"
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                required
+                placeholder="john@example.com or john123"
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-black"
+              />
+            </div>
           ) : (
             <>
               <div>
@@ -280,17 +336,26 @@ export default function Login({ onSuccess }) {
           >
             {isRecoveryMode
               ? (loading ? 'UPDATING PASSWORD...' : 'SET NEW PASSWORD')
-              : (loading ? 'LOGGING IN...' : 'LOGIN')}
+              : isForgotPasswordMode
+                ? (loading ? 'SENDING RESET LINK...' : 'SEND RESET LINK')
+                : (loading ? 'LOGGING IN...' : 'LOGIN')}
           </button>
         </form>
 
         {!isRecoveryMode && (
-          <p className="mt-6 text-slate-600">
-            Don&apos;t have an account?{" "}
-            <a href="#" className="text-[#7733ec] hover:underline font-medium">
-              Sign Up
-            </a>
-          </p>
+          <div className="mt-6 max-w-md text-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setIsForgotPasswordMode((prev) => !prev);
+                setError('');
+                setInfo('');
+              }}
+              className="font-medium text-[#7733ec] hover:underline"
+            >
+              {isForgotPasswordMode ? 'Back to login' : 'Forgot password?'}
+            </button>
+          </div>
         )}
       </div>
 

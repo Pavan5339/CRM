@@ -16,6 +16,80 @@ async function findAuthUserByEmail(email) {
   return users.find((user) => String(user.email || '').toLowerCase() === normalized) || null;
 }
 
+async function findEmployeeForReset(identifier) {
+  const normalized = String(identifier || '').trim().toLowerCase();
+  if (!normalized) return null;
+
+  let { data: employee, error } = await adminClient
+    .from('employees')
+    .select('id, email')
+    .eq('email', normalized)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to look up employee account');
+  }
+
+  if (employee?.email) {
+    return employee;
+  }
+
+  const localPart = normalized.includes('@') ? normalized.split('@')[0] : normalized;
+
+  if (!localPart) {
+    return null;
+  }
+
+  const { data: employeeByUsername, error: usernameError } = await adminClient
+    .from('employees')
+    .select('id, email')
+    .eq('username', localPart)
+    .limit(1)
+    .maybeSingle();
+
+  if (usernameError) {
+    throw new Error(usernameError.message || 'Failed to look up employee username');
+  }
+
+  return employeeByUsername || null;
+}
+
+async function isAdminAuthUser(userId) {
+  if (!userId) return false;
+
+  const { data: profile, error } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to look up admin profile');
+  }
+
+  return profile?.role === 'admin';
+}
+
+export async function resolvePasswordResetEmail(identifier) {
+  const employee = await findEmployeeForReset(identifier);
+  if (employee?.email) {
+    return employee.email;
+  }
+
+  const normalized = String(identifier || '').trim().toLowerCase();
+  if (!normalized.includes('@')) {
+    return null;
+  }
+
+  const authUser = await findAuthUserByEmail(normalized);
+  if (!authUser?.id || !authUser.email) {
+    return null;
+  }
+
+  return (await isAdminAuthUser(authUser.id)) ? authUser.email : null;
+}
+
 export async function ensureEmployeeAuthUser(employee, password) {
   if (!employee?.id) {
     throw new Error('Employee is required to ensure auth user');
@@ -93,6 +167,16 @@ export async function sendEmployeeResetPasswordEmail(email, redirectTo) {
   if (error) {
     throw new Error(error.message || 'Failed to send password reset email');
   }
+}
+
+export async function sendPasswordResetEmailForIdentifier(identifier, redirectTo = getResetRedirectUrl()) {
+  const email = await resolvePasswordResetEmail(identifier);
+  if (!email) {
+    return false;
+  }
+
+  await sendEmployeeResetPasswordEmail(email, redirectTo);
+  return true;
 }
 
 export function getResetRedirectUrl() {

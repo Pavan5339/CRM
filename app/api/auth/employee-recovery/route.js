@@ -35,23 +35,48 @@ export async function POST(request) {
       return NextResponse.json({ error: employeeError.message }, { status: 500 });
     }
 
-    if (!employee) {
-      return NextResponse.json({ error: 'Employee account not found' }, { status: 404 });
+    const { data: profile, error: profileError } = await adminClient
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
+
+    if (!employee && profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+
+    const authMetadata = employee
+      ? {
+          ...(user.user_metadata || {}),
+          full_name: employee.name || user.user_metadata?.full_name || '',
+          employee_uuid: employee.id,
+          role: 'employee',
+        }
+      : {
+          ...(user.user_metadata || {}),
+          full_name: profile?.full_name || user.user_metadata?.full_name || '',
+          role: 'admin',
+        };
 
     const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(user.id, {
       password: newPassword,
       email_confirm: true,
-      user_metadata: {
-        ...(user.user_metadata || {}),
-        full_name: employee.name || user.user_metadata?.full_name || '',
-        employee_uuid: employee.id,
-        role: 'employee',
-      },
+      user_metadata: authMetadata,
     });
 
     if (authUpdateError) {
       return NextResponse.json({ error: authUpdateError.message }, { status: 500 });
+    }
+
+    if (!employee) {
+      return NextResponse.json({
+        success: true,
+        message: 'Password updated successfully. You can continue to your workspace.',
+      });
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
@@ -70,7 +95,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Password updated successfully. You can continue to your dashboard.',
+      message: 'Password updated successfully. You can continue to your workspace.',
     });
   } catch (error) {
     console.error('Error finalizing employee recovery:', error);
