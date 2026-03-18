@@ -11,6 +11,24 @@ import {
   insertAssignmentActivityRows,
 } from '@/utils/api-helpers';
 
+function normalizeLabel(label) {
+  if (typeof label !== 'string') return null;
+  const trimmed = label.trim();
+  return trimmed || null;
+}
+
+async function ensureTaskLabelExists(supabase, label) {
+  if (!label) return;
+
+  const { error } = await supabase
+    .from('task_labels')
+    .upsert({ name: label }, { onConflict: 'name', ignoreDuplicates: true });
+
+  if (error) {
+    throw error;
+  }
+}
+
 
 export async function GET() {
   const supabase = await createClient();
@@ -54,9 +72,10 @@ export async function POST(request) {
     const { supabase, actor } = auth;
 
     const body = await request.json();
-    const { taskName, description, priority, dueDate, assignedMembers, attachments, subtasks } = body;
+    const { taskName, description, priority, dueDate, assignedMembers, attachments, subtasks, label } = body;
     const normalizedSubtasks = normalizeSubtasks(subtasks);
     const normalizedDueDate = normalizeDueDate(dueDate);
+    const normalizedLabel = normalizeLabel(label);
     const actorPayload = getAssignmentActivityActorPayload(actor);
     const employeeDirectory = await fetchEmployeeDirectory(supabase);
     const validEmployeeIds = new Set(employeeDirectory.map((employee) => employee.id));
@@ -74,12 +93,15 @@ export async function POST(request) {
       return NextResponse.json({ error: 'One or more subtask assignees were not found' }, { status: 400 });
     }
 
+    await ensureTaskLabelExists(supabase, normalizedLabel);
+
     // Insert task
     const { data: task, error: taskError } = await supabase
       .from('tasks')
       .insert({
         task_name: taskName,
         description,
+        label: normalizedLabel,
         priority,
         due_date: normalizedDueDate,
         status: 'pending',
@@ -202,9 +224,10 @@ export async function PUT(request) {
     }
 
     const body = await request.json();
-    const { taskName, description, priority, status, dueDate, assignedMembers, removedAttachments, newAttachments, subtasks } = body;
+    const { taskName, description, priority, status, dueDate, assignedMembers, removedAttachments, newAttachments, subtasks, label } = body;
     const normalizedSubtasks = normalizeSubtasks(subtasks);
     const normalizedDueDate = normalizeDueDate(dueDate);
+    const normalizedLabel = normalizeLabel(label);
     const actorPayload = getAssignmentActivityActorPayload(actor);
     const employeeDirectory = await fetchEmployeeDirectory(supabase);
     const validEmployeeIds = new Set(employeeDirectory.map((employee) => employee.id));
@@ -222,6 +245,8 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'One or more subtask assignees were not found' }, { status: 400 });
     }
 
+    await ensureTaskLabelExists(supabase, normalizedLabel);
+
     // Get old task data for employee count updates
     const { data: oldTask } = await supabase
       .from('tasks')
@@ -237,6 +262,7 @@ export async function PUT(request) {
       .update({
         task_name: taskName,
         description,
+        label: normalizedLabel,
         priority,
         status,
         due_date: normalizedDueDate,

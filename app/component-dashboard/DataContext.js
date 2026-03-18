@@ -8,6 +8,7 @@ const EMPTY_STATE = {
   user: null,
   users: [],
   tasks: [],
+  taskLabels: [],
 };
 
 const STATUS_LABELS = {
@@ -101,6 +102,7 @@ const normalizeTask = (task, fallbackAssignees = [], currentUserId = null) => {
     id: task.id,
     title: task.task_name,
     description: task.description || '',
+    label: task.label || null,
     priority: PRIORITY_LABELS[task.priority] || 'Medium',
     status: STATUS_LABELS[task.status] || 'Pending',
     startDate: formatDate(task.created_at),
@@ -126,21 +128,24 @@ export function DataProvider({ children, initialUser = null, mode = 'employee' }
   const [user, setUser] = useState(initialUser);
   const [users, setUsers] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [taskLabels, setTaskLabels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const isAdminMode = mode === 'admin';
 
   const fetchAdminData = async () => {
-    const [tasksRes, usersRes, adminMeRes] = await Promise.all([
+    const [tasksRes, usersRes, adminMeRes, taskLabelsRes] = await Promise.all([
       fetch('/api/tasks', { method: 'GET' }),
       fetch('/api/employees', { method: 'GET' }),
       fetch('/api/admin/me', { method: 'GET' }),
+      fetch('/api/task-labels', { method: 'GET' }),
     ]);
 
     const tasksJson = await tasksRes.json();
     const usersJson = await usersRes.json();
     const adminMeJson = await adminMeRes.json();
+    const taskLabelsJson = await taskLabelsRes.json();
 
     if (!tasksRes.ok) {
       throw new Error(tasksJson.error || 'Failed to fetch tasks');
@@ -155,14 +160,22 @@ export function DataProvider({ children, initialUser = null, mode = 'employee' }
         setUser(null);
         setTasks([]);
         setUsers([]);
+        setTaskLabels([]);
         return;
       }
       throw new Error(adminMeJson.error || 'Failed to fetch admin profile');
     }
 
+    if (!taskLabelsRes.ok) {
+      throw new Error(taskLabelsJson.error || 'Failed to fetch task labels');
+    }
+
     const nextUsers = normalizeUsers(usersJson.employees || []);
     const adminId = adminMeJson?.admin?.id || null;
     const nextTasks = (tasksJson.tasks || []).map((task) => normalizeTask(task, [], adminId));
+    const nextTaskLabels = Array.isArray(taskLabelsJson.labels)
+      ? taskLabelsJson.labels.map((item) => item.name).filter(Boolean)
+      : [];
 
     if (adminMeJson?.admin) {
       setUser(adminMeJson.admin);
@@ -172,6 +185,7 @@ export function DataProvider({ children, initialUser = null, mode = 'employee' }
 
     setUsers(nextUsers);
     setTasks(nextTasks);
+    setTaskLabels(nextTaskLabels);
   };
 
   const fetchEmployeeData = async () => {
@@ -183,6 +197,7 @@ export function DataProvider({ children, initialUser = null, mode = 'employee' }
         setUser(null);
         setTasks([]);
         setUsers([]);
+        setTaskLabels([]);
         return;
       }
       throw new Error(result.error || 'Failed to fetch employee tasks');
@@ -208,6 +223,7 @@ export function DataProvider({ children, initialUser = null, mode = 'employee' }
     );
     setTasks(nextTasks);
     setUsers(nextUsers);
+    setTaskLabels([]);
   };
 
   const refreshData = async () => {
@@ -318,6 +334,7 @@ export function DataProvider({ children, initialUser = null, mode = 'employee' }
       body: JSON.stringify({
         taskName: newTask.title,
         description: newTask.description,
+        label: newTask.label || null,
         priority: String(newTask.priority || 'Medium').toLowerCase(),
         dueDate: dueDateISO,
         assignedMembers: newTask.assignees || [],
@@ -339,6 +356,29 @@ export function DataProvider({ children, initialUser = null, mode = 'employee' }
 
     await refreshData();
     return { success: true };
+  };
+
+  const createTaskLabel = async (name) => {
+    const response = await fetch('/api/task-labels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      const message = result.error || 'Failed to create task label';
+      setError(message);
+      return { success: false, error: message };
+    }
+
+    const nextLabel = result?.label?.name || '';
+    if (nextLabel) {
+      setTaskLabels((prev) => Array.from(new Set([...prev, nextLabel])).sort((a, b) => a.localeCompare(b)));
+    }
+
+    return { success: true, label: nextLabel };
   };
 
   const updateTaskStatus = async (taskId, nextStatusLabel) => {
@@ -406,6 +446,7 @@ export function DataProvider({ children, initialUser = null, mode = 'employee' }
     user,
     users,
     tasks,
+    taskLabels,
     loading,
     error,
     login,
@@ -413,6 +454,7 @@ export function DataProvider({ children, initialUser = null, mode = 'employee' }
     refreshData,
     updateAvatar,
     addTask,
+    createTaskLabel,
     updateTaskStatus,
     deleteTask,
     getTasksByStatus,

@@ -6,10 +6,12 @@ import { Plus, Trash2, Paperclip, Check, X } from 'lucide-react';
 import { useData } from './DataContext';
 
 export default function CreateTask({ onCancel }) {
-  const { addTask, users } = useData();
+  const { addTask, createTaskLabel, taskLabels, users } = useData();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [label, setLabel] = useState('');
+  const [newLabelName, setNewLabelName] = useState('');
   const [priority, setPriority] = useState('Medium');
   const [dueDate, setDueDate] = useState('');
   const [assignees, setAssignees] = useState([]);
@@ -22,6 +24,7 @@ export default function CreateTask({ onCancel }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [creatingLabel, setCreatingLabel] = useState(false);
 
   const filteredUsers = users.filter((user) => {
     const query = assigneeSearch.trim().toLowerCase();
@@ -197,6 +200,7 @@ export default function CreateTask({ onCancel }) {
         id: `t${Date.now()}`,
         title,
         description,
+        label,
         priority,
         status: 'Pending',
         startDate: new Date().toLocaleDateString('en-GB', {
@@ -255,6 +259,28 @@ export default function CreateTask({ onCancel }) {
     setSelectedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  const handleCreateLabel = async () => {
+    const cleanLabel = newLabelName.trim();
+    if (!cleanLabel) return;
+
+    setCreatingLabel(true);
+    setError('');
+
+    try {
+      const result = await createTaskLabel(cleanLabel);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create label');
+      }
+
+      setLabel(result.label || cleanLabel);
+      setNewLabelName('');
+    } catch (createLabelError) {
+      setError(createLabelError.message || 'Failed to create label');
+    } finally {
+      setCreatingLabel(false);
+    }
+  };
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-8">
@@ -288,6 +314,43 @@ export default function CreateTask({ onCancel }) {
             placeholder="Develop a dynamic product catalog with filtering and sorting features..."
             className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700 resize-none"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">Label</label>
+          <select
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700 bg-white"
+          >
+            <option value="">Select a label</option>
+            {taskLabels.map((taskLabel) => (
+              <option key={taskLabel} value={taskLabel}>{taskLabel}</option>
+            ))}
+          </select>
+          <div className="mt-3 flex flex-col gap-2 md:flex-row">
+            <input
+              type="text"
+              value={newLabelName}
+              onChange={(e) => setNewLabelName(e.target.value)}
+              placeholder="Create a new label"
+              className="flex-1 px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleCreateLabel();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleCreateLabel}
+              disabled={creatingLabel || !newLabelName.trim()}
+              className="px-4 py-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:border-[#7F40EE] hover:text-[#7F40EE] disabled:opacity-60"
+            >
+              {creatingLabel ? 'Adding...' : 'Add Label'}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

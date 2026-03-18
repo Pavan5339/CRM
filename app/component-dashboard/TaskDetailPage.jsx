@@ -278,10 +278,14 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState('');
   const [progressDraft, setProgressDraft] = useState(0);
+  const [taskLabels, setTaskLabels] = useState([]);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [creatingLabel, setCreatingLabel] = useState(false);
 
   const [editForm, setEditForm] = useState({
     taskName: '',
     description: '',
+    label: '',
     priority: 'medium',
     status: 'pending',
     dueDate: '',
@@ -315,13 +319,15 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
     setError('');
 
     try {
-      const [taskRes, commentsRes] = await Promise.all([
+      const [taskRes, commentsRes, taskLabelsRes] = await Promise.all([
         fetch(`/api/tasks/${taskId}`, { method: 'GET' }),
         fetch(`/api/tasks/${taskId}/comments`, { method: 'GET' }),
+        fetch('/api/task-labels', { method: 'GET' }),
       ]);
 
       const taskJson = await taskRes.json();
       const commentsJson = await commentsRes.json();
+      const taskLabelsJson = await taskLabelsRes.json();
 
       if (!taskRes.ok) {
         throw new Error(taskJson.error || 'Failed to load task details');
@@ -329,6 +335,14 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
 
       if (!commentsRes.ok) {
         throw new Error(commentsJson.error || 'Failed to load task comments');
+      }
+
+      if (taskLabelsRes.ok) {
+        setTaskLabels(
+          Array.isArray(taskLabelsJson.labels)
+            ? taskLabelsJson.labels.map((item) => item.name).filter(Boolean)
+            : []
+        );
       }
 
       const fetchedTask = taskJson.task;
@@ -346,6 +360,7 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
       setEditForm({
         taskName: fetchedTask.task_name || '',
         description: fetchedTask.description || '',
+        label: fetchedTask.label || '',
         priority: fetchedTask.priority || 'medium',
         status: fetchedTask.status || 'pending',
         dueDate: fetchedTask.due_date ? new Date(fetchedTask.due_date).toISOString().slice(0, 10) : '',
@@ -490,6 +505,36 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
       setError(err.message || 'Failed to add checklist item');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCreateLabel = async () => {
+    const cleanLabel = newLabelName.trim();
+    if (!cleanLabel || !canEditTask) return;
+
+    setCreatingLabel(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/task-labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: cleanLabel }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create task label');
+      }
+
+      const createdLabel = result?.label?.name || cleanLabel;
+      setTaskLabels((prev) => Array.from(new Set([...prev, createdLabel])).sort((a, b) => a.localeCompare(b)));
+      setEditForm((prev) => ({ ...prev, label: createdLabel }));
+      setNewLabelName('');
+    } catch (err) {
+      setError(err.message || 'Failed to create task label');
+    } finally {
+      setCreatingLabel(false);
     }
   };
 
@@ -755,6 +800,13 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
               Back to tasks
             </Link>
             <h1 className='mt-2 text-2xl font-bold text-slate-900'>{task.task_name}</h1>
+            {task.label && (
+              <div className='mt-3'>
+                <span className='inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700'>
+                  {task.label}
+                </span>
+              </div>
+            )}
             <p className='mt-1 text-sm text-slate-500'>Created {formatDate(task.created_at)}</p>
           </div>
 
@@ -785,6 +837,11 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
               <span className='rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold uppercase text-orange-700'>
                 {task.priority} priority
               </span>
+              {task.label && (
+                <span className='rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold uppercase text-slate-700'>
+                  {task.label}
+                </span>
+              )}
             </div>
 
             {canManageStatus && (
@@ -1078,6 +1135,40 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
                   rows={3}
                   placeholder='Description'
                 />
+
+                <select
+                  value={editForm.label}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, label: event.target.value }))}
+                  className='w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white'
+                >
+                  <option value=''>Select a label</option>
+                  {taskLabels.map((taskLabel) => (
+                    <option key={taskLabel} value={taskLabel}>{taskLabel}</option>
+                  ))}
+                </select>
+
+                <div className='flex gap-2'>
+                  <input
+                    value={newLabelName}
+                    onChange={(event) => setNewLabelName(event.target.value)}
+                    className='flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm'
+                    placeholder='Create a new label'
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        handleCreateLabel();
+                      }
+                    }}
+                  />
+                  <button
+                    type='button'
+                    disabled={creatingLabel || !newLabelName.trim()}
+                    onClick={handleCreateLabel}
+                    className='rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-[#7F40EE] hover:text-[#7F40EE] disabled:opacity-60'
+                  >
+                    {creatingLabel ? 'Adding...' : 'Add Label'}
+                  </button>
+                </div>
 
                 <div className='grid grid-cols-2 gap-2'>
                   <select

@@ -47,6 +47,7 @@ export async function GET(request) {
           id,
           task_name,
           description,
+          label,
           priority,
           status,
           progress_percentage,

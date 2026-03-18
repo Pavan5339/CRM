@@ -19,6 +19,18 @@ function isBucketNotFoundError(error) {
   return message.includes('bucket') && message.includes('not found');
 }
 
+async function ensureTaskLabelExists(label) {
+  if (!label) return;
+
+  const { error } = await adminClient
+    .from('task_labels')
+    .upsert({ name: label }, { onConflict: 'name', ignoreDuplicates: true });
+
+  if (error) {
+    throw error;
+  }
+}
+
 async function listStorageAttachments(bucket, folderPath) {
   const { data: items, error } = await adminClient.storage
     .from(bucket)
@@ -82,6 +94,7 @@ async function fetchTaskById(taskId) {
       id,
       task_name,
       description,
+      label,
       priority,
       status,
       progress_percentage,
@@ -484,6 +497,12 @@ export async function PATCH(request, { params }) {
 
     if (typeof body?.description === 'string') {
       updatePayload.description = body.description.trim();
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'label')) {
+      const label = typeof body?.label === 'string' ? body.label.trim() : '';
+      updatePayload.label = label || null;
+      await ensureTaskLabelExists(updatePayload.label);
     }
 
     if (typeof body?.priority === 'string') {

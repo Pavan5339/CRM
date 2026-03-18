@@ -125,12 +125,19 @@ export default function ManageTasks() {
             className="relative bg-white p-6 rounded-xl shadow-sm border border-transparent hover:border-[#7F40EE]/25 transition-all hover:shadow-md group cursor-pointer"
           >
             <div className="flex justify-between items-start mb-4">
-              <span className={`px-3 py-1 rounded text-[10px] uppercase font-bold tracking-wider ${getStatusColor(task.status)}`}>
-                {task.status}
-              </span>
-              <span className={`px-3 py-1 rounded text-[10px] uppercase font-bold tracking-wider ${getPriorityColor(task.priority)}`}>
-                {task.priority} Priority
-              </span>
+              <div className="flex flex-wrap gap-2">
+                <span className={`px-3 py-1 rounded text-[10px] uppercase font-bold tracking-wider ${getStatusColor(task.status)}`}>
+                  {task.status}
+                </span>
+                <span className={`px-3 py-1 rounded text-[10px] uppercase font-bold tracking-wider ${getPriorityColor(task.priority)}`}>
+                  {task.priority} Priority
+                </span>
+                {task.label && (
+                  <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                    {task.label}
+                  </span>
+                )}
+              </div>
             </div>
 
             <h3 className="font-bold text-lg text-slate-800 mb-2 group-hover:text-[#7F40EE] transition-colors">{task.title}</h3>
