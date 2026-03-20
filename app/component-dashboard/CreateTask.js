@@ -318,55 +318,42 @@ export default function CreateTask({ onCancel }) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">Label</label>
-          <select
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700 bg-white"
-          >
-            <option value="">Select a label</option>
-            {taskLabels.map((taskLabel) => (
-              <option key={taskLabel} value={taskLabel}>{taskLabel}</option>
-            ))}
-          </select>
-          <div className="mt-3 flex flex-col gap-2 md:flex-row">
-            <input
-              type="text"
-              value={newLabelName}
-              onChange={(e) => setNewLabelName(e.target.value)}
-              placeholder="Create a new label"
-              className="flex-1 px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700"
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  handleCreateLabel();
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleCreateLabel}
-              disabled={creatingLabel || !newLabelName.trim()}
-              className="px-4 py-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:border-[#7F40EE] hover:text-[#7F40EE] disabled:opacity-60"
-            >
-              {creatingLabel ? 'Adding...' : 'Add Label'}
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Priority</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Label</label>
             <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700 bg-white"
             >
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
+              <option value="">Select a label</option>
+              {taskLabels.map((taskLabel) => (
+                <option key={taskLabel} value={taskLabel}>{taskLabel}</option>
+              ))}
             </select>
+            <div className="mt-3 flex flex-col gap-2 md:flex-row">
+              <input
+                type="text"
+                value={newLabelName}
+                onChange={(e) => setNewLabelName(e.target.value)}
+                placeholder="Create a new label"
+                className="flex-1 px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleCreateLabel();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleCreateLabel}
+                disabled={creatingLabel || !newLabelName.trim()}
+                className="px-4 py-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:border-[#7F40EE] hover:text-[#7F40EE] disabled:opacity-60"
+              >
+                {creatingLabel ? 'Adding...' : 'Add Label'}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Repeat</label>
@@ -379,6 +366,21 @@ export default function CreateTask({ onCancel }) {
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Priority</label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700 bg-white"
+            >
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
             </select>
           </div>
           <div>
