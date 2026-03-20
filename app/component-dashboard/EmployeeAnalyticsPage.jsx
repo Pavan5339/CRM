@@ -17,6 +17,80 @@ const PRIORITY_STYLES = {
   high: 'bg-rose-50 text-rose-700',
 };
 
+const DUE_TIMING_STYLES = {
+  completedWithinTime: 'bg-emerald-100 text-emerald-700',
+  completedOnDueTime: 'bg-sky-100 text-sky-700',
+  completedLate: 'bg-rose-100 text-rose-700',
+  exceededDueDate: 'bg-rose-100 text-rose-700',
+  withinDueDate: 'bg-amber-100 text-amber-700',
+  noDueDate: 'bg-slate-100 text-slate-600',
+  completedTimeUnknown: 'bg-slate-100 text-slate-700',
+};
+
+function isDateOnlyValue(value) {
+  return typeof value === 'string' && !value.includes('T');
+}
+
+function getTaskDueTiming(task) {
+  const dueValue = task?.due_date;
+  const dueAt = dueValue ? new Date(dueValue) : null;
+  const isCompleted = task?.status === 'completed';
+
+  if (!dueAt || Number.isNaN(dueAt.getTime())) {
+    return isCompleted
+      ? { label: 'Completed (no due date)', className: DUE_TIMING_STYLES.completedWithinTime }
+      : { label: 'No due date set', className: DUE_TIMING_STYLES.noDueDate };
+  }
+
+  const hasExplicitDueTime = !isDateOnlyValue(dueValue);
+  const dueDeadline = new Date(dueAt);
+
+  if (!hasExplicitDueTime) {
+    dueDeadline.setHours(23, 59, 59, 999);
+  }
+
+  if (isCompleted) {
+    const completedAt = task?.updated_at ? new Date(task.updated_at) : null;
+    if (!completedAt || Number.isNaN(completedAt.getTime())) {
+      return { label: 'Completed (time unknown)', className: DUE_TIMING_STYLES.completedTimeUnknown };
+    }
+
+    if (!hasExplicitDueTime) {
+      const dueDayStart = new Date(dueAt);
+      dueDayStart.setHours(0, 0, 0, 0);
+
+      const dueDayEnd = new Date(dueAt);
+      dueDayEnd.setHours(23, 59, 59, 999);
+
+      if (completedAt.getTime() < dueDayStart.getTime()) {
+        return { label: 'Completed in time', className: DUE_TIMING_STYLES.completedWithinTime };
+      }
+
+      if (completedAt.getTime() > dueDayEnd.getTime()) {
+        return { label: 'Completed late', className: DUE_TIMING_STYLES.completedLate };
+      }
+
+      return { label: 'Completed on due date', className: DUE_TIMING_STYLES.completedOnDueTime };
+    }
+
+    if (completedAt.getTime() < dueDeadline.getTime()) {
+      return { label: 'Completed in time', className: DUE_TIMING_STYLES.completedWithinTime };
+    }
+
+    if (completedAt.getTime() > dueDeadline.getTime()) {
+      return { label: 'Completed late', className: DUE_TIMING_STYLES.completedLate };
+    }
+
+    return { label: 'Completed on due date', className: DUE_TIMING_STYLES.completedOnDueTime };
+  }
+
+  if (Date.now() > dueDeadline.getTime()) {
+    return { label: 'Exceeded due date', className: DUE_TIMING_STYLES.exceededDueDate };
+  }
+
+  return { label: 'Within due date', className: DUE_TIMING_STYLES.withinDueDate };
+}
+
 function formatDate(value, { includeTime = false } = {}) {
   if (!value) return 'N/A';
   const date = new Date(value);
@@ -213,7 +287,7 @@ export default function EmployeeAnalyticsPage({ employeeId }) {
           </div>
         </div>
 
-        <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-sm">
           <div className="bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_45%,#334155_100%)] px-8 py-10 text-white">
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-5">
@@ -251,8 +325,8 @@ export default function EmployeeAnalyticsPage({ employeeId }) {
           <MetricCard icon={TriangleAlert} label="Overdue" value={stats?.overdue ?? 0} tone="rose" />
         </section>
 
-        <div className="grid gap-8 xl:grid-cols-[1.7fr_1fr]">
-          <section className="space-y-6">
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
+          <section className="min-w-0 space-y-6">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -269,59 +343,69 @@ export default function EmployeeAnalyticsPage({ employeeId }) {
                   No assigned tasks found for this employee.
                 </div>
               ) : (
-                <div className="mt-6 overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <div className="mt-6 w-full">
+                  <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-[0.16em] text-slate-400">
-                        <th className="pb-3 pr-4 font-semibold">Task</th>
-                        <th className="pb-3 pr-4 font-semibold">Status</th>
-                        <th className="pb-3 pr-4 font-semibold">Due</th>
-                        <th className="pb-3 pr-4 font-semibold">Progress</th>
-                        <th className="pb-3 pr-4 font-semibold">Assigned By</th>
-                        <th className="pb-3 font-semibold">Assigned At</th>
+                        <th style={{ width: '24%' }} className="pb-3 pr-4 font-semibold">Task</th>
+                        <th style={{ width: '10%' }} className="pb-3 pr-4 font-semibold">Status</th>
+                        <th style={{ width: '11%' }} className="pb-3 pr-4 font-semibold">Due</th>
+                        <th style={{ width: '22%' }} className="pb-3 pr-4 font-semibold">Due Timeline</th>
+                        <th style={{ width: '12%' }} className="pb-3 pr-4 font-semibold">Progress</th>
+                        <th style={{ width: '11%' }} className="pb-3 pr-4 font-semibold">Assigned By</th>
+                        <th style={{ width: '10%' }} className="pb-3 font-semibold">Assigned At</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {sortedTasks.map((task) => (
-                        <tr key={task.id} className="align-top">
-                          <td className="py-4 pr-4">
-                            <div>
-                              <Link href={`/admin/tasks/${task.id}`} className="font-semibold text-slate-900 hover:text-[#7F40EE]">
-                                {task.task_name}
-                              </Link>
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase ${PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.medium}`}>
-                                  {task.priority} priority
-                                </span>
-                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
-                                  {task.subtasks_completed}/{task.subtasks_total} subtasks
-                                </span>
+                      {sortedTasks.map((task) => {
+                        const dueTiming = getTaskDueTiming(task);
+
+                        return (
+                          <tr key={task.id} className="align-top">
+                            <td className="py-4 pr-4">
+                              <div>
+                                <Link href={`/admin/tasks/${task.id}`} className="wrap-break-word font-semibold text-slate-900 hover:text-[#7F40EE]">
+                                  {task.task_name}
+                                </Link>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase ${PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.medium}`}>
+                                    {task.priority} priority
+                                  </span>
+                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                    {task.subtasks_completed}/{task.subtasks_total} subtasks
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-4 pr-4">
-                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase ${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}>
-                              {String(task.status || 'pending').replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td className="py-4 pr-4 text-slate-700">{formatDate(task.due_date)}</td>
-                          <td className="py-4 pr-4">
-                            <div className="w-32">
-                              <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
-                                <span>{task.progress_percentage}%</span>
+                            </td>
+                            <td className="py-4 pr-4">
+                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase ${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}>
+                                {String(task.status || 'pending').replace('_', ' ')}
+                              </span>
+                            </td>
+                            <td className="py-4 pr-4 text-slate-700">{formatDate(task.due_date)}</td>
+                            <td className="py-4 pr-4">
+                              <span className={`inline-block max-w-full whitespace-normal rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4 ${dueTiming.className}`}>
+                                {dueTiming.label}
+                              </span>
+                            </td>
+                            <td className="py-4 pr-4">
+                              <div className="w-24">
+                                <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+                                  <span>{task.progress_percentage}%</span>
+                                </div>
+                                <div className="h-2 rounded-full bg-slate-100">
+                                  <div
+                                    className="h-2 rounded-full bg-[#7F40EE]"
+                                    style={{ width: `${task.progress_percentage}%` }}
+                                  ></div>
+                                </div>
                               </div>
-                              <div className="h-2 rounded-full bg-slate-100">
-                                <div
-                                  className="h-2 rounded-full bg-[#7F40EE]"
-                                  style={{ width: `${task.progress_percentage}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 pr-4 text-slate-700">{task.assigned_by || 'Assigned'}</td>
-                          <td className="py-4 text-slate-700">{formatDate(task.assigned_at, { includeTime: true })}</td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="wrap-break-word py-4 pr-4 text-slate-700">{task.assigned_by || 'Assigned'}</td>
+                            <td className="py-4 text-slate-700">{formatDate(task.assigned_at, { includeTime: true })}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -329,7 +413,7 @@ export default function EmployeeAnalyticsPage({ employeeId }) {
             </div>
           </section>
 
-          <aside className="space-y-6">
+          <aside className="min-w-0 space-y-6">
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
