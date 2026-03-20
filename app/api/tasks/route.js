@@ -72,10 +72,11 @@ export async function POST(request) {
     const { supabase, actor } = auth;
 
     const body = await request.json();
-    const { taskName, description, priority, dueDate, assignedMembers, attachments, subtasks, label } = body;
+    const { taskName, description, priority, dueDate, assignedMembers, attachments, subtasks, label, frequency } = body;
     const normalizedSubtasks = normalizeSubtasks(subtasks);
     const normalizedDueDate = normalizeDueDate(dueDate);
     const normalizedLabel = normalizeLabel(label);
+    const normalizedFrequency = ['weekly', 'monthly', 'yearly'].includes(frequency) ? frequency : null;
     const actorPayload = getAssignmentActivityActorPayload(actor);
     const employeeDirectory = await fetchEmployeeDirectory(supabase);
     const validEmployeeIds = new Set(employeeDirectory.map((employee) => employee.id));
@@ -104,6 +105,8 @@ export async function POST(request) {
         label: normalizedLabel,
         priority,
         due_date: normalizedDueDate,
+        frequency: normalizedFrequency,
+        last_cycle_reset: new Date().toISOString(),
         status: 'pending',
         created_by: actor.type === 'admin' ? actor.userId : null
       })

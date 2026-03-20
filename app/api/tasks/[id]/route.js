@@ -99,6 +99,8 @@ async function fetchTaskById(taskId) {
       status,
       progress_percentage,
       due_date,
+      frequency,
+      last_cycle_reset,
       rating,
       created_by,
       created_at,
@@ -560,6 +562,15 @@ export async function PATCH(request, { params }) {
 
     if (Object.prototype.hasOwnProperty.call(body || {}, 'dueDate')) {
       updatePayload.due_date = normalizeDueDate(body?.dueDate);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'frequency')) {
+      const freq = body.frequency;
+      if (freq === null || freq === '' || ['weekly', 'monthly', 'yearly'].includes(freq)) {
+        updatePayload.frequency = freq || null;
+      } else {
+        return NextResponse.json({ error: 'Invalid frequency' }, { status: 400 });
+      }
     }
 
     if (Object.keys(updatePayload).length === 0) {

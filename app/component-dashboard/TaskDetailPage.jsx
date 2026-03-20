@@ -316,6 +316,7 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
     description: '',
     label: '',
     priority: 'medium',
+    frequency: '',
     status: 'pending',
     dueDate: '',
   });
@@ -392,6 +393,7 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
         description: fetchedTask.description || '',
         label: fetchedTask.label || '',
         priority: fetchedTask.priority || 'medium',
+        frequency: fetchedTask.frequency || '',
         status: fetchedTask.status || 'pending',
         dueDate: fetchedTask.due_date ? new Date(fetchedTask.due_date).toISOString().slice(0, 10) : '',
       });
@@ -910,6 +912,11 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
               <span className='rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold uppercase text-orange-700'>
                 {task.priority} priority
               </span>
+              {task.frequency && (
+                <span className='rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase text-blue-700'>
+                  Repeats {task.frequency}
+                </span>
+              )}
               {task.label && (
                 <span className='rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold uppercase text-slate-700'>
                   {task.label}
@@ -1239,7 +1246,7 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
                   </button>
                 </div>
 
-                <div className='grid grid-cols-2 gap-2'>
+                <div className='grid grid-cols-3 gap-2'>
                   <select
                     value={editForm.priority}
                     onChange={(event) => setEditForm((prev) => ({ ...prev, priority: event.target.value }))}
@@ -1248,6 +1255,17 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
                     {PRIORITY_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
+                  </select>
+
+                  <select
+                    value={editForm.frequency}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, frequency: event.target.value }))}
+                    className='rounded-lg border border-slate-200 px-3 py-2 text-sm'
+                  >
+                    <option value=''>Never</option>
+                    <option value='weekly'>Weekly</option>
+                    <option value='monthly'>Monthly</option>
+                    <option value='yearly'>Yearly</option>
                   </select>
 
                   <select

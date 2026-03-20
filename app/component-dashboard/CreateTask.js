@@ -13,6 +13,7 @@ export default function CreateTask({ onCancel }) {
   const [label, setLabel] = useState('');
   const [newLabelName, setNewLabelName] = useState('');
   const [priority, setPriority] = useState('Medium');
+  const [frequency, setFrequency] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [assignees, setAssignees] = useState([]);
 
@@ -202,6 +203,7 @@ export default function CreateTask({ onCancel }) {
         description,
         label,
         priority,
+        frequency: frequency || null,
         status: 'Pending',
         startDate: new Date().toLocaleDateString('en-GB', {
           day: 'numeric',
@@ -353,7 +355,7 @@ export default function CreateTask({ onCancel }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Priority</label>
             <select
@@ -364,6 +366,19 @@ export default function CreateTask({ onCancel }) {
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Repeat</label>
+            <select
+              value={frequency}
+              onChange={(e) => setFrequency(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700 bg-white"
+            >
+              <option value="">Never</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
             </select>
           </div>
           <div>

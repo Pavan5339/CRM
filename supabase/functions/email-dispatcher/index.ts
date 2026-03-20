@@ -9,7 +9,7 @@ const EMAIL_NOTIFICATIONS_ENABLED = (Deno.env.get('EMAIL_NOTIFICATIONS_ENABLED')
 
 type OutboxRow = {
   id: string;
-  event_type: 'employee_created' | 'task_assigned' | 'task_due';
+  event_type: 'employee_created' | 'task_assigned' | 'task_due' | 'task_repeat_assigned';
   recipient_email: string;
   payload: Record<string, unknown>;
 };
@@ -65,6 +65,14 @@ function renderEmail(row: OutboxRow) {
       subject: `New task assigned: ${taskName}`,
       text: `Hi ${employeeName}, a new task was assigned.\nTask: ${taskName}\nPriority: ${priority}\nDue: ${dueDate || 'Not set'}\n${taskUrl}`,
       html: `<p>Hi ${employeeName},</p><p>A new task was assigned to you.</p><p><strong>Task:</strong> ${taskName}<br/><strong>Priority:</strong> ${priority}<br/><strong>Due:</strong> ${dueDate || 'Not set'}</p><p><a href="${taskUrl}">Open task</a></p>`,
+    };
+  }
+
+  if (row.event_type === 'task_repeat_assigned') {
+    return {
+      subject: `Repeated task started: ${taskName}`,
+      text: `Hi ${employeeName}, a repeating task cycle has started.\nTask: ${taskName}\nPriority: ${priority}\nDue: ${dueDate || 'Not set'}\n${taskUrl}`,
+      html: `<p>Hi ${employeeName},</p><p>A repeating task cycle has started and you are assigned.</p><p><strong>Task:</strong> ${taskName}<br/><strong>Priority:</strong> ${priority}<br/><strong>Due:</strong> ${dueDate || 'Not set'}</p><p><a href="${taskUrl}">Open task</a></p>`,
     };
   }
 
