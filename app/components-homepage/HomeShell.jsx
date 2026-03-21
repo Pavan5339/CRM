@@ -25,9 +25,9 @@ const otherModules = [
     accent: 'from-cyan-500 via-sky-500 to-blue-600',
   },
   {
-    id: 'client-requirement',
-    title: 'Client Requirement',
-    description: 'Capture requests, align stakeholders, and translate requirements into structured execution.',
+    id: 'hrm',
+    title: 'HRM',
+    description: 'Human Resource Management workspace for the internal BNC team to manage people operations and workflows.',
     icon: Files,
     accent: 'from-amber-400 via-orange-500 to-rose-500',
   },
@@ -139,8 +139,8 @@ export default function HomeShell() {
       return;
     }
 
-    if (moduleId === 'client-requirement') {
-      router.push('/client-requirement');
+    if (moduleId === 'hrm') {
+      router.push('/hrm');
       return;
     }
 
