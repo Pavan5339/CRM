@@ -349,30 +349,11 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
     setError('');
 
     try {
-      const [taskRes, commentsRes, taskLabelsRes] = await Promise.all([
-        fetch(`/api/tasks/${taskId}`, { method: 'GET' }),
-        fetch(`/api/tasks/${taskId}/comments`, { method: 'GET' }),
-        fetch('/api/task-labels', { method: 'GET' }),
-      ]);
-
+      const taskRes = await fetch(`/api/tasks/${taskId}`, { method: 'GET' });
       const taskJson = await taskRes.json();
-      const commentsJson = await commentsRes.json();
-      const taskLabelsJson = await taskLabelsRes.json();
 
       if (!taskRes.ok) {
         throw new Error(taskJson.error || 'Failed to load task details');
-      }
-
-      if (!commentsRes.ok) {
-        throw new Error(commentsJson.error || 'Failed to load task comments');
-      }
-
-      if (taskLabelsRes.ok) {
-        setTaskLabels(
-          Array.isArray(taskLabelsJson.labels)
-            ? taskLabelsJson.labels.map((item) => item.name).filter(Boolean)
-            : []
-        );
       }
 
       const fetchedTask = taskJson.task;
@@ -387,7 +368,8 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
       setViewer(taskJson.viewer || null);
       setEmployees(taskJson.employees || []);
       setAssignmentActivity(taskJson.assignmentActivity || []);
-      setComments(commentsJson.comments || []);
+      setComments(taskJson.comments || []);
+      setTaskLabels(Array.isArray(taskJson.taskLabels) ? taskJson.taskLabels : []);
       setEditForm({
         taskName: fetchedTask.task_name || '',
         description: fetchedTask.description || '',

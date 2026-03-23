@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { adminClient } from '@/utils/supabase/admin';
 
-const SESSION_COOKIE = 'employee_session';
 const EMPLOYEE_DIRECTORY_SELECT = 'id, name, email, role, profile_picture_url';
 const ASSIGNMENT_ACTIVITY_SELECT = `
   id,
@@ -102,11 +101,19 @@ async function getActorFromSupabaseUser() {
 
   if (!user) return null;
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, full_name')
-    .eq('id', user.id)
-    .maybeSingle();
+  // Run profile + employee lookups in parallel (both only need user.id)
+  const [{ data: profile }, { data: employee }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', user.id)
+      .maybeSingle(),
+    adminClient
+      .from('employees')
+      .select('id, name, email, role, profile_picture_url')
+      .eq('auth_user_id', user.id)
+      .maybeSingle(),
+  ]);
 
   if (profile?.role === 'admin') {
     return {
@@ -118,12 +125,6 @@ async function getActorFromSupabaseUser() {
       avatarUrl: user.user_metadata?.avatar_url || null,
     };
   }
-
-  const { data: employee } = await adminClient
-    .from('employees')
-    .select('id, name, email, role, profile_picture_url')
-    .eq('auth_user_id', user.id)
-    .maybeSingle();
 
   if (!employee) return null;
 
@@ -138,38 +139,8 @@ async function getActorFromSupabaseUser() {
   };
 }
 
-async function getActorFromLegacyEmployeeSession(request) {
-  const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!sessionToken) return null;
-
-  const { data: session, error } = await adminClient
-    .from('employee_sessions')
-    .select('employee_id, expires_at, employee:employees(id, name, email, role, profile_picture_url)')
-    .eq('token', sessionToken)
-    .single();
-
-  if (error || !session) return null;
-
-  if (new Date(session.expires_at).getTime() <= Date.now()) {
-    await adminClient.from('employee_sessions').delete().eq('token', sessionToken);
-    return null;
-  }
-
-  return {
-    type: 'employee',
-    employeeId: session.employee_id,
-    authUserId: null,
-    name: session.employee?.name || 'Employee',
-    email: session.employee?.email || '',
-    role: session.employee?.role || 'Employee',
-    avatarUrl: session.employee?.profile_picture_url || null,
-  };
-}
-
 export async function getActor(request) {
-  const jwtActor = await getActorFromSupabaseUser();
-  if (jwtActor) return jwtActor;
-  return getActorFromLegacyEmployeeSession(request);
+  return getActorFromSupabaseUser();
 }
 
 export async function hasTaskAccess(taskId, actor) {

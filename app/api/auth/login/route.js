@@ -7,8 +7,6 @@ import {
   syncEmployeePasswordToAuth,
 } from '@/utils/employee-auth';
 
-const SESSION_COOKIE = 'employee_session';
-
 async function findEmployeeBy(column, value) {
   return adminClient
     .from('employees')
@@ -153,18 +151,6 @@ async function tryEmployeeLogin(email, password) {
   };
 }
 
-function clearLegacyEmployeeSessionCookie(response) {
-  response.cookies.set({
-    name: SESSION_COOKIE,
-    value: '',
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 0,
-  });
-}
-
 export async function POST(request) {
   try {
     const { email, password } = await request.json();
@@ -175,9 +161,7 @@ export async function POST(request) {
 
     const adminResult = await tryAdminLogin(email, password);
     if (adminResult.ok) {
-      const response = NextResponse.json(adminResult.payload);
-      clearLegacyEmployeeSessionCookie(response);
-      return response;
+      return NextResponse.json(adminResult.payload);
     }
 
     const employeeResult = await tryEmployeeLogin(email, password);
@@ -186,9 +170,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const response = NextResponse.json(employeeResult.payload);
-    clearLegacyEmployeeSessionCookie(response);
-    return response;
+    return NextResponse.json(employeeResult.payload);
   } catch (error) {
     console.error('Error in unified login:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });

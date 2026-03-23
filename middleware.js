@@ -35,8 +35,6 @@ export async function middleware(request) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const employeeSessionToken = request.cookies.get('employee_session')?.value
-
   // Admin pages require Supabase auth
   if (!user && isAdminPath) {
     const url = request.nextUrl.clone()
@@ -44,8 +42,8 @@ export async function middleware(request) {
     return NextResponse.redirect(url)
   }
 
-  // Dashboard pages require either Supabase auth or employee session cookie
-  if (!user && isDashboardPath && !employeeSessionToken) {
+  // Dashboard pages require Supabase auth
+  if (!user && isDashboardPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

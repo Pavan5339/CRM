@@ -12,7 +12,7 @@ export default function CreateTask({ onCancel }) {
   const [description, setDescription] = useState('');
   const [label, setLabel] = useState('');
   const [newLabelName, setNewLabelName] = useState('');
-  const [priority, setPriority] = useState('Medium');
+  const [priority, setPriority] = useState('medium');
   const [frequency, setFrequency] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [assignees, setAssignees] = useState([]);
@@ -378,9 +378,9 @@ export default function CreateTask({ onCancel }) {
               onChange={(e) => setPriority(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700 bg-white"
             >
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
             </select>
           </div>
           <div>

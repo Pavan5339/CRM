@@ -66,21 +66,20 @@ async function listStorageAttachments(bucket, folderPath) {
 }
 
 async function fetchStorageAttachments(taskId) {
-  const allAttachments = [];
-
-  for (const bucket of TASK_FILES_BUCKET_CANDIDATES) {
-    const [taskFolderAttachments, tasksFolderAttachments] = await Promise.all([
+  // Process ALL bucket × folder combinations in parallel instead of sequentially
+  const allResults = await Promise.all(
+    TASK_FILES_BUCKET_CANDIDATES.flatMap((bucket) => [
       listStorageAttachments(bucket, String(taskId)),
       listStorageAttachments(bucket, `tasks/${taskId}`),
-    ]);
-
-    allAttachments.push(...taskFolderAttachments, ...tasksFolderAttachments);
-  }
+    ])
+  );
 
   const dedupeByPath = new Map();
-  for (const attachment of allAttachments) {
-    if (attachment?.id) {
-      dedupeByPath.set(attachment.id, attachment);
+  for (const attachments of allResults) {
+    for (const attachment of attachments) {
+      if (attachment?.id) {
+        dedupeByPath.set(attachment.id, attachment);
+      }
     }
   }
 
@@ -164,9 +163,18 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
     }
 
-    const actor = await getActor(request);
+    // Run auth + task fetch in parallel (task fetch doesn't depend on actor)
+    const [actor, task] = await Promise.all([
+      getActor(request),
+      fetchTaskById(taskId),
+    ]);
+
     if (!actor) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
     const canAccess = await hasTaskAccess(taskId, actor);
@@ -174,15 +182,29 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const task = await fetchTaskById(taskId);
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-    }
-
-    const [employees, assignmentActivity] = await Promise.all([
+    // Fetch employees, assignment activity, comments, and labels all in parallel
+    const [employees, assignmentActivity, commentsResult, labelsResult] = await Promise.all([
       fetchEmployeeDirectory(adminClient),
       fetchAssignmentActivity(taskId, adminClient),
+      adminClient
+        .from('task_comments')
+        .select('id, task_id, author_type, author_name, author_avatar_url, comment_text, created_at, updated_at, employee_id, profile_id')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: true }),
+      adminClient
+        .from('task_labels')
+        .select('id, name, created_at')
+        .order('name', { ascending: true }),
     ]);
+
+    const comments = (commentsResult.data || []).map((comment) => ({
+      ...comment,
+      can_delete:
+        (actor.type === 'admin' && comment.author_type === 'admin' && comment.profile_id === actor.userId) ||
+        (actor.type === 'employee' && comment.author_type === 'employee' && comment.employee_id === actor.employeeId),
+    }));
+
+    const taskLabels = (labelsResult.data || []).map((item) => item.name).filter(Boolean);
 
     const viewer = {
       type: actor.type,
@@ -193,7 +215,7 @@ export async function GET(request, { params }) {
       canRateTask: task.status === 'completed' && !!actor.authUserId && task.created_by === actor.authUserId,
     };
 
-    return NextResponse.json({ success: true, task, viewer, employees, assignmentActivity });
+    return NextResponse.json({ success: true, task, viewer, employees, assignmentActivity, comments, taskLabels });
   } catch (error) {
     console.error('Error fetching task detail:', error);
     return NextResponse.json({ error: 'Failed to fetch task detail' }, { status: 500 });
