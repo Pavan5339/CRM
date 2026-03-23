@@ -1,6 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function Dashboard() {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isSwipesModalOpen, setIsSwipesModalOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedFullDate = currentTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const formattedShortDate = currentTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const dayName = currentTime.toLocaleDateString('en-GB', { weekday: 'long' });
+  
+  const hours = currentTime.getHours().toString().padStart(2, '0');
+  const minutes = currentTime.getMinutes().toString().padStart(2, '0');
+  const seconds = currentTime.getSeconds().toString().padStart(2, '0');
+  const timeString = { hours, minutes, seconds };
+
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-12">
       {/* Welcome Hero Section */}
@@ -137,14 +154,35 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div className="bg-[#2d3335] p-8 rounded-[1.5rem] text-white flex flex-col justify-between min-h-[220px] shadow-lg">
-            <div>
-              <h4 className="text-2xl font-bold font-headline mb-2">Policy Manual</h4>
-              <p className="text-sm opacity-60 leading-relaxed">Updated HR guidelines for 2024 are now available for review.</p>
+          <div className="bg-gradient-to-br from-[#f8f9fc] to-[#eef2f6] border border-outline-variant/30 p-8 rounded-[1.5rem] text-on-surface flex flex-col justify-between min-h-[220px] shadow-sm relative overflow-hidden group">
+            <div className="absolute top-6 right-6 flex items-center justify-center">
+              <span className="absolute w-4 h-4 rounded-full bg-emerald-400 animate-ping opacity-75"></span>
+              <span className="relative w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+              <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-pink-400"></span>
             </div>
-            <div className="flex justify-between items-center mt-6">
-              <span className="material-symbols-outlined text-4xl opacity-20">menu_book</span>
-              <button className="px-5 py-2 bg-surface/10 text-white border border-white/20 rounded-lg text-sm font-bold hover:bg-surface/20 transition-colors">Read PDF</button>
+            
+            <div className="space-y-1 relative z-10">
+              <p className="text-base font-semibold text-on-surface-variant flex items-center gap-2">
+                {formattedFullDate}
+              </p>
+              <p className="text-sm text-on-surface-variant opacity-80 flex items-center gap-2">
+                {dayName} | <span className="font-mono text-xs font-semibold bg-surface-container-high px-2 py-0.5 rounded-sm">1019</span>
+              </p>
+              <div className="mt-4 font-mono text-[2.5rem] tracking-tight font-light text-primary flex items-baseline gap-1">
+                {timeString.hours}<span className="animate-pulse opacity-50 relative -top-1">:</span>{timeString.minutes}<span className="text-xl ml-1 text-on-surface-variant opacity-60">:{timeString.seconds}</span>
+              </div>
+            </div>
+            
+            <div className="flex justify-between items-center mt-6 relative z-10">
+              <button 
+                onClick={() => setIsSwipesModalOpen(true)}
+                className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors flex items-center gap-1 hover:underline"
+              >
+                View Swipes
+              </button>
+              <button className="px-5 py-2.5 bg-[#4c6bf4] hover:bg-[#3f5be0] text-white rounded-xl text-sm font-bold shadow-md shadow-primary/20 hover:-translate-y-0.5 transition-all">
+                Sign Out
+              </button>
             </div>
           </div>
         </div>
@@ -164,6 +202,57 @@ export default function Dashboard() {
           <a className="text-xs text-on-surface-variant hover:text-primary font-medium transition-colors" href="#">Support Center</a>
         </div>
       </footer>
+      
+      {isSwipesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity">
+          <div className="bg-surface w-[calc(100%-2rem)] max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-outline-variant/20 scale-100 transition-transform">
+            <div className="bg-surface-container-lowest px-6 py-4 flex items-center justify-between border-b border-outline-variant/10">
+              <h3 className="text-lg font-bold font-headline text-on-surface flex items-center gap-2">
+                Swipes
+              </h3>
+              <button 
+                onClick={() => setIsSwipesModalOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                title="Close"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            
+            <div className="p-6 bg-surface">
+              <div className="flex flex-wrap gap-x-8 gap-y-4 items-center text-sm mb-6 text-on-surface-variant">
+                <div>Date <span className="font-semibold text-on-surface ml-1">{formattedShortDate}</span></div>
+                <div>Shift Time <span className="font-semibold text-on-surface ml-1">10:00 to 19:00</span></div>
+                <div>Shift Type <span className="font-semibold text-on-surface ml-1">1019</span></div>
+              </div>
+              
+              <div className="overflow-hidden rounded-xl border border-outline-variant/20">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-[#eaf4fa] text-on-surface-variant font-semibold">
+                    <tr>
+                      <th className="px-4 py-3 border-b border-outline-variant/10">Swipe Time</th>
+                      <th className="px-4 py-3 border-b border-outline-variant/10">In/Out</th>
+                      <th className="px-4 py-3 border-b border-outline-variant/10">Door/Address</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-surface-container-lowest divide-y divide-outline-variant/10">
+                    <tr className="hover:bg-surface-container-low/50 transition-colors">
+                      <td className="px-4 py-3 font-mono text-on-surface">10:00:03</td>
+                      <td className="px-4 py-3 font-semibold text-on-surface">IN</td>
+                      <td className="px-4 py-3 text-on-surface-variant">-</td>
+                    </tr>
+                    <tr className="hover:bg-surface-container-low/50 transition-colors">
+                      <td className="px-4 py-3 font-mono text-on-surface opacity-30">--:--:--</td>
+                      <td className="px-4 py-3 font-semibold text-on-surface-variant opacity-30">-</td>
+                      <td className="px-4 py-3 text-on-surface-variant opacity-30">-</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
