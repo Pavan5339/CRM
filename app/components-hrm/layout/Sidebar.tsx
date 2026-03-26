@@ -15,15 +15,15 @@ export default function Sidebar({ currentTab, setCurrentTab }: SidebarProps) {
   ];
 
   return (
-    <aside className="h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-surface-container-low flex flex-col py-8 pr-4 z-50">
-      <div className="px-8 mb-10">
-        <h1 className="text-2xl font-bold text-on-background font-headline">Sanctuary HR</h1>
+    <aside className="h-screen w-64 fixed left-0 top-0 overflow-y-auto bg-surface-container-low flex flex-col py-6 pr-4 z-50">
+      <div className="px-6 mb-8">
+        <h1 className="text-xl font-bold text-on-background font-headline">Sanctuary HR</h1>
       </div>
       
-      <div className="px-8 mb-8 flex items-center gap-4">
+      <div className="px-6 mb-6 flex items-center gap-4">
         <img 
           alt="User Profile Avatar" 
-          className="w-12 h-12 rounded-full object-cover" 
+          className="w-10 h-10 rounded-full object-cover" 
           src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9uJH1i8zKJXpfoh9Yh7RZq-cTIioMkp9r80fWS8nWmkFmSlAR6QQxpRyQeDtE_9Wd0EMhYRoe1ggQDke6PEOzhTnhpnEkRsd1tsMnXXNCmA5NiFdaEB2vZ36t48qERBFgrPdQ-vsjFkPIYoT1rgK-_V1L2GUz9AHHp6W3Wj_iAD9uO3DFM53TyeACEXl8hT8r3zGTBhrEumYXhJ_PIwkjBuM_PQr_4_IAA2KHVpN50FvS2_BfHcEmxMSDMl0o9e7CZgE2KpxQcqk"
         />
         <div>
@@ -39,7 +39,7 @@ export default function Sidebar({ currentTab, setCurrentTab }: SidebarProps) {
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center gap-3 px-6 py-3 transition-colors group ${
+              className={`w-full flex items-center gap-3 px-5 py-2.5 transition-colors group ${
                 isActive 
                   ? 'text-primary bg-surface-container-lowest rounded-r-full font-bold shadow-sm' 
                   : 'text-on-surface-variant hover:text-primary hover:bg-surface-container-lowest/50 rounded-r-full'
@@ -59,18 +59,18 @@ export default function Sidebar({ currentTab, setCurrentTab }: SidebarProps) {
         })}
       </nav>
 
-      <div className="px-8 mt-6">
-        <button className="w-full bg-primary text-on-primary py-3 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all">
+      <div className="px-6 mt-4">
+        <button className="w-full bg-primary text-on-primary py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all">
           Quick Check-in
         </button>
       </div>
 
       <div className="mt-auto border-t border-outline-variant/10 pt-6">
-        <button className="w-full flex items-center gap-3 px-6 py-3 text-on-surface-variant hover:text-primary transition-colors">
+        <button className="w-full flex items-center gap-3 px-5 py-2.5 text-on-surface-variant hover:text-primary transition-colors">
           <span className="material-symbols-outlined">settings</span>
           <span className="font-body text-sm font-medium">Settings</span>
         </button>
-        <button className="w-full flex items-center gap-3 px-6 py-3 text-error/80 hover:text-error transition-colors">
+        <button className="w-full flex items-center gap-3 px-5 py-2.5 text-error/80 hover:text-error transition-colors">
           <span className="material-symbols-outlined">logout</span>
           <span className="font-body text-sm font-medium">Logout</span>
         </button>
