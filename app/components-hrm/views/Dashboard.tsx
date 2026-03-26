@@ -154,33 +154,64 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-[#f8f9fc] to-[#eef2f6] border border-outline-variant/30 p-6 rounded-2xl text-on-surface flex flex-col justify-between min-h-[180px] shadow-sm relative overflow-hidden group">
-            <div className="absolute top-6 right-6 flex items-center justify-center">
-              <span className="absolute w-4 h-4 rounded-full bg-emerald-400 animate-ping opacity-75"></span>
-              <span className="relative w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-              <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-pink-400"></span>
+          <div className="bg-gradient-to-br from-white via-slate-50 to-slate-100 border border-slate-200/60 p-6 rounded-2xl text-on-surface flex flex-col justify-between min-h-[180px] shadow-sm relative overflow-hidden group">
+            {/* Subtle background pattern */}
+            <div className="absolute inset-0 opacity-40">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/5 to-transparent rounded-full blur-2xl"></div>
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-blue-500/5 to-transparent rounded-full blur-2xl"></div>
             </div>
             
-            <div className="space-y-1 relative z-10">
-              <p className="text-sm font-semibold text-on-surface-variant flex items-center gap-2">
-                {formattedFullDate}
-              </p>
-              <p className="text-xs text-on-surface-variant opacity-80 flex items-center gap-2">
-                {dayName} | <span className="font-mono text-[10px] font-semibold bg-surface-container-high px-2 py-0.5 rounded-sm">1019</span>
-              </p>
-              <div className="mt-2 font-mono text-3xl tracking-tight font-light text-primary flex items-baseline gap-1">
-                {timeString.hours}<span className="animate-pulse opacity-50 relative -top-1">:</span>{timeString.minutes}<span className="text-lg ml-1 text-on-surface-variant opacity-60">:{timeString.seconds}</span>
+            {/* Live indicator */}
+            <div className="absolute top-5 right-5 flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span className="text-[10px] font-medium text-emerald-600 uppercase tracking-wide">Live</span>
+            </div>
+            
+            <div className="space-y-3 relative z-10">
+              {/* Date with clean styling */}
+              <div className="inline-flex items-center gap-2">
+                <span className="material-symbols-outlined text-base text-slate-400">calendar_today</span>
+                <p className="text-sm font-medium text-slate-600">
+                  {formattedFullDate}
+                </p>
+              </div>
+              
+              {/* Day and shift info */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-slate-500">{dayName}</span>
+                <span className="w-px h-3 bg-slate-300"></span>
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100">
+                  <span className="text-[11px] font-bold text-indigo-600 font-mono">1019</span>
+                </span>
+              </div>
+              
+              {/* Clock display - more elegant */}
+              <div className="mt-3 flex items-baseline gap-0">
+                <span className="font-mono text-4xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-600 tracking-tight">
+                  {timeString.hours}
+                </span>
+                <span className="font-mono text-4xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-600 tracking-tight animate-pulse">:</span>
+                <span className="font-mono text-4xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-600 tracking-tight">
+                  {timeString.minutes}
+                </span>
+                <span className="font-mono text-xl font-medium text-slate-400 ml-1">:{timeString.seconds}</span>
               </div>
             </div>
             
-            <div className="flex justify-between items-center mt-4 relative z-10">
+            {/* Action buttons */}
+            <div className="flex items-center gap-3 mt-6 relative z-10">
               <button 
                 onClick={() => setIsSwipesModalOpen(true)}
-                className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors flex items-center gap-1 hover:underline"
+                className="group flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md hover:shadow-indigo-500/10 transition-all duration-200"
               >
+                <span className="material-symbols-outlined text-base group-hover:scale-110 transition-transform">badge</span>
                 View Swipes
               </button>
-              <button className="px-4 py-2 bg-[#4c6bf4] hover:bg-[#3f5be0] text-white rounded-xl text-xs font-bold shadow-md shadow-primary/20 hover:-translate-y-0.5 transition-all">
+              <button className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-base">logout</span>
                 Sign Out
               </button>
             </div>
