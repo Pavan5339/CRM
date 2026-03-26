@@ -1,8 +1,92 @@
 import React, { useState, useEffect } from 'react';
 
+// Dummy holiday data for the dashboard card and full calendar modal
+const holidays = [
+  {
+    id: '1',
+    date: '2026-03-30',
+    title: 'Ugadi',
+    type: 'Festival Holiday',
+    occasion: 'Telugu and Kannada New Year',
+    description: 'Celebrated as the traditional new year with prayers, family meals, and festive gatherings.',
+  },
+  {
+    id: '2',
+    date: '2026-04-03',
+    title: 'Good Friday',
+    type: 'Gazetted Holiday',
+    occasion: 'Christian observance',
+    description: 'A day of reflection and prayer commemorating the crucifixion of Jesus Christ.',
+  },
+  {
+    id: '3',
+    date: '2026-04-14',
+    title: 'Dr. Ambedkar Jayanti',
+    type: 'National Holiday',
+    occasion: 'Birth anniversary of Dr. B. R. Ambedkar',
+    description: 'Observed to honor Dr. Ambedkar’s contribution to the Constitution and social justice in India.',
+  },
+  {
+    id: '4',
+    date: '2026-05-01',
+    title: 'Labour Day',
+    type: 'National Holiday',
+    occasion: 'International Workers’ Day',
+    description: 'Recognizes workers, labor rights, and the contributions of people across industries.',
+  },
+  {
+    id: '5',
+    date: '2026-08-15',
+    title: 'Independence Day',
+    type: 'National Holiday',
+    occasion: 'Independence of India',
+    description: 'Marked with flag hoisting, cultural programs, and remembrance of the freedom movement.',
+  },
+  {
+    id: '6',
+    date: '2026-08-28',
+    title: 'Onam',
+    type: 'Festival Holiday',
+    occasion: 'Harvest festival of Kerala',
+    description: 'Celebrated with floral decorations, traditional feasts, and community events.',
+  },
+  {
+    id: '7',
+    date: '2026-10-19',
+    title: 'Diwali',
+    type: 'Festival Holiday',
+    occasion: 'Festival of Lights',
+    description: 'Observed with lamps, sweets, family visits, and prayers symbolizing light over darkness.',
+  },
+  {
+    id: '8',
+    date: '2026-12-25',
+    title: 'Christmas Day',
+    type: 'Gazetted Holiday',
+    occasion: 'Christmas celebration',
+    description: 'A holiday for church services, community celebrations, and time with family.',
+  },
+];
+
+const cardHolidays = holidays.slice(0, 3);
+
 export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isSwipesModalOpen, setIsSwipesModalOpen] = useState(false);
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  // Escape key handler for modals
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        if (isSwipesModalOpen) setIsSwipesModalOpen(false);
+        if (isHolidayModalOpen) setIsHolidayModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isSwipesModalOpen, isHolidayModalOpen]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -17,6 +101,110 @@ export default function Dashboard() {
   const minutes = currentTime.getMinutes().toString().padStart(2, '0');
   const seconds = currentTime.getSeconds().toString().padStart(2, '0');
   const timeString = { hours, minutes, seconds };
+
+  // Calendar helper functions
+  const getMonthData = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDay = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+    const today = new Date();
+    
+    const days = [];
+    // Previous month padding
+    for (let i = 0; i < startDay; i++) {
+      days.push({ day: null, isCurrentMonth: false });
+    }
+    // Current month days
+    for (let i = 1; i <= totalDays; i++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      const holiday = holidays.find(h => h.date === dateStr);
+      const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === i;
+      days.push({ 
+        day: i, 
+        date: dateStr,
+        isCurrentMonth: true, 
+        isWeekend: new Date(year, month, i).getDay() === 0 || new Date(year, month, i).getDay() === 6,
+        isToday,
+        holiday
+      });
+    }
+    // Next month padding
+    const remaining = 42 - days.length;
+    for (let i = 0; i < remaining; i++) {
+      days.push({ day: null, isCurrentMonth: false });
+    }
+    
+    return { days, year, month, monthName: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) };
+  };
+
+  const getMonthFromHoliday = (holidayDate) => {
+    const [year, month] = holidayDate.split('-').map(Number);
+    return new Date(year, month - 1, 1);
+  };
+
+  const getHolidayForMonth = (date) => holidays.find((holiday) => {
+    const holidayDate = parseDate(holiday.date);
+    return holidayDate.getFullYear() === date.getFullYear() && holidayDate.getMonth() === date.getMonth();
+  });
+
+  // Find next upcoming holiday, otherwise fall back to the latest holiday month in the list
+  const getDefaultMonth = () => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const nextHoliday = holidays.find(h => h.date >= todayStr);
+    if (nextHoliday) {
+      return getMonthFromHoliday(nextHoliday.date);
+    }
+
+    const latestHoliday = holidays[holidays.length - 1];
+    if (latestHoliday) {
+      return getMonthFromHoliday(latestHoliday.date);
+    }
+
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  };
+
+  const [calendarMonth, setCalendarMonth] = useState(() => getDefaultMonth());
+  const monthData = getMonthData(calendarMonth);
+
+  const changeCalendarMonth = (offset) => {
+    const nextMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + offset, 1);
+    setCalendarMonth(nextMonth);
+    setSelectedDate(getHolidayForMonth(nextMonth) || null);
+  };
+
+  const goToPrevMonth = () => changeCalendarMonth(-1);
+  const goToNextMonth = () => changeCalendarMonth(1);
+
+  const openHolidayModal = () => {
+    const defaultMonth = getDefaultMonth();
+    setCalendarMonth(defaultMonth);
+    setSelectedDate(getHolidayForMonth(defaultMonth) || null);
+    setIsHolidayModalOpen(true);
+  };
+
+  const handleDateClick = (dayInfo) => {
+    if (dayInfo.isCurrentMonth && dayInfo.holiday) {
+      setSelectedDate(dayInfo.holiday);
+    }
+  };
+
+  // Safe date parsing without timezone issues
+  const parseDate = (dateStr) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const getHolidayDateInfo = (dateStr) => {
+    const d = parseDate(dateStr);
+    return {
+      month: d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(),
+      day: d.getDate()
+    };
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-8">
@@ -105,38 +293,27 @@ export default function Dashboard() {
             <button className="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors text-xl">more_horiz</button>
           </div>
           <div className="space-y-4">
-            <div className="flex items-center gap-4 group cursor-pointer">
-              <div className="w-12 h-12 rounded-xl bg-surface-container-low flex flex-col items-center justify-center border border-outline-variant/15 group-hover:bg-primary/5 transition-colors">
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase">Oct</span>
-                <span className="text-base font-bold text-primary">24</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-on-surface">Dussehra Festival</p>
-                <p className="text-xs text-on-surface-variant">Tuesday • National Holiday</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 group cursor-pointer">
-              <div className="w-12 h-12 rounded-xl bg-surface-container-low flex flex-col items-center justify-center border border-outline-variant/15 group-hover:bg-primary/5 transition-colors">
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase">Nov</span>
-                <span className="text-base font-bold text-primary">12</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-on-surface">Diwali Vacation</p>
-                <p className="text-xs text-on-surface-variant">Sunday • Festival Holiday</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 group cursor-pointer">
-              <div className="w-12 h-12 rounded-xl bg-surface-container-low flex flex-col items-center justify-center border border-outline-variant/15 group-hover:bg-primary/5 transition-colors">
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase">Dec</span>
-                <span className="text-base font-bold text-primary">25</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-on-surface">Christmas Day</p>
-                <p className="text-xs text-on-surface-variant">Monday • Gazetted Holiday</p>
-              </div>
-            </div>
+            {cardHolidays.map((holiday) => {
+              const dateInfo = getHolidayDateInfo(holiday.date);
+              const weekday = parseDate(holiday.date).toLocaleDateString('en-GB', { weekday: 'short' });
+              return (
+                <div key={holiday.id} className="flex items-center gap-4 group cursor-pointer">
+                  <div className="w-12 h-12 rounded-xl bg-surface-container-low flex flex-col items-center justify-center border border-outline-variant/15 group-hover:bg-primary/5 transition-colors">
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase">{dateInfo.month}</span>
+                    <span className="text-base font-bold text-primary">{dateInfo.day}</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-on-surface">{holiday.title}</p>
+                    <p className="text-xs text-on-surface-variant">{weekday} • {holiday.type}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <button className="w-full mt-6 py-2 bg-surface-container-low text-on-surface-variant rounded-lg text-sm font-semibold hover:bg-surface-container transition-colors">
+          <button 
+            onClick={openHolidayModal}
+            className="w-full mt-6 py-2 bg-surface-container-low text-on-surface-variant rounded-lg text-sm font-semibold hover:bg-surface-container transition-colors"
+          >
             Full Calendar
           </button>
         </div>
@@ -295,6 +472,171 @@ export default function Dashboard() {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Holiday Calendar Modal */}
+      {isHolidayModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity"
+          onClick={(e) => e.target === e.currentTarget && setIsHolidayModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="holiday-modal-title"
+        >
+          <div id="holiday-modal-title" className="sr-only">Holiday Calendar</div>
+          <div className="bg-surface w-[calc(100%-2rem)] max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden border border-outline-variant/20 scale-100 transition-transform flex flex-col">
+            {/* Modal Header */}
+            <div className="bg-surface-container-lowest px-6 py-4 flex items-center justify-between border-b border-outline-variant/10 shrink-0">
+              <h3 className="text-lg font-bold font-headline text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">calendar_month</span>
+                Holiday Calendar
+              </h3>
+              <button 
+                onClick={() => setIsHolidayModalOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                title="Close"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="flex flex-col lg:flex-row overflow-hidden">
+              {/* Calendar Grid */}
+              <div className="flex-1 p-6 overflow-y-auto">
+                {/* Month Navigation */}
+                <div className="flex items-center justify-between mb-6">
+                  <button 
+                    onClick={goToPrevMonth}
+                    className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+                  >
+                    <span className="material-symbols-outlined">chevron_left</span>
+                  </button>
+                  <h4 className="text-xl font-bold font-headline text-on-surface">{monthData.monthName}</h4>
+                  <button 
+                    onClick={goToNextMonth}
+                    className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+                  >
+                    <span className="material-symbols-outlined">chevron_right</span>
+                  </button>
+                </div>
+                
+                {/* Weekday Headers */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className="text-center text-xs font-semibold text-on-surface-variant py-2">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Calendar Days Grid */}
+                <div className="grid grid-cols-7 gap-2">
+                  {monthData.days.map((dayInfo, idx) => {
+                    if (!dayInfo.isCurrentMonth || !dayInfo.day) {
+                      return <div key={idx} className="h-14 rounded-xl" aria-hidden="true"></div>;
+                    }
+
+                    const isSelected = selectedDate?.date === dayInfo.date;
+                    const baseClasses = 'relative flex h-14 flex-col justify-between rounded-xl px-3 py-2 text-left transition-all';
+                    const stateClasses = isSelected
+                      ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10'
+                      : dayInfo.holiday
+                        ? 'bg-amber-50 text-slate-900 ring-1 ring-amber-200 hover:bg-amber-100'
+                        : dayInfo.isWeekend
+                          ? 'bg-surface-container-low text-on-surface hover:bg-surface-container'
+                          : 'bg-transparent text-on-surface hover:bg-surface-container-low';
+                    const interactivityClasses = dayInfo.holiday ? 'cursor-pointer' : 'cursor-default';
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        className={`${baseClasses} ${stateClasses} ${interactivityClasses} ${dayInfo.isToday ? 'ring-1 ring-slate-300' : ''}`}
+                        disabled={!dayInfo.holiday}
+                        onClick={() => handleDateClick(dayInfo)}
+                      >
+                        <span className={`relative z-10 block text-base font-bold leading-none ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                          {dayInfo.day}
+                        </span>
+                        {dayInfo.holiday && (
+                          <>
+                            <span className={`absolute right-2 top-2 inline-flex h-2.5 w-2.5 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500'}`}></span>
+                            <span className={`relative z-10 mt-2 inline-flex max-w-full self-start truncate rounded-full px-2 py-1 text-[10px] font-semibold ${isSelected ? 'bg-white/15 text-white' : 'bg-white text-amber-700 shadow-sm'}`}>
+                              Holiday
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {/* Legend */}
+                <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t border-outline-variant/10 text-xs text-on-surface-variant">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span>Holiday</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded bg-surface-container-low ring-1 ring-slate-300"></span>
+                    <span>Today</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded bg-slate-900"></span>
+                    <span>Selected</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Holiday Detail Panel */}
+              <div className="w-full lg:w-72 bg-surface-container-lowest p-6 border-t lg:border-t-0 lg:border-l border-outline-variant/10 shrink-0">
+                <h5 className="text-sm font-bold font-headline text-on-surface-variant uppercase tracking-wide mb-4">
+                  Selected Date
+                </h5>
+                {selectedDate ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-xl bg-surface-container flex flex-col items-center justify-center border border-outline-variant/20">
+                        <span className="text-[10px] font-bold text-on-surface-variant uppercase">
+                          {parseDate(selectedDate.date).toLocaleDateString('en-GB', { month: 'short' })}
+                        </span>
+                        <span className="text-xl font-bold text-on-surface">
+                          {parseDate(selectedDate.date).getDate()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-on-surface">{selectedDate.title}</p>
+                        <p className="text-xs text-on-surface-variant">
+                          {parseDate(selectedDate.date).toLocaleDateString('en-GB', { weekday: 'long' })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-outline-variant/10">
+                      <p className="text-xs text-on-surface-variant mb-1">Occasion</p>
+                      <span className="inline-flex px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs font-semibold border border-outline-variant/20">
+                        {selectedDate.occasion}
+                      </span>
+                    </div>
+                    <div className="pt-4 border-t border-outline-variant/10">
+                      <p className="text-xs text-on-surface-variant mb-2">Holiday Type</p>
+                      <p className="text-sm font-medium text-on-surface">{selectedDate.type}</p>
+                    </div>
+                    <div className="pt-4 border-t border-outline-variant/10">
+                      <p className="text-xs text-on-surface-variant mb-2">About This Holiday</p>
+                      <p className="text-sm leading-6 text-on-surface-variant">{selectedDate.description}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-40 text-center">
+                    <span className="material-symbols-outlined text-on-surface-variant text-4xl mb-2 opacity-50">event</span>
+                    <p className="text-sm text-on-surface-variant">Select a holiday from the calendar</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
