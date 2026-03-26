@@ -141,20 +141,36 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Quick Action Cards / Banner */}
-        <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-br from-primary to-primary-container p-6 rounded-2xl text-on-primary flex flex-col justify-between min-h-[180px] shadow-lg shadow-primary/20">
-            <div>
-              <h4 className="text-xl font-bold font-headline mb-1">Request Leave</h4>
-              <p className="text-xs opacity-80 leading-relaxed">Planning a getaway? Submit your leave application in just a few clicks.</p>
+        {/* Quick Action Cards - 2 Column with Split Left */}
+        <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
+          {/* Left Column - Split into two stacked cards */}
+          <div className="flex flex-col h-full min-h-65">
+            {/* Request Leave Card */}
+            <div className="bg-gradient-to-br from-primary to-primary-container p-6 rounded-t-2xl text-on-primary flex flex-col justify-between flex-1 shadow-lg shadow-primary/20 group hover:shadow-xl hover:shadow-primary/30 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-lg">flight_takeoff</span>
+                  <h4 className="text-base font-bold font-headline">Request Leave</h4>
+                </div>
+                <button className="px-3 py-1.5 bg-surface-container-lowest/90 text-primary rounded-lg text-xs font-bold shadow-sm hover:scale-105 hover:bg-surface-container-lowest transition-all">Apply Now</button>
+              </div>
+              <p className="text-xs opacity-80 mt-1">Planning a getaway? Submit your leave application in just a few clicks.</p>
             </div>
-            <div className="flex justify-between items-center mt-4">
-              <span className="material-symbols-outlined text-3xl opacity-40">flight_takeoff</span>
-              <button className="px-4 py-2 bg-surface-container-lowest text-primary rounded-lg text-xs font-bold shadow-sm hover:scale-105 transition-transform">Apply Now</button>
+
+            {/* Policy Manual Card - Matching the style */}
+            <div className="bg-gradient-to-br from-white via-slate-50 to-slate-100 border border-slate-200/60 p-6 rounded-b-2xl text-on-surface flex flex-col justify-between flex-1 shadow-sm group hover:shadow-md hover:shadow-slate-500/10 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-lg text-slate-500">menu_book</span>
+                  <h4 className="text-base font-bold font-headline text-slate-700">Policy Manual</h4>
+                </div>
+                <button className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all">View</button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Access company policies, HR guidelines, and workplace rules.</p>
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-white via-slate-50 to-slate-100 border border-slate-200/60 p-6 rounded-2xl text-on-surface flex flex-col justify-between min-h-[180px] shadow-sm relative overflow-hidden group">
+          <div className="bg-gradient-to-br from-white via-slate-50 to-slate-100 border border-slate-200/60 p-6 rounded-2xl text-on-surface flex flex-col justify-between h-full min-h-65 shadow-sm relative overflow-hidden group">
             {/* Subtle background pattern */}
             <div className="absolute inset-0 opacity-40">
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/5 to-transparent rounded-full blur-2xl"></div>
