@@ -76,15 +76,24 @@ export default function Leave() {
                   <option>Maternity/Paternity</option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant ml-1">Start Date</label>
-                  <input className="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 text-sm text-on-surface outline-none" type="date" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant ml-1">End Date</label>
-                  <input className="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 text-sm text-on-surface outline-none" type="date" />
-                </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant ml-1">Session</label>
+                <select className="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 text-sm text-on-surface font-medium outline-none appearance-none">
+                  <option>Full Session</option>
+                  <option>10-1AM Session</option>
+                  <option>1-7Am Session</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant ml-1">Start Date</label>
+                <input className="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 text-sm text-on-surface outline-none" type="date" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant ml-1">End Date</label>
+                <input className="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 text-sm text-on-surface outline-none" type="date" />
               </div>
             </div>
             
