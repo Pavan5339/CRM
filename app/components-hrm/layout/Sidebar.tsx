@@ -15,7 +15,7 @@ export default function Sidebar({ currentTab, setCurrentTab }: SidebarProps) {
   ];
 
   return (
-    <aside className="h-screen w-64 fixed left-0 top-0 overflow-y-auto bg-surface-container-low flex flex-col py-6 pr-4 z-50">
+    <aside className="h-screen w-60 fixed left-0 top-0 overflow-y-auto bg-surface-container-low flex flex-col py-6 pr-4 z-50">
       <div className="px-6 mb-8">
         <h1 className="text-xl font-bold text-on-background font-headline">Sanctuary HR</h1>
       </div>

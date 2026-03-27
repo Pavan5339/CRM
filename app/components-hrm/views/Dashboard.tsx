@@ -412,21 +412,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Footer Info Section */}
-      <footer className="mt-20 flex flex-col md:flex-row justify-between items-center py-8 border-t border-outline-variant/15 gap-4">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <p className="text-xs font-medium text-on-surface-variant">System Status: Optimal</p>
-          </div>
-          <p className="text-xs text-on-surface-variant hidden md:block">© 2024 Sanctuary HRMS. All rights reserved.</p>
-        </div>
-        <div className="flex gap-6">
-          <a className="text-xs text-on-surface-variant hover:text-primary font-medium transition-colors" href="#">Privacy Policy</a>
-          <a className="text-xs text-on-surface-variant hover:text-primary font-medium transition-colors" href="#">Support Center</a>
-        </div>
-      </footer>
-      
       {isSwipesModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity">
           <div className="bg-surface w-[calc(100%-2rem)] max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-outline-variant/20 scale-100 transition-transform">

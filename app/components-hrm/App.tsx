@@ -42,7 +42,7 @@ export default function App() {
     <div className="flex min-h-screen bg-surface">
       <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
       
-      <div className="flex-1 flex flex-col ml-72">
+      <div className="flex-1 flex flex-col ml-64">
         <TopBar title={getTitle()} showDate={currentTab === 'home'} />
         
         <main className="flex-1 relative">
