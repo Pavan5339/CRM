@@ -1,9 +1,160 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 
+// ── Attendance record shape ──────────────────────────────────────────
+type AttendanceStatus = 'present' | 'absent' | 'late' | 'halfday' | 'weekend' | 'holiday';
+
+interface AttendanceRecord {
+  date: string;          // YYYY-MM-DD
+  status: AttendanceStatus;
+  checkIn: string;       // e.g. "09:02 AM"
+  checkOut: string;
+  lateIn: string;        // e.g. "12 min" or "-"
+  earlyOut: string;
+  workHours: string;     // e.g. "8h 42m"
+  shiftHours: string;    // e.g. "9h 00m"
+  notes: string;
+}
+
+// ── Static seed data for March 2026 ─────────────────────────────────
+const ATTENDANCE_DATA: AttendanceRecord[] = [
+  { date: '2026-03-02', status: 'present',  checkIn: '09:55 AM', checkOut: '07:10 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 15m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-03', status: 'present',  checkIn: '09:48 AM', checkOut: '07:02 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 14m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-04', status: 'late',     checkIn: '10:32 AM', checkOut: '07:15 PM', lateIn: '32 min', earlyOut: '-',      workHours: '8h 43m', shiftHours: '9h 00m', notes: 'Late arrival — traffic delay' },
+  { date: '2026-03-05', status: 'present',  checkIn: '09:50 AM', checkOut: '07:05 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 15m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-06', status: 'present',  checkIn: '09:58 AM', checkOut: '07:00 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 02m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-09', status: 'present',  checkIn: '09:45 AM', checkOut: '07:08 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 23m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-10', status: 'halfday',  checkIn: '09:50 AM', checkOut: '02:00 PM', lateIn: '-',      earlyOut: '5h 00m', workHours: '4h 10m', shiftHours: '9h 00m', notes: 'Half day — personal errand' },
+  { date: '2026-03-11', status: 'present',  checkIn: '09:52 AM', checkOut: '07:12 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 20m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-12', status: 'present',  checkIn: '09:47 AM', checkOut: '07:00 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 13m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-13', status: 'absent',   checkIn: '-',        checkOut: '-',        lateIn: '-',      earlyOut: '-',      workHours: '0h 00m', shiftHours: '9h 00m', notes: 'Absent — sick leave' },
+  { date: '2026-03-16', status: 'present',  checkIn: '09:55 AM', checkOut: '07:05 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 10m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-17', status: 'present',  checkIn: '09:42 AM', checkOut: '07:00 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 18m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-18', status: 'late',     checkIn: '10:18 AM', checkOut: '07:20 PM', lateIn: '18 min', earlyOut: '-',      workHours: '9h 02m', shiftHours: '9h 00m', notes: 'Late arrival' },
+  { date: '2026-03-19', status: 'present',  checkIn: '09:50 AM', checkOut: '07:10 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 20m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-20', status: 'present',  checkIn: '09:48 AM', checkOut: '07:02 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 14m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-23', status: 'present',  checkIn: '09:55 AM', checkOut: '07:08 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 13m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-24', status: 'present',  checkIn: '09:40 AM', checkOut: '07:00 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 20m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-25', status: 'halfday',  checkIn: '09:50 AM', checkOut: '01:50 PM', lateIn: '-',      earlyOut: '5h 10m', workHours: '4h 00m', shiftHours: '9h 00m', notes: 'Half day — doctor appointment' },
+  { date: '2026-03-26', status: 'present',  checkIn: '09:52 AM', checkOut: '07:05 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 13m', shiftHours: '9h 00m', notes: '' },
+  { date: '2026-03-27', status: 'present',  checkIn: '09:58 AM', checkOut: '-',        lateIn: '-',      earlyOut: '-',      workHours: '-',      shiftHours: '9h 00m', notes: 'Today — still in office' },
+  { date: '2026-03-30', status: 'holiday',  checkIn: '-',        checkOut: '-',        lateIn: '-',      earlyOut: '-',      workHours: '-',      shiftHours: '-',      notes: 'Ugadi' },
+];
+
+// ── Helpers ──────────────────────────────────────────────────────────
+const STATUS_CONFIG: Record<AttendanceStatus, { label: string; bg: string; text: string; dot: string; icon: string }> = {
+  present:  { label: 'Present',  bg: 'bg-emerald-50',  text: 'text-emerald-700', dot: 'bg-emerald-500', icon: 'check_circle' },
+  absent:   { label: 'Absent',   bg: 'bg-rose-50',     text: 'text-rose-600',    dot: 'bg-rose-500',    icon: 'cancel' },
+  late:     { label: 'Late',     bg: 'bg-amber-50',    text: 'text-amber-700',   dot: 'bg-amber-500',   icon: 'schedule' },
+  halfday:  { label: 'Half Day', bg: 'bg-sky-50',      text: 'text-sky-700',     dot: 'bg-sky-500',     icon: 'timelapse' },
+  weekend:  { label: 'Weekend',  bg: 'bg-surface-container-low', text: 'text-on-surface-variant', dot: 'bg-on-surface/20', icon: 'weekend' },
+  holiday:  { label: 'Holiday',  bg: 'bg-purple-50',   text: 'text-purple-700',  dot: 'bg-purple-500',  icon: 'celebration' },
+};
+
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function buildMonthGrid(year: number, month: number) {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  // getDay() returns 0=Sun. We want Mon=0, so shift.
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const totalDays = lastDay.getDate();
+  const today = new Date();
+
+  const cells: {
+    day: number | null;
+    dateStr: string;
+    isCurrentMonth: boolean;
+    isWeekend: boolean;
+    isToday: boolean;
+  }[] = [];
+
+  // Leading empty cells
+  for (let i = 0; i < startOffset; i++) {
+    cells.push({ day: null, dateStr: '', isCurrentMonth: false, isWeekend: false, isToday: false });
+  }
+
+  // Current month days
+  for (let d = 1; d <= totalDays; d++) {
+    const dt = new Date(year, month, d);
+    const dow = dt.getDay();
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    cells.push({
+      day: d,
+      dateStr,
+      isCurrentMonth: true,
+      isWeekend: dow === 0 || dow === 6,
+      isToday: today.getFullYear() === year && today.getMonth() === month && today.getDate() === d,
+    });
+  }
+
+  // Trailing empty cells to fill 42
+  while (cells.length < 42) {
+    cells.push({ day: null, dateStr: '', isCurrentMonth: false, isWeekend: false, isToday: false });
+  }
+
+  return cells;
+}
+
+function formatMonthYear(year: number, month: number) {
+  return new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function formatDateLong(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// ── Component ────────────────────────────────────────────────────────
 export default function Attendance() {
+  const [activeMonth, setActiveMonth] = useState(() => new Date(2026, 2, 1)); // March 2026
+  const [selectedDate, setSelectedDate] = useState<string>('2026-03-27');
+
+  const year = activeMonth.getFullYear();
+  const month = activeMonth.getMonth();
+  const cells = useMemo(() => buildMonthGrid(year, month), [year, month]);
+
+  const recordMap = useMemo(() => {
+    const map: Record<string, AttendanceRecord> = {};
+    ATTENDANCE_DATA.forEach((r) => { map[r.date] = r; });
+    return map;
+  }, []);
+
+  const selectedRecord = selectedDate ? recordMap[selectedDate] ?? null : null;
+
+  // Determine effective status for a cell
+  const getStatus = (dateStr: string, isWeekend: boolean): AttendanceStatus => {
+    const rec = recordMap[dateStr];
+    if (rec) return rec.status;
+    if (isWeekend) return 'weekend';
+    return 'present'; // fallback for days before data range — treat as neutral
+  };
+
+  const changeMonth = (offset: number) => {
+    const next = new Date(year, month + offset, 1);
+    setActiveMonth(next);
+    // Try to keep selection in month, else clear
+    const ny = next.getFullYear();
+    const nm = next.getMonth();
+    const selY = selectedDate ? Number(selectedDate.slice(0, 4)) : -1;
+    const selM = selectedDate ? Number(selectedDate.slice(5, 7)) - 1 : -1;
+    if (selY !== ny || selM !== nm) {
+      // Pick first record in the new month, or 1st
+      const first = ATTENDANCE_DATA.find(r => {
+        const ry = Number(r.date.slice(0, 4));
+        const rm = Number(r.date.slice(5, 7)) - 1;
+        return ry === ny && rm === nm;
+      });
+      setSelectedDate(first ? first.date : `${ny}-${String(nm + 1).padStart(2, '0')}-01`);
+    }
+  };
+
+  // Check if a cell has no record and is not a weekend
+  const hasNoRecord = (dateStr: string, isWeekend: boolean) => !recordMap[dateStr] && !isWeekend;
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-8">
-      {/* Bento Grid: Stats and Action */}
+      {/* ─── Bento Grid: Stats and Action (unchanged) ─── */}
       <div className="grid grid-cols-12 gap-6">
         {/* Summary Stats */}
         <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -59,152 +210,196 @@ export default function Attendance() {
         </div>
       </div>
 
-      {/* Asymmetric Layout: History & Calendar */}
+      {/* ─── Calendar + Detail Panel ─── */}
       <div className="grid grid-cols-12 gap-6">
-        {/* Attendance History Table */}
+        {/* Left: Monthly Attendance Calendar */}
         <div className="col-span-12 xl:col-span-8">
-          <div className="bg-surface-container-lowest rounded-2xl editorial-shadow overflow-hidden">
-            <div className="px-6 py-4 flex justify-between items-center">
-              <h3 className="font-headline text-lg font-bold">Recent History</h3>
-              <div className="flex items-center gap-2 text-primary font-bold text-xs cursor-pointer hover:underline">
-                View all history <span className="material-symbols-outlined text-sm">arrow_forward</span>
-              </div>
+          <div className="bg-surface-container-lowest rounded-2xl editorial-shadow p-6">
+            {/* Month Navigation */}
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={() => changeMonth(-1)}
+                className="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">chevron_left</span>
+              </button>
+              <h3 className="text-lg font-bold font-headline text-on-surface">{formatMonthYear(year, month)}</h3>
+              <button
+                onClick={() => changeMonth(1)}
+                className="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">chevron_right</span>
+              </button>
             </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-surface-container-low/50">
-                    <th className="px-6 py-3 text-[10px] tracking-[0.2em] uppercase font-bold text-on-surface-variant/70">Date</th>
-                    <th className="px-6 py-3 text-[10px] tracking-[0.2em] uppercase font-bold text-on-surface-variant/70">Check-in</th>
-                    <th className="px-6 py-3 text-[10px] tracking-[0.2em] uppercase font-bold text-on-surface-variant/70">Check-out</th>
-                    <th className="px-6 py-3 text-[10px] tracking-[0.2em] uppercase font-bold text-on-surface-variant/70">Total Hrs</th>
-                    <th className="px-6 py-3 text-[10px] tracking-[0.2em] uppercase font-bold text-on-surface-variant/70">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/5">
-                  <tr className="hover:bg-surface-container-low/20 transition-colors">
-                    <td className="px-6 py-4 font-body text-sm font-semibold">Oct 24, 2023</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">09:02 AM</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">06:15 PM</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">9h 13m</td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-[10px] font-bold uppercase tracking-wider">On-Time</span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-surface-container-low/20 transition-colors">
-                    <td className="px-6 py-4 font-body text-sm font-semibold">Oct 23, 2023</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">09:45 AM</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">06:40 PM</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">8h 55m</td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-error-container/20 text-error rounded-full text-[10px] font-bold uppercase tracking-wider">Late-In</span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-surface-container-low/20 transition-colors">
-                    <td className="px-6 py-4 font-body text-sm font-semibold">Oct 22, 2023</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">08:58 AM</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">06:05 PM</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">9h 07m</td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-[10px] font-bold uppercase tracking-wider">On-Time</span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-surface-container-low/20 transition-colors">
-                    <td className="px-6 py-4 font-body text-sm font-semibold">Oct 21, 2023</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">-</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">-</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">0h 00m</td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-surface-container text-on-surface-variant rounded-full text-[10px] font-bold uppercase tracking-wider">Absent</span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-surface-container-low/20 transition-colors">
-                    <td className="px-6 py-4 font-body text-sm font-semibold">Oct 20, 2023</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">09:10 AM</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">07:20 PM</td>
-                    <td className="px-6 py-4 font-body text-sm text-on-surface-variant">10h 10m</td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-[10px] font-bold uppercase tracking-wider">Overtime</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+
+            {/* Weekday Headers */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {WEEKDAYS.map((d) => (
+                <div key={d} className="text-center text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest py-1">
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            {/* Day Grid */}
+            <div className="grid grid-cols-7 gap-1.5">
+              {cells.map((cell, idx) => {
+                if (!cell.isCurrentMonth || cell.day === null) {
+                  return <div key={idx} className="h-14 rounded-xl" />;
+                }
+
+                const status = getStatus(cell.dateStr, cell.isWeekend);
+                const cfg = STATUS_CONFIG[status];
+                const isSelected = cell.dateStr === selectedDate;
+                const noRecord = hasNoRecord(cell.dateStr, cell.isWeekend);
+
+                // For days with no record that aren't weekends, show a neutral muted cell
+                const cellBg = noRecord
+                  ? 'bg-surface-container-low/60'
+                  : cfg.bg;
+                const cellText = noRecord
+                  ? 'text-on-surface-variant/50'
+                  : cfg.text;
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedDate(cell.dateStr)}
+                    className={`
+                      relative flex flex-col items-center justify-center h-14 rounded-xl transition-all duration-200 cursor-pointer
+                      ${cellBg} ${cellText}
+                      ${isSelected ? 'ring-2 ring-primary shadow-md shadow-primary/15 scale-[1.04]' : 'hover:scale-[1.02] hover:shadow-sm'}
+                      ${cell.isToday && !isSelected ? 'ring-1 ring-slate-300' : ''}
+                    `}
+                  >
+                    <span className={`text-sm font-bold leading-none ${isSelected ? 'text-primary' : ''}`}>
+                      {cell.day}
+                    </span>
+                    {!noRecord && (
+                      <span className={`w-1.5 h-1.5 rounded-full mt-1 ${cfg.dot}`} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-x-5 gap-y-2 mt-5 pt-4 border-t border-outline-variant/10">
+              {(['present', 'late', 'halfday', 'absent', 'weekend', 'holiday'] as AttendanceStatus[]).map((s) => (
+                <div key={s} className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${STATUS_CONFIG[s].dot}`} />
+                  <span className="text-[11px] font-medium text-on-surface-variant">{STATUS_CONFIG[s].label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Calendar Sidebar View */}
+        {/* Right: Date Detail Panel */}
         <div className="col-span-12 xl:col-span-4">
-          <div className="bg-surface-container-lowest rounded-2xl editorial-shadow p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-headline text-lg font-bold">Tracking</h3>
-              <div className="flex gap-2 items-center">
-                <button className="p-1 hover:bg-surface-container rounded transition-colors flex items-center justify-center">
-                  <span className="material-symbols-outlined text-xl">chevron_left</span>
-                </button>
-                <span className="text-sm font-bold px-2">October</span>
-                <button className="p-1 hover:bg-surface-container rounded transition-colors flex items-center justify-center">
-                  <span className="material-symbols-outlined text-xl">chevron_right</span>
-                </button>
-              </div>
-            </div>
-            
-            {/* Mini Calendar Grid */}
-            <div className="grid grid-cols-7 gap-y-4 text-center mb-8">
-              <div className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Mo</div>
-              <div className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Tu</div>
-              <div className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">We</div>
-              <div className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Th</div>
-              <div className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Fr</div>
-              <div className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Sa</div>
-              <div className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">Su</div>
-              
-              {/* Spacer for start of month */}
-              <div></div><div></div><div></div><div></div>
-              
-              {/* Days */}
-              <div className="text-sm font-medium py-2 text-on-surface-variant/30">1</div>
-              <div className="text-sm font-medium py-2 text-on-surface-variant/30">2</div>
-              <div className="text-sm font-medium py-2 text-on-surface-variant/30">3</div>
-              
-              <div className="text-sm font-medium py-2 relative">4<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span></div>
-              <div className="text-sm font-medium py-2 relative">5<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span></div>
-              <div className="text-sm font-medium py-2 relative">6<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span></div>
-              <div className="text-sm font-medium py-2 relative">7<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-error rounded-full"></span></div>
-              <div className="text-sm font-medium py-2 relative">8<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span></div>
-              <div className="text-sm font-medium py-2">9</div>
-              <div className="text-sm font-medium py-2">10</div>
-              
-              <div className="text-sm font-medium py-2 relative">11<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span></div>
-              <div className="text-sm font-medium py-2 relative">12<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span></div>
-              <div className="text-sm font-medium py-2 relative">13<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span></div>
-              <div className="text-sm font-medium py-2">14</div>
-              <div className="text-sm font-medium py-2">15</div>
-              <div className="text-sm font-medium py-2 relative">16<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span></div>
-              <div className="text-sm font-medium py-2 relative">17<span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span></div>
-              
-              <div className="text-sm font-medium py-2 bg-primary text-on-primary rounded-full font-bold">18</div>
-              <div className="text-sm font-medium py-2">19</div>
-              <div className="text-sm font-medium py-2">20</div>
-              <div className="text-sm font-medium py-2">21</div>
-              <div className="text-sm font-medium py-2">22</div>
-            </div>
-            
-            <div className="space-y-4 pt-6 border-t border-outline-variant/10">
-              <div className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-primary"></span>
-                <span className="text-xs font-medium text-on-surface-variant">On-time (22 days)</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-error"></span>
-                <span className="text-xs font-medium text-on-surface-variant">Late arrival (3 days)</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-on-surface/20"></span>
-                <span className="text-xs font-medium text-on-surface-variant">Weekend / Holiday</span>
-              </div>
-            </div>
+          <div className="bg-surface-container-lowest rounded-2xl editorial-shadow p-6 h-full flex flex-col">
+            <h4 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-5">Selected Date</h4>
+
+            {(() => {
+              // Weekend / holiday with no work record
+              const selParts = selectedDate.split('-').map(Number);
+              const selDt = new Date(selParts[0], selParts[1] - 1, selParts[2]);
+              const isWeekend = selDt.getDay() === 0 || selDt.getDay() === 6;
+
+              if (selectedRecord && selectedRecord.status === 'holiday') {
+                // Holiday state
+                const cfg = STATUS_CONFIG.holiday;
+                return (
+                  <div className="flex-1 flex flex-col">
+                    <p className="text-base font-bold font-headline text-on-surface mb-1">{formatDateLong(selectedDate)}</p>
+                    <span className={`self-start inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${cfg.bg} ${cfg.text} mt-1 mb-5`}>
+                      <span className="material-symbols-outlined text-sm">{cfg.icon}</span>
+                      {cfg.label}
+                    </span>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+                      <span className="material-symbols-outlined text-purple-300 text-5xl mb-3">celebration</span>
+                      <p className="text-sm font-semibold text-on-surface mb-1">{selectedRecord.notes || 'Holiday'}</p>
+                      <p className="text-xs text-on-surface-variant">No attendance tracking on holidays.</p>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (isWeekend && !selectedRecord) {
+                return (
+                  <div className="flex-1 flex flex-col">
+                    <p className="text-base font-bold font-headline text-on-surface mb-4">{formatDateLong(selectedDate)}</p>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+                      <span className="material-symbols-outlined text-on-surface-variant/30 text-5xl mb-3">weekend</span>
+                      <p className="text-sm font-semibold text-on-surface mb-1">Weekend</p>
+                      <p className="text-xs text-on-surface-variant">No attendance tracking on weekends.</p>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (!selectedRecord) {
+                return (
+                  <div className="flex-1 flex flex-col">
+                    <p className="text-base font-bold font-headline text-on-surface mb-4">{formatDateLong(selectedDate)}</p>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+                      <span className="material-symbols-outlined text-on-surface-variant/30 text-5xl mb-3">event_busy</span>
+                      <p className="text-sm text-on-surface-variant">No attendance details available for this date.</p>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Normal record
+              const cfg = STATUS_CONFIG[selectedRecord.status];
+              return (
+                <div className="flex-1 flex flex-col">
+                  {/* Date Header */}
+                  <p className="text-base font-bold font-headline text-on-surface mb-1">{formatDateLong(selectedDate)}</p>
+                  <span className={`self-start inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${cfg.bg} ${cfg.text} mt-1 mb-5`}>
+                    <span className="material-symbols-outlined text-sm">{cfg.icon}</span>
+                    {cfg.label}
+                  </span>
+
+                  {/* Shift Summary */}
+                  <div className="flex items-center gap-2 text-xs text-on-surface-variant mb-5 pb-4 border-b border-outline-variant/10">
+                    <span className="material-symbols-outlined text-base">schedule</span>
+                    <span>Shift: <strong className="text-on-surface">10:00 AM – 07:00 PM</strong></span>
+                  </div>
+
+                  {/* Metrics Grid */}
+                  <div className="grid grid-cols-2 gap-4 mb-5">
+                    {[
+                      { label: 'Check-in',   value: selectedRecord.checkIn,   icon: 'login' },
+                      { label: 'Check-out',  value: selectedRecord.checkOut,  icon: 'logout' },
+                      { label: 'Late In',    value: selectedRecord.lateIn,    icon: 'alarm' },
+                      { label: 'Early Out',  value: selectedRecord.earlyOut,  icon: 'directions_run' },
+                      { label: 'Work Hours', value: selectedRecord.workHours, icon: 'hourglass_top' },
+                      { label: 'Shift Hours',value: selectedRecord.shiftHours,icon: 'work_history' },
+                    ].map((m) => (
+                      <div key={m.label} className="bg-surface-container-low/60 rounded-xl px-3.5 py-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="material-symbols-outlined text-on-surface-variant/60 text-sm">{m.icon}</span>
+                          <span className="text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-wider">{m.label}</span>
+                        </div>
+                        <p className="text-sm font-bold font-headline text-on-surface">{m.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Notes / Remark */}
+                  {selectedRecord.notes && (
+                    <div className="mt-auto pt-4 border-t border-outline-variant/10">
+                      <div className="flex items-start gap-2">
+                        <span className="material-symbols-outlined text-on-surface-variant/50 text-base mt-0.5">info</span>
+                        <p className="text-xs text-on-surface-variant leading-relaxed">{selectedRecord.notes}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
