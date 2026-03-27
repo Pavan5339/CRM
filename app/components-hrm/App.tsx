@@ -5,6 +5,7 @@ import Dashboard from './views/Dashboard';
 import Profile from './views/Profile';
 import Leave from './views/Leave';
 import Attendance from './views/Attendance';
+import RegularizeAttendance from './views/RegularizeAttendance';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('home');
@@ -15,6 +16,8 @@ export default function App() {
         return <Dashboard />;
       case 'attendance':
         return <Attendance />;
+      case 'regularize-attendance':
+        return <RegularizeAttendance />;
       case 'leave':
         return <Leave />;
       case 'profile':
@@ -32,6 +35,7 @@ export default function App() {
     switch (currentTab) {
       case 'home': return '';
       case 'attendance': return 'Attendance';
+      case 'regularize-attendance': return 'Regularize Attendance';
       case 'leave': return 'Leave Management';
       case 'profile': return 'Profile';
       default: return 'Sanctuary HR';

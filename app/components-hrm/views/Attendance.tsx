@@ -1,44 +1,13 @@
 import React, { useState, useMemo } from 'react';
-
-// ── Attendance record shape ──────────────────────────────────────────
-type AttendanceStatus = 'present' | 'absent' | 'late' | 'halfday' | 'weekend' | 'holiday';
-
-interface AttendanceRecord {
-  date: string;          // YYYY-MM-DD
-  status: AttendanceStatus;
-  checkIn: string;       // e.g. "09:02 AM"
-  checkOut: string;
-  lateIn: string;        // e.g. "12 min" or "-"
-  earlyOut: string;
-  workHours: string;     // e.g. "8h 42m"
-  shiftHours: string;    // e.g. "9h 00m"
-  notes: string;
-}
-
-// ── Static seed data for March 2026 ─────────────────────────────────
-const ATTENDANCE_DATA: AttendanceRecord[] = [
-  { date: '2026-03-02', status: 'present',  checkIn: '09:55 AM', checkOut: '07:10 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 15m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-03', status: 'present',  checkIn: '09:48 AM', checkOut: '07:02 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 14m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-04', status: 'late',     checkIn: '10:32 AM', checkOut: '07:15 PM', lateIn: '32 min', earlyOut: '-',      workHours: '8h 43m', shiftHours: '9h 00m', notes: 'Late arrival — traffic delay' },
-  { date: '2026-03-05', status: 'present',  checkIn: '09:50 AM', checkOut: '07:05 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 15m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-06', status: 'present',  checkIn: '09:58 AM', checkOut: '07:00 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 02m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-09', status: 'present',  checkIn: '09:45 AM', checkOut: '07:08 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 23m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-10', status: 'halfday',  checkIn: '09:50 AM', checkOut: '02:00 PM', lateIn: '-',      earlyOut: '5h 00m', workHours: '4h 10m', shiftHours: '9h 00m', notes: 'Half day — personal errand' },
-  { date: '2026-03-11', status: 'present',  checkIn: '09:52 AM', checkOut: '07:12 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 20m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-12', status: 'present',  checkIn: '09:47 AM', checkOut: '07:00 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 13m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-13', status: 'absent',   checkIn: '-',        checkOut: '-',        lateIn: '-',      earlyOut: '-',      workHours: '0h 00m', shiftHours: '9h 00m', notes: 'Absent — sick leave' },
-  { date: '2026-03-16', status: 'present',  checkIn: '09:55 AM', checkOut: '07:05 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 10m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-17', status: 'present',  checkIn: '09:42 AM', checkOut: '07:00 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 18m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-18', status: 'late',     checkIn: '10:18 AM', checkOut: '07:20 PM', lateIn: '18 min', earlyOut: '-',      workHours: '9h 02m', shiftHours: '9h 00m', notes: 'Late arrival' },
-  { date: '2026-03-19', status: 'present',  checkIn: '09:50 AM', checkOut: '07:10 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 20m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-20', status: 'present',  checkIn: '09:48 AM', checkOut: '07:02 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 14m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-23', status: 'present',  checkIn: '09:55 AM', checkOut: '07:08 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 13m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-24', status: 'present',  checkIn: '09:40 AM', checkOut: '07:00 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 20m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-25', status: 'halfday',  checkIn: '09:50 AM', checkOut: '01:50 PM', lateIn: '-',      earlyOut: '5h 10m', workHours: '4h 00m', shiftHours: '9h 00m', notes: 'Half day — doctor appointment' },
-  { date: '2026-03-26', status: 'present',  checkIn: '09:52 AM', checkOut: '07:05 PM', lateIn: '-',      earlyOut: '-',      workHours: '9h 13m', shiftHours: '9h 00m', notes: '' },
-  { date: '2026-03-27', status: 'present',  checkIn: '09:58 AM', checkOut: '-',        lateIn: '-',      earlyOut: '-',      workHours: '-',      shiftHours: '9h 00m', notes: 'Today — still in office' },
-  { date: '2026-03-30', status: 'holiday',  checkIn: '-',        checkOut: '-',        lateIn: '-',      earlyOut: '-',      workHours: '-',      shiftHours: '-',      notes: 'Ugadi' },
-];
+import {
+  ATTENDANCE_DATA,
+  WEEKDAYS,
+  buildMonthGrid,
+  formatDateLong,
+  formatMonthYear,
+  type AttendanceRecord,
+  type AttendanceStatus,
+} from './attendanceShared';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; bg: string; text: string; dot: string; icon: string }> = {
@@ -49,61 +18,6 @@ const STATUS_CONFIG: Record<AttendanceStatus, { label: string; bg: string; text:
   weekend:  { label: 'Weekend',  bg: 'bg-surface-container-low', text: 'text-on-surface-variant', dot: 'bg-on-surface/20', icon: 'weekend' },
   holiday:  { label: 'Holiday',  bg: 'bg-purple-50',   text: 'text-purple-700',  dot: 'bg-purple-500',  icon: 'celebration' },
 };
-
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-function buildMonthGrid(year: number, month: number) {
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  // getDay() returns 0=Sun. We want Mon=0, so shift.
-  const startOffset = (firstDay.getDay() + 6) % 7;
-  const totalDays = lastDay.getDate();
-  const today = new Date();
-
-  const cells: {
-    day: number | null;
-    dateStr: string;
-    isCurrentMonth: boolean;
-    isWeekend: boolean;
-    isToday: boolean;
-  }[] = [];
-
-  // Leading empty cells
-  for (let i = 0; i < startOffset; i++) {
-    cells.push({ day: null, dateStr: '', isCurrentMonth: false, isWeekend: false, isToday: false });
-  }
-
-  // Current month days
-  for (let d = 1; d <= totalDays; d++) {
-    const dt = new Date(year, month, d);
-    const dow = dt.getDay();
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    cells.push({
-      day: d,
-      dateStr,
-      isCurrentMonth: true,
-      isWeekend: dow === 0 || dow === 6,
-      isToday: today.getFullYear() === year && today.getMonth() === month && today.getDate() === d,
-    });
-  }
-
-  // Trailing empty cells to fill 42
-  while (cells.length < 42) {
-    cells.push({ day: null, dateStr: '', isCurrentMonth: false, isWeekend: false, isToday: false });
-  }
-
-  return cells;
-}
-
-function formatMonthYear(year: number, month: number) {
-  return new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-}
-
-function formatDateLong(dateStr: string) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const dt = new Date(y, m - 1, d);
-  return dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
 
 // ── Component ────────────────────────────────────────────────────────
 export default function Attendance() {

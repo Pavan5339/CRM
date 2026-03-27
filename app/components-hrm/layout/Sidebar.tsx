@@ -9,6 +9,7 @@ export default function Sidebar({ currentTab, setCurrentTab }: SidebarProps) {
   const navItems = [
     { id: 'home', label: 'Home', icon: 'dashboard' },
     { id: 'attendance', label: 'Attendance', icon: 'calendar_today' },
+    { id: 'regularize-attendance', label: 'Regularize Attendance', icon: 'edit_calendar' },
     { id: 'leave', label: 'Leave', icon: 'event_busy' },
     { id: 'salary', label: 'Salary', icon: 'payments' },
     { id: 'profile', label: 'Profile', icon: 'person' },
@@ -51,7 +52,12 @@ export default function Sidebar({ currentTab, setCurrentTab }: SidebarProps) {
               >
                 {item.icon}
               </span>
-              <span className={`font-body text-sm ${isActive ? 'font-bold' : 'font-medium'}`}>
+              <span
+                className={`font-body text-sm min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap ${
+                  isActive ? 'font-bold' : 'font-medium'
+                }`}
+                title={item.label}
+              >
                 {item.label}
               </span>
             </button>
