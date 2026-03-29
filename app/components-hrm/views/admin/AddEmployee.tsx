@@ -32,60 +32,167 @@ export default function AddEmployee() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-6">
-            <div className="md:col-span-8 space-y-2">
+            <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Full Name</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" placeholder="e.g. Alexander Pierce" type="text" />
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
             </div>
             <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Date of Birth</label>
               <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="date" />
             </div>
             <div className="md:col-span-4 space-y-2">
-              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Gender</label>
-              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm appearance-none cursor-pointer outline-none transition-colors">
-                <option>Select Gender</option>
-                <option>Male</option>
-                <option>Female</option>
-                <option>Non-binary</option>
-                <option>Prefer not to say</option>
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Birthday</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" placeholder="DD MMM" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Blood Group</label>
+              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm appearance-none outline-none">
+                <option>Select</option><option>A+</option><option>O+</option><option>B+</option><option>AB+</option><option>A-</option><option>O-</option><option>B-</option><option>AB-</option>
               </select>
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Father's Name</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
             </div>
             <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Marital Status</label>
-              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm appearance-none cursor-pointer outline-none transition-colors">
-                <option>Select Status</option>
-                <option>Single</option>
-                <option>Married</option>
-                <option>Divorced</option>
+              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm appearance-none outline-none">
+                <option>Single</option><option>Married</option>
               </select>
             </div>
             <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Marriage Date</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="date" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Spouse Name</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Nationality</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" placeholder="e.g. American" type="text" />
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
             </div>
-            <div className="md:col-span-6 space-y-2">
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Residential Status</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Place of Birth</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Country Of Origin</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Religion</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">International Employee</label>
+              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm appearance-none outline-none">
+                <option>No</option><option>Yes</option>
+              </select>
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Physically Challenged</label>
+              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm appearance-none outline-none">
+                <option>No</option><option>Yes</option>
+              </select>
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Is Director</label>
+              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm appearance-none outline-none">
+                <option>No</option><option>Yes</option>
+              </select>
+            </div>
+            <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Personal Email</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" placeholder="alex.p@example.com" type="email" />
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="email" />
             </div>
-            <div className="md:col-span-6 space-y-2">
-              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Phone Number</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" placeholder="+1 (555) 000-0000" type="tel" />
-            </div>
-            <div className="md:col-span-3 space-y-2">
+            <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Height (cm)</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" placeholder="180" type="number" />
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="number" />
             </div>
-            <div className="md:col-span-3 space-y-2">
+            <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Weight (kg)</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" placeholder="75" type="number" />
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="number" />
             </div>
-            <div className="md:col-span-6 space-y-2">
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Identification Mark</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Hobby</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" placeholder="e.g. Photography, Hiking" type="text" />
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
             </div>
-            <div className="md:col-span-12 space-y-2">
-              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Current Address</label>
-              <textarea className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm resize-none outline-none transition-colors" placeholder="Street name, City, State, Zip Code" rows={3}></textarea>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Caste</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Present Address */}
+        <section className="bg-surface-container-lowest p-10 rounded-[1.5rem] shadow-sm border border-outline-variant/10">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-12 h-12 rounded-xl bg-primary-container/20 flex items-center justify-center text-primary">
+              <span className="material-symbols-outlined">home</span>
+            </div>
+            <h3 className="text-xl font-bold font-headline tracking-tight">Present Address</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-6">
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Name</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Address</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">City</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">District</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">State</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Country</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Pincode</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Phone1</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="tel" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Phone2</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="tel" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Ext</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Fax</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Mobile no</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="tel" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Email</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm transition-colors outline-none" type="email" />
             </div>
           </div>
         </section>
@@ -99,51 +206,82 @@ export default function AddEmployee() {
             <h3 className="text-xl font-bold font-headline tracking-tight">Joining Details</h3>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="space-y-2">
-              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Date of Joining</label>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-6">
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Joined On</label>
               <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" type="date" />
             </div>
-            <div className="space-y-2">
+            <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Confirmation Date</label>
               <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" type="date" />
             </div>
-            <div className="space-y-2">
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Status</label>
+              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors appearance-none cursor-pointer">
+                <option>Probation</option>
+                <option>Confirmed</option>
+              </select>
+            </div>
+            <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Probation Period</label>
-              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors appearance-none cursor-pointer">
-                <option>3 Months</option>
-                <option>6 Months</option>
-                <option>None</option>
-              </select>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" placeholder="e.g. 180 days" type="text" />
             </div>
-            <div className="space-y-2">
+            <div className="md:col-span-4 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Notice Period</label>
-              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors appearance-none cursor-pointer">
-                <option>30 Days</option>
-                <option>60 Days</option>
-                <option>90 Days</option>
-              </select>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" placeholder="e.g. 30 days" type="text" />
             </div>
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Designation</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" placeholder="e.g. Senior Product Designer" type="text" />
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Current Company Experience</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" placeholder="e.g. 1M" type="text" />
             </div>
-            <div className="md:col-span-2 space-y-2">
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Previous Experience</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" placeholder="e.g. 2Y" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Total Experience</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" placeholder="e.g. 2Y 1M" type="text" />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Referred By</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" type="text" />
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Current Position */}
+        <section className="bg-surface-container-lowest p-10 rounded-[1.5rem] shadow-sm border border-outline-variant/10">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-12 h-12 rounded-xl bg-tertiary-container/40 flex items-center justify-center text-tertiary">
+              <span className="material-symbols-outlined">badge</span>
+            </div>
+            <h3 className="text-xl font-bold font-headline tracking-tight">Current Position</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-6">
+            <div className="md:col-span-3 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Location</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" type="text" />
+            </div>
+            <div className="md:col-span-3 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Department</label>
-              <select className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors appearance-none cursor-pointer">
-                <option>Product & Design</option>
-                <option>Engineering</option>
-                <option>Marketing</option>
-                <option>Human Resources</option>
-              </select>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" type="text" />
             </div>
-            <div className="md:col-span-2 space-y-2">
+            <div className="md:col-span-3 space-y-2">
               <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Division</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" placeholder="e.g. User Experience" type="text" />
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" type="text" />
             </div>
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Reporting Manager</label>
-              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" placeholder="Search manager name..." type="text" />
+            <div className="md:col-span-3 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Designation</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" type="text" />
+            </div>
+            <div className="md:col-span-6 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Reporting To</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" type="text" />
+            </div>
+            <div className="md:col-span-6 space-y-2">
+              <label className="text-[11px] font-label uppercase tracking-widest text-on-surface-variant">Company</label>
+              <input className="w-full bg-surface-container-low border border-transparent focus:border-primary px-4 py-3 rounded-lg text-sm outline-none transition-colors" type="text" />
             </div>
           </div>
         </section>
