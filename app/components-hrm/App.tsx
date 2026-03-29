@@ -15,7 +15,7 @@ export default function App() {
       case 'home':
         return <Dashboard />;
       case 'attendance':
-        return <Attendance />;
+        return <Attendance onOpenRegularizeAttendance={() => setCurrentTab('regularize-attendance')} />;
       case 'regularize-attendance':
         return <RegularizeAttendance />;
       case 'leave':

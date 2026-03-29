@@ -9,6 +9,10 @@ import {
   type AttendanceStatus,
 } from './attendanceShared';
 
+interface AttendanceProps {
+  onOpenRegularizeAttendance: () => void;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<AttendanceStatus, { label: string; bg: string; text: string; dot: string; icon: string }> = {
   present:  { label: 'Present',  bg: 'bg-emerald-50',  text: 'text-emerald-700', dot: 'bg-emerald-500', icon: 'check_circle' },
@@ -20,7 +24,7 @@ const STATUS_CONFIG: Record<AttendanceStatus, { label: string; bg: string; text:
 };
 
 // ── Component ────────────────────────────────────────────────────────
-export default function Attendance() {
+export default function Attendance({ onOpenRegularizeAttendance }: AttendanceProps) {
   const [activeMonth, setActiveMonth] = useState(() => new Date(2026, 2, 1)); // March 2026
   const [selectedDate, setSelectedDate] = useState<string>('2026-03-27');
 
@@ -111,7 +115,11 @@ export default function Attendance() {
           <div className="z-10">
             <h3 className="font-headline text-lg font-bold text-on-tertiary-container mb-1">Missed a swipe?</h3>
             <p className="text-xs text-on-tertiary-container/80 mb-4 max-w-[200px]">Submit a regularization request for the current pay period.</p>
-            <button className="bg-on-tertiary-container text-tertiary-container px-5 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all">
+            <button
+              type="button"
+              onClick={onOpenRegularizeAttendance}
+              className="bg-on-tertiary-container text-tertiary-container px-5 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all"
+            >
               <span className="material-symbols-outlined text-sm">edit_note</span>
               Regularize Attendance
             </button>
