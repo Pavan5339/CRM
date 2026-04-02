@@ -135,12 +135,12 @@ export default function HomeShell() {
 
   const handleSelectModule = (moduleId) => {
     if (moduleId === 'auditing') {
-      router.push('/auditing');
+      router.push('/Auditing/auditing');
       return;
     }
 
     if (moduleId === 'hrm') {
-      router.push('/hrm');
+      router.push('/HRM/hrm');
       return;
     }
 

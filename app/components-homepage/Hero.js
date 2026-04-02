@@ -53,7 +53,7 @@ export function Hero() {
             collaboration and success
           </p>
 
-          <Button href="/dashboard" size="lg" className="mb-10 shadow-2xl shadow-violet-900/40 border border-white/20">
+          <Button href="/Taskmanager/dashboard" size="lg" className="mb-10 shadow-2xl shadow-violet-900/40 border border-white/20">
             Get Access
           </Button>
         </div>

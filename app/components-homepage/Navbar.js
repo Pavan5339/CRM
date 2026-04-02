@@ -41,7 +41,7 @@ export function Navbar({ isOthersOpen = false, onToggleOthers = () => {} }) {
       }
 
       try {
-        const response = await fetch('/api/admin/me', { method: 'GET', credentials: 'include' });
+        const response = await fetch('/Taskmanager/api/admin/me', { method: 'GET', credentials: 'include' });
 
         if (isMounted) {
           setIsAdmin(response.ok);
@@ -67,7 +67,7 @@ export function Navbar({ isOthersOpen = false, onToggleOthers = () => {} }) {
     };
   }, []);
 
-  const workspaceHref = isAdmin ? '/admin' : isAuthenticated ? '/dashboard' : '/login';
+  const workspaceHref = isAdmin ? '/Taskmanager/admin' : isAuthenticated ? '/Taskmanager/dashboard' : '/login';
   const workspaceLabel = isAuthenticated ? 'Workspace' : 'Login';
 
   const navLinks = [

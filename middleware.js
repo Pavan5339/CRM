@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server'
 
 export async function middleware(request) {
   const pathname = request.nextUrl.pathname
-  const isAdminPath = pathname.startsWith('/admin')
-  const isDashboardPath = pathname.startsWith('/dashboard')
+  const isAdminPath = pathname.startsWith('/Taskmanager/admin')
+  const isDashboardPath = pathname.startsWith('/Taskmanager/dashboard')
+  const isHRMPath = pathname.startsWith('/HRM/hrm')
+  const isAuditingPath = pathname.startsWith('/Auditing/auditing')
 
   let supabaseResponse = NextResponse.next({
     request,
@@ -49,6 +51,13 @@ export async function middleware(request) {
     return NextResponse.redirect(url)
   }
 
+  // HRM pages require Supabase auth
+  if (!user && isHRMPath) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
   // If user is authenticated, check role for admin routes
   if (user && isAdminPath) {
     const { data: profile } = await supabase
@@ -59,7 +68,7 @@ export async function middleware(request) {
 
     if (profile?.role !== 'admin') {
       const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
+      url.pathname = '/Taskmanager/dashboard'
       return NextResponse.redirect(url)
     }
   }
@@ -73,7 +82,7 @@ export async function middleware(request) {
       .single()
 
     const url = request.nextUrl.clone()
-    url.pathname = profile?.role === 'admin' ? '/admin' : '/dashboard'
+    url.pathname = profile?.role === 'admin' ? '/Taskmanager/admin' : '/Taskmanager/dashboard'
     return NextResponse.redirect(url)
   }
 
@@ -81,5 +90,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/dashboard/:path*', '/login'],
+  matcher: ['/Taskmanager/admin/:path*', '/Taskmanager/dashboard/:path*', '/HRM/hrm/:path*', '/Auditing/auditing/:path*', '/login'],
 }

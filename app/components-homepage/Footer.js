@@ -30,7 +30,7 @@ export function Footer() {
               trial today!
             </h2>
             <Button
-              href="/dashboard"
+              href="/Taskmanager/dashboard"
               size="xl"
               className="shadow-xl shadow-primary/20 hover:scale-105 transform duration-300"
             >
