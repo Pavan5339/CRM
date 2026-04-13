@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AdminSidebar from './layout/AdminSidebar';
+import { createClient } from '@/utils/supabase/client';
 
 // We will import the actual views here once they are created
 import AdminDashboard from './views/admin/AdminDashboard';
@@ -21,6 +22,7 @@ export default function AdminApp() {
   const [currentTab, setCurrentTab] = useState(requestedTab || 'admin-dashboard');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [admin, setAdmin] = useState(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +49,28 @@ export default function AdminApp() {
       active = false;
     };
   }, []);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      await fetch('/api/auth/signout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Failed to sign out HR admin:', error);
+    } finally {
+      setAdmin(null);
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    }
+  };
 
   const renderContent = () => {
     switch (currentTab) {
@@ -90,7 +114,13 @@ export default function AdminApp() {
 
   return (
     <div className="flex min-h-screen bg-surface">
-      <AdminSidebar currentTab={currentTab} setCurrentTab={setCurrentTab} admin={admin} />
+      <AdminSidebar
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+        admin={admin}
+        onLogout={handleLogout}
+        isLoggingOut={isLoggingOut}
+      />
       
       <div className="flex-1 flex flex-col ml-64 min-w-0">
         <main className="flex-1 relative">

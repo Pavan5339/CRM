@@ -112,6 +112,10 @@ async function getSupportedEmploymentColumns() {
   );
 }
 
+async function supportsGenderColumn() {
+  return supportsHrmEmployeeColumn('gender');
+}
+
 function filterPayloadByAllowedColumns(payload, allowedColumns) {
   const nextPayload = { ...payload };
 
@@ -166,6 +170,15 @@ function parseIntegerValue(value) {
 function parseBoolean(value) {
   const normalized = String(value || '').trim().toLowerCase();
   return ['true', 'yes', '1', 'on'].includes(normalized);
+}
+
+function parseGender(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (['male', 'female', 'others'].includes(normalized)) {
+    return normalized;
+  }
+
+  return null;
 }
 
 function getEmploymentInputValues(source = {}) {
@@ -997,6 +1010,7 @@ export async function POST(request) {
 
     const reportingSuperAdminSupported = await supportsReportingSuperAdminColumn();
     const supportedEmploymentColumns = await getSupportedEmploymentColumns();
+    const genderSupported = await supportsGenderColumn();
     const departmentId = await ensureDepartmentId(departmentName);
     const designationId = await ensureDesignationId(designationTitle, departmentId);
     const reportingTarget = await resolveReportingTarget(formData.get('reportingTo'));
@@ -1038,17 +1052,13 @@ export async function POST(request) {
       phone: cleanText(formData.get('phone')),
       personal_email: cleanEmail(formData.get('personalEmail')),
       date_of_birth: parseDate(formData.get('dateOfBirth')),
+      ...(genderSupported ? { gender: parseGender(formData.get('gender')) } : {}),
       blood_group: cleanText(formData.get('bloodGroup')),
       father_name: cleanText(formData.get('fatherName')),
       marital_status: cleanText(formData.get('maritalStatus')),
-      marriage_date: parseDate(formData.get('marriageDate')),
       spouse_name: cleanText(formData.get('spouseName')),
       nationality: cleanText(formData.get('nationality')),
-      residential_status: cleanText(formData.get('residentialStatus')),
-      place_of_birth: cleanText(formData.get('placeOfBirth')),
-      country_of_origin: cleanText(formData.get('countryOfOrigin')),
       religion: cleanText(formData.get('religion')),
-      is_international: parseBoolean(formData.get('isInternational')),
       is_physically_challenged: parseBoolean(formData.get('isPhysicallyChallenged')),
       address: cleanText(formData.get('address')),
       city: cleanText(formData.get('city')),
@@ -1064,6 +1074,8 @@ export async function POST(request) {
       permanent_pincode: cleanText(formData.get('permanentPincode')),
       alternate_phone: cleanText(formData.get('phone2')),
       mobile_phone: cleanText(formData.get('mobile')),
+      emergency_contact_name: cleanText(formData.get('emergencyContactName')),
+      emergency_contact_number: cleanText(formData.get('emergencyContactNumber')),
       date_of_joining: parseDate(formData.get('joinedOn')),
       confirmation_date: parseDate(formData.get('confirmationDate')),
       employee_status: employmentColumns.employee_status,
@@ -1338,6 +1350,7 @@ export async function PATCH(request) {
 
     const reportingSuperAdminSupported = await supportsReportingSuperAdminColumn();
     const supportedEmploymentColumns = await getSupportedEmploymentColumns();
+    const genderSupported = await supportsGenderColumn();
     const name = body?.name !== undefined ? cleanText(body.name) : undefined;
     const email = body?.email !== undefined ? cleanEmail(body.email) : undefined;
     const role = body?.role !== undefined ? cleanText(body.role) : undefined;
@@ -1389,17 +1402,13 @@ export async function PATCH(request) {
       ['phone', 'phone', cleanText],
       ['personalEmail', 'personal_email', cleanEmail],
       ['dateOfBirth', 'date_of_birth', parseDate],
+      ...(genderSupported ? [['gender', 'gender', parseGender]] : []),
       ['bloodGroup', 'blood_group', cleanText],
       ['fatherName', 'father_name', cleanText],
       ['maritalStatus', 'marital_status', cleanText],
-      ['marriageDate', 'marriage_date', parseDate],
       ['spouseName', 'spouse_name', cleanText],
       ['nationality', 'nationality', cleanText],
-      ['residentialStatus', 'residential_status', cleanText],
-      ['placeOfBirth', 'place_of_birth', cleanText],
-      ['countryOfOrigin', 'country_of_origin', cleanText],
       ['religion', 'religion', cleanText],
-      ['isInternational', 'is_international', parseBoolean],
       ['isPhysicallyChallenged', 'is_physically_challenged', parseBoolean],
       ['address', 'address', cleanText],
       ['city', 'city', cleanText],
@@ -1415,6 +1424,8 @@ export async function PATCH(request) {
       ['permanentPincode', 'permanent_pincode', cleanText],
       ['phone2', 'alternate_phone', cleanText],
       ['mobile', 'mobile_phone', cleanText],
+      ['emergencyContactName', 'emergency_contact_name', cleanText],
+      ['emergencyContactNumber', 'emergency_contact_number', cleanText],
       ['joinedOn', 'date_of_joining', parseDate],
       ['confirmationDate', 'confirmation_date', parseDate],
       ['probationPeriodDays', 'probation_period_days', parseIntegerValue],

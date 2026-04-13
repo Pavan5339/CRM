@@ -22,7 +22,6 @@ const EMPLOYEE_PROFILE_SELECT_BASE = `
   address,
   nationality,
   marital_status,
-  location,
   module_access:hrm_module_access!module_access_employee_id_fkey (
     task_manager
   ),

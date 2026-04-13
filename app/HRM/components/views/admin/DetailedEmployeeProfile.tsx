@@ -11,11 +11,15 @@ import {
 } from '@/utils/hrm-employment';
 
 const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-const RESIDENTIAL_STATUS_OPTIONS = ['Resident', 'Non-Resident', 'Resident but Not Ordinarily Resident'];
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'others', label: 'Others' },
+];
 const RELIGION_OPTIONS = ['Hindu', 'Muslim', 'Sikh', 'Christian', 'Buddhist', 'Jain', 'Parsi', 'Other'];
 const YES_NO_OPTIONS = ['Yes', 'No'];
 const PROBATION_PERIOD_OPTIONS = ['90', '180'];
-const NOTICE_PERIOD_OPTIONS = ['30', '90', '180'];
+const NOTICE_PERIOD_OPTIONS = ['30', '60', '90'];
 const DOCUMENT_TYPES = [
   { key: 'aadhaar_card', label: 'Aadhaar Card' },
   { key: 'pan_card', label: 'PAN Card' },
@@ -32,17 +36,13 @@ const defaultForm = {
   phone: '',
   personalEmail: '',
   dateOfBirth: '',
+  gender: '',
   bloodGroup: '',
   fatherName: '',
   maritalStatus: '',
-  marriageDate: '',
   spouseName: '',
   nationality: '',
-  residentialStatus: '',
-  placeOfBirth: '',
-  countryOfOrigin: '',
   religion: '',
-  isInternational: 'No',
   isPhysicallyChallenged: 'No',
   address: '',
   city: '',
@@ -58,6 +58,8 @@ const defaultForm = {
   permanentPincode: '',
   phone2: '',
   mobile: '',
+  emergencyContactName: '',
+  emergencyContactNumber: '',
   joinedOn: '',
   confirmationDate: '',
   employeeType: 'full_time_employee',
@@ -136,6 +138,15 @@ function toDisplayDate(value?: string | null) {
 
 function formatStatus(status?: string | null) {
   return formatEmploymentValue(status);
+}
+
+function normalizeGender(value?: string | null) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (['male', 'female', 'others'].includes(normalized)) {
+    return normalized;
+  }
+
+  return '';
 }
 
 function getInitials(name?: string | null) {
@@ -244,17 +255,13 @@ function normalizeEmployeeToForm(employee: any) {
     phone: employee?.phone || '',
     personalEmail: employee?.personal_email || '',
     dateOfBirth: toInputDate(employee?.date_of_birth),
+    gender: normalizeGender(employee?.gender),
     bloodGroup: employee?.blood_group || '',
     fatherName: employee?.father_name || '',
     maritalStatus: employee?.marital_status || '',
-    marriageDate: toInputDate(employee?.marriage_date),
     spouseName: employee?.spouse_name || '',
     nationality: employee?.nationality || '',
-    residentialStatus: employee?.residential_status || '',
-    placeOfBirth: employee?.place_of_birth || '',
-    countryOfOrigin: employee?.country_of_origin || '',
     religion: employee?.religion || '',
-    isInternational: toYesNo(employee?.is_international),
     isPhysicallyChallenged: toYesNo(employee?.is_physically_challenged),
     address: employee?.address || '',
     city: employee?.city || '',
@@ -270,6 +277,8 @@ function normalizeEmployeeToForm(employee: any) {
     permanentPincode: employee?.permanent_pincode || '',
     phone2: employee?.alternate_phone || '',
     mobile: employee?.mobile_phone || '',
+    emergencyContactName: employee?.emergency_contact_name || '',
+    emergencyContactNumber: employee?.emergency_contact_number || '',
     joinedOn: toInputDate(employee?.date_of_joining),
     confirmationDate: toInputDate(employee?.confirmation_date),
     employeeType: employee?.resolved_employee_type || employee?.employee_type || 'full_time_employee',
@@ -717,6 +726,14 @@ export default function DetailedEmployeeProfile({
           <Field label="Date Of Birth">
             <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
           </Field>
+          <Field label="Gender">
+            <select name="gender" value={form.gender} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
+              <option value="">Select gender</option>
+              {GENDER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </Field>
           <Field label="Blood Group">
             <select name="bloodGroup" value={form.bloodGroup} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
               <option value="">Select blood group</option>
@@ -731,40 +748,16 @@ export default function DetailedEmployeeProfile({
           <Field label="Marital Status">
             <input name="maritalStatus" value={form.maritalStatus} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
           </Field>
-          <Field label="Marriage Date">
-            <input type="date" name="marriageDate" value={form.marriageDate} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
-          </Field>
           <Field label="Spouse Name">
             <input name="spouseName" value={form.spouseName} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
           </Field>
           <Field label="Nationality">
             <input name="nationality" value={form.nationality} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
           </Field>
-          <Field label="Residential Status">
-            <select name="residentialStatus" value={form.residentialStatus} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
-              <option value="">Select residential status</option>
-              {RESIDENTIAL_STATUS_OPTIONS.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Place Of Birth">
-            <input name="placeOfBirth" value={form.placeOfBirth} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
-          </Field>
-          <Field label="Country Of Origin">
-            <input name="countryOfOrigin" value={form.countryOfOrigin} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
-          </Field>
           <Field label="Religion">
             <select name="religion" value={form.religion} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
               <option value="">Select religion</option>
               {RELIGION_OPTIONS.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="International Employee">
-            <select name="isInternational" value={form.isInternational} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
-              {YES_NO_OPTIONS.map((option) => (
                 <option key={option} value={option}>{option}</option>
               ))}
             </select>
@@ -781,6 +774,12 @@ export default function DetailedEmployeeProfile({
           </Field>
           <Field label="Mobile">
             <input name="mobile" value={form.mobile} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
+          </Field>
+          <Field label="Emergency Contact Name">
+            <input name="emergencyContactName" value={form.emergencyContactName} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
+          </Field>
+          <Field label="Emergency Contact Number">
+            <input name="emergencyContactNumber" value={form.emergencyContactNumber} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
           </Field>
           <div className="md:col-span-2 xl:col-span-3 mt-2">
             <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-low px-5 py-5">

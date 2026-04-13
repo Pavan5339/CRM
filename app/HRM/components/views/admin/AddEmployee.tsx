@@ -48,17 +48,13 @@ type FormState = {
   profilePicture: File | null;
   personalEmail: string;
   dateOfBirth: string;
+  gender: string;
   bloodGroup: string;
   fatherName: string;
   maritalStatus: string;
-  marriageDate: string;
   spouseName: string;
   nationality: string;
-  residentialStatus: string;
-  placeOfBirth: string;
-  countryOfOrigin: string;
   religion: string;
-  isInternational: string;
   isPhysicallyChallenged: string;
   address: string;
   city: string;
@@ -74,6 +70,8 @@ type FormState = {
   permanentPincode: string;
   phone2: string;
   mobile: string;
+  emergencyContactName: string;
+  emergencyContactNumber: string;
   joinedOn: string;
   confirmationDate: string;
   employeeType: string;
@@ -111,10 +109,14 @@ const WORKING_DAY_PRESETS = [
 
 const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-const RESIDENTIAL_STATUS_OPTIONS = ['Resident', 'Non-Resident', 'Resident but Not Ordinarily Resident'];
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'others', label: 'Others' },
+];
 const RELIGION_OPTIONS = ['Hindu', 'Muslim', 'Sikh', 'Christian', 'Buddhist', 'Jain', 'Parsi', 'Other'];
 const PROBATION_PERIOD_OPTIONS = ['90', '180'];
-const NOTICE_PERIOD_OPTIONS = ['30', '90', '180'];
+const NOTICE_PERIOD_OPTIONS = ['30', '60', '90'];
 
 const DOCUMENT_TYPES = [
   { key: 'aadhaar_card', label: 'Aadhaar Card' },
@@ -142,17 +144,13 @@ const defaultFormState: FormState = {
   profilePicture: null,
   personalEmail: '',
   dateOfBirth: '',
+  gender: '',
   bloodGroup: '',
   fatherName: '',
   maritalStatus: '',
-  marriageDate: '',
   spouseName: '',
   nationality: 'Indian',
-  residentialStatus: '',
-  placeOfBirth: '',
-  countryOfOrigin: 'India',
   religion: '',
-  isInternational: 'No',
   isPhysicallyChallenged: 'No',
   address: '',
   city: '',
@@ -168,6 +166,8 @@ const defaultFormState: FormState = {
   permanentPincode: '',
   phone2: '',
   mobile: '',
+  emergencyContactName: '',
+  emergencyContactNumber: '',
   joinedOn: '',
   confirmationDate: '',
   employeeType: 'full_time_employee',
@@ -218,14 +218,19 @@ function Section({
 
 function Field({
   label,
+  required = false,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">{label}</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+        {label}
+        {required ? <span className="ml-1 text-rose-600">*</span> : null}
+      </span>
       {children}
     </label>
   );
@@ -285,6 +290,7 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -530,6 +536,7 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
       }
 
       setMessage(result.message || 'Employee added successfully.');
+      setShowSuccessModal(true);
       resetForm();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Failed to save employee');
@@ -581,22 +588,16 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
           </div>
         )}
 
-        {message && (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-medium text-emerald-700">
-            {message}
-          </div>
-        )}
-
         <form id="add-employee-form" className="space-y-8" onSubmit={handleSubmit}>
           <Section title="Account & Access" subtitle="Create the login credentials and primary employee access.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Employee ID">
+              <Field label="Employee ID" required>
                 <input className={inputClassName()} name="employeeId" value={form.employeeId} onChange={handleInputChange} required />
               </Field>
-              <Field label="Work Email">
+              <Field label="Work Email" required>
                 <input className={inputClassName()} name="email" type="email" value={form.email} onChange={handleInputChange} required />
               </Field>
-              <Field label="Password">
+              <Field label="Password" required>
                 <input className={inputClassName()} name="password" type="text" value={form.password} onChange={handleInputChange} required />
               </Field>
               <Field label="Phone Number">
@@ -619,7 +620,7 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
 
           <Section title="Personal Information" subtitle="Capture the employee's core identity and personal details.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Full Name">
+              <Field label="Full Name" required>
                 <input className={inputClassName()} name="name" value={form.name} onChange={handleInputChange} required />
               </Field>
               <Field label="Personal Email">
@@ -627,6 +628,16 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
               </Field>
               <Field label="Date Of Birth">
                 <input className={inputClassName()} name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleInputChange} />
+              </Field>
+              <Field label="Gender">
+                <select className={selectClassName()} name="gender" value={form.gender} onChange={handleInputChange}>
+                  <option value="">Select gender</option>
+                  {GENDER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Blood Group">
                 <select className={selectClassName()} name="bloodGroup" value={form.bloodGroup} onChange={handleInputChange}>
@@ -650,30 +661,11 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
                   <option>Widowed</option>
                 </select>
               </Field>
-              <Field label="Marriage Date">
-                <input className={inputClassName()} name="marriageDate" type="date" value={form.marriageDate} onChange={handleInputChange} />
-              </Field>
               <Field label="Spouse Name">
                 <input className={inputClassName()} name="spouseName" value={form.spouseName} onChange={handleInputChange} />
               </Field>
               <Field label="Nationality">
                 <input className={inputClassName()} name="nationality" value={form.nationality} onChange={handleInputChange} />
-              </Field>
-              <Field label="Residential Status">
-                <select className={selectClassName()} name="residentialStatus" value={form.residentialStatus} onChange={handleInputChange}>
-                  <option value="">Select residential status</option>
-                  {RESIDENTIAL_STATUS_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Place Of Birth">
-                <input className={inputClassName()} name="placeOfBirth" value={form.placeOfBirth} onChange={handleInputChange} />
-              </Field>
-              <Field label="Country Of Origin">
-                <input className={inputClassName()} name="countryOfOrigin" value={form.countryOfOrigin} onChange={handleInputChange} />
               </Field>
               <Field label="Religion">
                 <select className={selectClassName()} name="religion" value={form.religion} onChange={handleInputChange}>
@@ -683,12 +675,6 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
                       {option}
                     </option>
                   ))}
-                </select>
-              </Field>
-              <Field label="International Employee">
-                <select className={selectClassName()} name="isInternational" value={form.isInternational} onChange={handleInputChange}>
-                  <option>No</option>
-                  <option>Yes</option>
                 </select>
               </Field>
               <Field label="Physically Challenged">
@@ -725,6 +711,12 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
               </Field>
               <Field label="Mobile">
                 <input className={inputClassName()} name="mobile" value={form.mobile} onChange={handleInputChange} />
+              </Field>
+              <Field label="Emergency Contact Name">
+                <input className={inputClassName()} name="emergencyContactName" value={form.emergencyContactName} onChange={handleInputChange} />
+              </Field>
+              <Field label="Emergency Contact Number">
+                <input className={inputClassName()} name="emergencyContactNumber" value={form.emergencyContactNumber} onChange={handleInputChange} />
               </Field>
             </div>
           </Section>
@@ -831,13 +823,13 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
 
           <Section title="Current Position" subtitle="Define reporting structure, work schedule, and position details.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Department">
+              <Field label="Department" required>
                 <input className={inputClassName()} list="department-options" name="department" value={form.department} onChange={handleInputChange} required />
               </Field>
               <Field label="Division">
                 <input className={inputClassName()} name="division" value={form.division} onChange={handleInputChange} />
               </Field>
-              <Field label="Designation">
+              <Field label="Designation" required>
                 <input className={inputClassName()} list="designation-options" name="designation" value={form.designation} onChange={handleInputChange} required />
               </Field>
               <Field label="Reporting To">
@@ -1074,8 +1066,115 @@ export default function AddEmployee({ setCurrentTab }: { setCurrentTab?: (tab: s
               ))}
             </div>
           </Section>
+
+          <div className="flex justify-end gap-4 pt-2">
+            <button
+              type="button"
+              onClick={() => setCurrentTab?.('admin-employee-list')}
+              className="rounded-2xl border border-outline-variant/15 bg-surface px-6 py-3 text-sm font-bold text-on-surface"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-2xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {submitting ? 'Saving Employee...' : 'Save Employee'}
+            </button>
+          </div>
         </form>
       </div>
+
+      {showSuccessModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-6 backdrop-blur-sm">
+          <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
+            <div className="flex flex-col items-center text-center">
+              <div className="relative mb-6 flex h-24 w-24 items-center justify-center">
+                <div className="absolute inset-1 rounded-full border-2 border-violet-500/20 animate-[pulseRing_1.8s_ease-out_infinite]" />
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-[3px] border-violet-600 bg-white shadow-[0_18px_40px_rgba(139,92,246,0.18)] animate-[modalIconIn_0.45s_ease-out]">
+                  <svg
+                    viewBox="0 0 52 52"
+                    className="h-11 w-11 text-violet-600"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M14 27.5L22.5 36L38.5 19"
+                      stroke="currentColor"
+                      strokeWidth="4.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="origin-center [stroke-dasharray:40] [stroke-dashoffset:40] animate-[dash_0.6s_ease-out_forwards_0.15s]"
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Employee Added</h2>
+              <p className="mt-3 text-base leading-7 text-slate-600 whitespace-nowrap">
+                New employee has been added successfully.
+              </p>
+
+              <div className="mt-8 flex w-full flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setShowSuccessModal(false)}
+                  className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                >
+                  Add Another
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    setCurrentTab?.('admin-employee-list');
+                  }}
+                  className="flex-1 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700"
+                >
+                  View Employees
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <style jsx>{`
+        @keyframes dash {
+          from {
+            stroke-dashoffset: 40;
+          }
+          to {
+            stroke-dashoffset: 0;
+          }
+        }
+
+        @keyframes pulseRing {
+          0% {
+            transform: scale(0.9);
+            opacity: 0;
+          }
+          35% {
+            opacity: 0.5;
+          }
+          100% {
+            transform: scale(1.12);
+            opacity: 0;
+          }
+        }
+
+        @keyframes modalIconIn {
+          from {
+            transform: scale(0.82);
+            opacity: 0.4;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 }

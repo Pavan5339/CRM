@@ -287,7 +287,7 @@ export default function EmployeeList({
                       setCurrentTab?.('admin-employee-profile');
                     }}
                   >
-                    <td className="px-6 py-5 text-lg font-bold text-primary/60">{employee.employee_id || '--'}</td>
+                    <td className="px-6 py-5 text-lg font-bold text-on-surface">{employee.employee_id || '--'}</td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-4">
                         {employee.profile_picture_url ? (

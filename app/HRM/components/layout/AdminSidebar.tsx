@@ -7,6 +7,8 @@ import Link from 'next/link';
 interface AdminSidebarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
+  onLogout: () => Promise<void> | void;
+  isLoggingOut?: boolean;
   admin?: {
     name?: string;
     designation?: string;
@@ -14,7 +16,13 @@ interface AdminSidebarProps {
   } | null;
 }
 
-export default function AdminSidebar({ currentTab, setCurrentTab, admin }: AdminSidebarProps) {
+export default function AdminSidebar({
+  currentTab,
+  setCurrentTab,
+  admin,
+  onLogout,
+  isLoggingOut = false,
+}: AdminSidebarProps) {
   const fallbackInitial = admin?.name?.trim()?.charAt(0)?.toUpperCase() || 'H';
 
   const navItems = [
@@ -92,9 +100,14 @@ export default function AdminSidebar({ currentTab, setCurrentTab, admin }: Admin
           <span className="material-symbols-outlined">exit_to_app</span>
           <span className="font-body text-sm font-medium">Exit Admin Mode</span>
         </Link>
-        <button className="w-full flex items-center gap-3 px-5 py-2.5 text-on-surface-variant hover:text-primary transition-colors">
-          <span className="material-symbols-outlined">settings</span>
-          <span className="font-body text-sm font-medium">Settings</span>
+        <button
+          type="button"
+          onClick={onLogout}
+          disabled={isLoggingOut}
+          className="w-full flex items-center gap-3 px-5 py-2.5 text-on-surface-variant hover:text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <span className="material-symbols-outlined">logout</span>
+          <span className="font-body text-sm font-medium">{isLoggingOut ? 'Logging Out...' : 'Log Out'}</span>
         </button>
       </div>
     </aside>
