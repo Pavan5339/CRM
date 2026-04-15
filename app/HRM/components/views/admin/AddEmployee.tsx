@@ -117,6 +117,14 @@ const GENDER_OPTIONS = [
 const RELIGION_OPTIONS = ['Hindu', 'Muslim', 'Sikh', 'Christian', 'Buddhist', 'Jain', 'Parsi', 'Other'];
 const PROBATION_PERIOD_OPTIONS = ['90', '180'];
 const NOTICE_PERIOD_OPTIONS = ['30', '60', '90'];
+const FIXED_DEPARTMENT_OPTIONS = [
+  'Finance & Accounts',
+  'Marketing',
+  'Cyber Security',
+  'Artificial Intelligence',
+  'Information Technology',
+  'Human Resource',
+];
 
 const DOCUMENT_TYPES = [
   { key: 'aadhaar_card', label: 'Aadhaar Card' },
@@ -303,6 +311,7 @@ export default function AddEmployee({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -310,6 +319,7 @@ export default function AddEmployee({
     async function loadMeta() {
       setLoadingMeta(true);
       setError('');
+      setShowErrorModal(false);
 
       try {
         const response = await fetch(metaUrl);
@@ -330,6 +340,7 @@ export default function AddEmployee({
       } catch (requestError) {
         if (active) {
           setError(requestError instanceof Error ? requestError.message : 'Failed to load employee form data');
+          setShowErrorModal(true);
         }
       } finally {
         if (active) {
@@ -357,6 +368,7 @@ export default function AddEmployee({
     const { name, value, files } = event.target as HTMLInputElement;
     setMessage('');
     setError('');
+    setShowErrorModal(false);
 
     if (name === 'profilePicture') {
       setForm((current) => ({ ...current, profilePicture: files?.[0] || null }));
@@ -481,16 +493,9 @@ export default function AddEmployee({
     setSubmitting(true);
     setMessage('');
     setError('');
+    setShowErrorModal(false);
 
     try {
-      if (!form.profilePicture) {
-        throw new Error('Profile picture is required.');
-      }
-
-      if (!documents.aadhaar_card) {
-        throw new Error('Aadhaar Card upload is required.');
-      }
-
       const payload = new FormData();
 
       Object.entries(form).forEach(([key, value]) => {
@@ -560,6 +565,7 @@ export default function AddEmployee({
       resetForm();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Failed to save employee');
+      setShowErrorModal(true);
     } finally {
       setSubmitting(false);
     }
@@ -619,25 +625,35 @@ export default function AddEmployee({
         <form id="add-employee-form" className="space-y-8" onSubmit={handleSubmit}>
           <Section title="Account & Access" subtitle="Create the login credentials and primary employee access.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Employee ID" required>
-                <input className={inputClassName()} name="employeeId" value={form.employeeId} onChange={handleInputChange} required />
+              <Field label="Employee ID">
+                <input className={inputClassName()} name="employeeId" value={form.employeeId} onChange={handleInputChange} />
               </Field>
-              <Field label="Work Email" required>
-                <input className={inputClassName()} name="email" type="email" value={form.email} onChange={handleInputChange} required />
+              <Field label="Work Email">
+                <div className="space-y-2">
+                  <input className={inputClassName()} name="email" type="email" value={form.email} onChange={handleInputChange} />
+                  <p className="text-xs text-on-surface-variant">
+                    Use your BNC email if you have., If not, then use personal email
+                  </p>
+                </div>
               </Field>
-              <Field label="Password" required>
-                <input className={inputClassName()} name="password" type="text" value={form.password} onChange={handleInputChange} required />
+              <Field label="Password">
+                <div className="space-y-2">
+                  <input className={inputClassName()} name="password" type="text" value={form.password} onChange={handleInputChange} />
+                  <p className="text-xs text-on-surface-variant">
+                    Create a password for logging in. This is not your email password.
+                  </p>
+                </div>
               </Field>
               <Field label="Phone Number">
-                <input className={inputClassName()} name="phone" value={form.phone} onChange={handleInputChange} required />
+                <input className={inputClassName()} name="phone" value={form.phone} onChange={handleInputChange} />
               </Field>
               <Field label="Task Manager Access">
-                <select className={selectClassName()} name="taskManagerAccess" value={form.taskManagerAccess} onChange={handleInputChange} required>
+                <select className={selectClassName()} name="taskManagerAccess" value={form.taskManagerAccess} onChange={handleInputChange}>
                   <option>Yes</option>
                   <option>No</option>
                 </select>
               </Field>
-              <Field label="Profile Picture" required>
+              <Field label="Profile Picture">
                 <label className={fileButtonClassName()}>
                   <span>{form.profilePicture ? form.profilePicture.name : 'Choose Profile Image'}</span>
                   <input className="hidden" name="profilePicture" type="file" accept="image/*" onChange={handleInputChange} />
@@ -648,17 +664,17 @@ export default function AddEmployee({
 
           <Section title="Personal Information" subtitle="Capture the employee's core identity and personal details.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Full Name" required>
-                <input className={inputClassName()} name="name" value={form.name} onChange={handleInputChange} required />
+              <Field label="Full Name">
+                <input className={inputClassName()} name="name" value={form.name} onChange={handleInputChange} />
               </Field>
-              <Field label="Personal Email" required>
-                <input className={inputClassName()} name="personalEmail" type="email" value={form.personalEmail} onChange={handleInputChange} required />
+              <Field label="Personal Email">
+                <input className={inputClassName()} name="personalEmail" type="email" value={form.personalEmail} onChange={handleInputChange} />
               </Field>
-              <Field label="Date Of Birth" required>
-                <input className={inputClassName()} name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleInputChange} required />
+              <Field label="Date Of Birth">
+                <input className={inputClassName()} name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleInputChange} />
               </Field>
-              <Field label="Gender" required>
-                <select className={selectClassName()} name="gender" value={form.gender} onChange={handleInputChange} required>
+              <Field label="Gender">
+                <select className={selectClassName()} name="gender" value={form.gender} onChange={handleInputChange}>
                   <option value="">Select gender</option>
                   {GENDER_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -667,8 +683,8 @@ export default function AddEmployee({
                   ))}
                 </select>
               </Field>
-              <Field label="Blood Group" required>
-                <select className={selectClassName()} name="bloodGroup" value={form.bloodGroup} onChange={handleInputChange} required>
+              <Field label="Blood Group">
+                <select className={selectClassName()} name="bloodGroup" value={form.bloodGroup} onChange={handleInputChange}>
                   <option value="">Select blood group</option>
                   {BLOOD_GROUP_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -677,11 +693,11 @@ export default function AddEmployee({
                   ))}
                 </select>
               </Field>
-              <Field label="Father Name" required>
-                <input className={inputClassName()} name="fatherName" value={form.fatherName} onChange={handleInputChange} required />
+              <Field label="Father Name">
+                <input className={inputClassName()} name="fatherName" value={form.fatherName} onChange={handleInputChange} />
               </Field>
-              <Field label="Marital Status" required>
-                <select className={selectClassName()} name="maritalStatus" value={form.maritalStatus} onChange={handleInputChange} required>
+              <Field label="Marital Status">
+                <select className={selectClassName()} name="maritalStatus" value={form.maritalStatus} onChange={handleInputChange}>
                   <option value="">Select</option>
                   <option>Single</option>
                   <option>Married</option>
@@ -689,14 +705,14 @@ export default function AddEmployee({
                   <option>Widowed</option>
                 </select>
               </Field>
-              <Field label="Spouse Name" required>
-                <input className={inputClassName()} name="spouseName" value={form.spouseName} onChange={handleInputChange} required />
+              <Field label="Spouse Name">
+                <input className={inputClassName()} name="spouseName" value={form.spouseName} onChange={handleInputChange} />
               </Field>
-              <Field label="Nationality" required>
-                <input className={inputClassName()} name="nationality" value={form.nationality} onChange={handleInputChange} required />
+              <Field label="Nationality">
+                <input className={inputClassName()} name="nationality" value={form.nationality} onChange={handleInputChange} />
               </Field>
-              <Field label="Religion" required>
-                <select className={selectClassName()} name="religion" value={form.religion} onChange={handleInputChange} required>
+              <Field label="Religion">
+                <select className={selectClassName()} name="religion" value={form.religion} onChange={handleInputChange}>
                   <option value="">Select religion</option>
                   {RELIGION_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -705,8 +721,8 @@ export default function AddEmployee({
                   ))}
                 </select>
               </Field>
-              <Field label="Physically Challenged" required>
-                <select className={selectClassName()} name="isPhysicallyChallenged" value={form.isPhysicallyChallenged} onChange={handleInputChange} required>
+              <Field label="Physically Challenged">
+                <select className={selectClassName()} name="isPhysicallyChallenged" value={form.isPhysicallyChallenged} onChange={handleInputChange}>
                   <option>No</option>
                   <option>Yes</option>
                 </select>
@@ -716,35 +732,35 @@ export default function AddEmployee({
 
           <Section title="Current Address" subtitle="Save the communication address and contact numbers for the employee.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Address" required>
-                <textarea className={inputClassName(true)} name="address" value={form.address} onChange={handleInputChange} required />
+              <Field label="Address">
+                <textarea className={inputClassName(true)} name="address" value={form.address} onChange={handleInputChange} />
               </Field>
-              <Field label="City" required>
-                <input className={inputClassName()} name="city" value={form.city} onChange={handleInputChange} required />
+              <Field label="City">
+                <input className={inputClassName()} name="city" value={form.city} onChange={handleInputChange} />
               </Field>
-              <Field label="District" required>
-                <input className={inputClassName()} name="district" value={form.district} onChange={handleInputChange} required />
+              <Field label="District">
+                <input className={inputClassName()} name="district" value={form.district} onChange={handleInputChange} />
               </Field>
-              <Field label="State" required>
-                <input className={inputClassName()} name="state" value={form.state} onChange={handleInputChange} required />
+              <Field label="State">
+                <input className={inputClassName()} name="state" value={form.state} onChange={handleInputChange} />
               </Field>
-              <Field label="Country" required>
-                <input className={inputClassName()} name="country" value={form.country} onChange={handleInputChange} required />
+              <Field label="Country">
+                <input className={inputClassName()} name="country" value={form.country} onChange={handleInputChange} />
               </Field>
-              <Field label="Pincode" required>
-                <input className={inputClassName()} name="pincode" value={form.pincode} onChange={handleInputChange} required />
+              <Field label="Pincode">
+                <input className={inputClassName()} name="pincode" value={form.pincode} onChange={handleInputChange} />
               </Field>
-              <Field label="Alternate Phone" required>
-                <input className={inputClassName()} name="phone2" value={form.phone2} onChange={handleInputChange} required />
+              <Field label="Alternate Phone">
+                <input className={inputClassName()} name="phone2" value={form.phone2} onChange={handleInputChange} />
               </Field>
-              <Field label="Mobile" required>
-                <input className={inputClassName()} name="mobile" value={form.mobile} onChange={handleInputChange} required />
+              <Field label="Mobile">
+                <input className={inputClassName()} name="mobile" value={form.mobile} onChange={handleInputChange} />
               </Field>
-              <Field label="Emergency Contact Name" required>
-                <input className={inputClassName()} name="emergencyContactName" value={form.emergencyContactName} onChange={handleInputChange} required />
+              <Field label="Emergency Contact Name">
+                <input className={inputClassName()} name="emergencyContactName" value={form.emergencyContactName} onChange={handleInputChange} />
               </Field>
-              <Field label="Emergency Contact Number" required>
-                <input className={inputClassName()} name="emergencyContactNumber" value={form.emergencyContactNumber} onChange={handleInputChange} required />
+              <Field label="Emergency Contact Number">
+                <input className={inputClassName()} name="emergencyContactNumber" value={form.emergencyContactNumber} onChange={handleInputChange} />
               </Field>
             </div>
           </Section>
@@ -767,65 +783,64 @@ export default function AddEmployee({
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Address" required>
+              <Field label="Address">
                 <textarea
                   className={inputClassName(true)}
                   name="permanentAddress"
                   value={form.permanentAddress}
                   onChange={handleInputChange}
                   disabled={sameAsCurrentAddress}
-                  required={!sameAsCurrentAddress}
                 />
               </Field>
-              <Field label="City" required>
-                <input className={inputClassName()} name="permanentCity" value={form.permanentCity} onChange={handleInputChange} disabled={sameAsCurrentAddress} required={!sameAsCurrentAddress} />
+              <Field label="City">
+                <input className={inputClassName()} name="permanentCity" value={form.permanentCity} onChange={handleInputChange} disabled={sameAsCurrentAddress} />
               </Field>
-              <Field label="District" required>
-                <input className={inputClassName()} name="permanentDistrict" value={form.permanentDistrict} onChange={handleInputChange} disabled={sameAsCurrentAddress} required={!sameAsCurrentAddress} />
+              <Field label="District">
+                <input className={inputClassName()} name="permanentDistrict" value={form.permanentDistrict} onChange={handleInputChange} disabled={sameAsCurrentAddress} />
               </Field>
-              <Field label="State" required>
-                <input className={inputClassName()} name="permanentState" value={form.permanentState} onChange={handleInputChange} disabled={sameAsCurrentAddress} required={!sameAsCurrentAddress} />
+              <Field label="State">
+                <input className={inputClassName()} name="permanentState" value={form.permanentState} onChange={handleInputChange} disabled={sameAsCurrentAddress} />
               </Field>
-              <Field label="Country" required>
-                <input className={inputClassName()} name="permanentCountry" value={form.permanentCountry} onChange={handleInputChange} disabled={sameAsCurrentAddress} required={!sameAsCurrentAddress} />
+              <Field label="Country">
+                <input className={inputClassName()} name="permanentCountry" value={form.permanentCountry} onChange={handleInputChange} disabled={sameAsCurrentAddress} />
               </Field>
-              <Field label="Pincode" required>
-                <input className={inputClassName()} name="permanentPincode" value={form.permanentPincode} onChange={handleInputChange} disabled={sameAsCurrentAddress} required={!sameAsCurrentAddress} />
+              <Field label="Pincode">
+                <input className={inputClassName()} name="permanentPincode" value={form.permanentPincode} onChange={handleInputChange} disabled={sameAsCurrentAddress} />
               </Field>
             </div>
           </Section>
 
           <Section title="Joining Details" subtitle="Record employee type, lifecycle status, current stage, and onboarding references.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Employee Type" required>
-                <select className={selectClassName()} name="employeeType" value={form.employeeType} onChange={handleInputChange} required>
+              <Field label="Employee Type">
+                <select className={selectClassName()} name="employeeType" value={form.employeeType} onChange={handleInputChange}>
                   {EMPLOYEE_TYPE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
               </Field>
-              <Field label="Lifecycle Status" required>
-                <select className={selectClassName()} name="lifecycleStatus" value={form.lifecycleStatus} onChange={handleInputChange} required>
+              <Field label="Lifecycle Status">
+                <select className={selectClassName()} name="lifecycleStatus" value={form.lifecycleStatus} onChange={handleInputChange}>
                   {EMPLOYMENT_LIFECYCLE_STATUS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
               </Field>
-              <Field label="Current Stage" required>
-                <select className={selectClassName()} name="currentStage" value={form.currentStage} onChange={handleInputChange} required>
+              <Field label="Current Stage">
+                <select className={selectClassName()} name="currentStage" value={form.currentStage} onChange={handleInputChange}>
                   {CURRENT_STAGE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
               </Field>
-              <Field label="Joining Date" required>
-                <input className={inputClassName()} name="joinedOn" type="date" value={form.joinedOn} onChange={handleInputChange} required />
+              <Field label="Joining Date">
+                <input className={inputClassName()} name="joinedOn" type="date" value={form.joinedOn} onChange={handleInputChange} />
               </Field>
-              <Field label="Confirmation Date" required>
-                <input className={inputClassName()} name="confirmationDate" type="date" value={form.confirmationDate} onChange={handleInputChange} required />
+              <Field label="Confirmation Date">
+                <input className={inputClassName()} name="confirmationDate" type="date" value={form.confirmationDate} onChange={handleInputChange} />
               </Field>
-              <Field label="Probation Period (days)" required>
-                <select className={selectClassName()} name="probationPeriodDays" value={form.probationPeriodDays} onChange={handleInputChange} required>
+              <Field label="Probation Period (days)">
+                <select className={selectClassName()} name="probationPeriodDays" value={form.probationPeriodDays} onChange={handleInputChange}>
                   <option value="">Select probation period</option>
                   {PROBATION_PERIOD_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -834,8 +849,8 @@ export default function AddEmployee({
                   ))}
                 </select>
               </Field>
-              <Field label="Notice Period (days)" required>
-                <select className={selectClassName()} name="noticePeriodDays" value={form.noticePeriodDays} onChange={handleInputChange} required>
+              <Field label="Notice Period (days)">
+                <select className={selectClassName()} name="noticePeriodDays" value={form.noticePeriodDays} onChange={handleInputChange}>
                   <option value="">Select notice period</option>
                   {NOTICE_PERIOD_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -844,25 +859,32 @@ export default function AddEmployee({
                   ))}
                 </select>
               </Field>
-              <Field label="Referred By" required>
-                <input className={inputClassName()} name="referredBy" value={form.referredBy} onChange={handleInputChange} required />
+              <Field label="Referred By">
+                <input className={inputClassName()} name="referredBy" value={form.referredBy} onChange={handleInputChange} />
               </Field>
             </div>
           </Section>
 
           <Section title="Current Position" subtitle="Define reporting structure, work schedule, and position details.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Department" required>
-                <input className={inputClassName()} list="department-options" name="department" value={form.department} onChange={handleInputChange} required />
+              <Field label="Department">
+                <select className={selectClassName()} name="department" value={form.department} onChange={handleInputChange}>
+                  <option value="">Select department</option>
+                  {FIXED_DEPARTMENT_OPTIONS.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
+                  ))}
+                </select>
               </Field>
-              <Field label="Division" required>
-                <input className={inputClassName()} name="division" value={form.division} onChange={handleInputChange} required />
+              <Field label="Division">
+                <input className={inputClassName()} name="division" value={form.division} onChange={handleInputChange} />
               </Field>
-              <Field label="Designation" required>
-                <input className={inputClassName()} list="designation-options" name="designation" value={form.designation} onChange={handleInputChange} required />
+              <Field label="Designation">
+                <input className={inputClassName()} list="designation-options" name="designation" value={form.designation} onChange={handleInputChange} />
               </Field>
-              <Field label="Reporting To" required>
-                <select className={selectClassName()} name="reportingTo" value={form.reportingTo} onChange={handleInputChange} required>
+              <Field label="Reporting To">
+                <select className={selectClassName()} name="reportingTo" value={form.reportingTo} onChange={handleInputChange}>
                   <option value="">Select reporting to</option>
                   {superAdmins.length > 0 ? (
                     <optgroup label="Super Admins">
@@ -882,10 +904,10 @@ export default function AddEmployee({
                   </optgroup>
                 </select>
               </Field>
-              <Field label="Company" required>
-                <input className={inputClassName()} name="company" value={form.company} onChange={handleInputChange} required />
+              <Field label="Company">
+                <input className={inputClassName()} name="company" value={form.company} onChange={handleInputChange} />
               </Field>
-              <Field label="Salary" required>
+              <Field label="Salary">
                 <input
                   className={inputClassName()}
                   name="salary"
@@ -895,11 +917,10 @@ export default function AddEmployee({
                   placeholder="e.g. 35000"
                   value={form.salary}
                   onChange={handleInputChange}
-                  required
                 />
               </Field>
-              <Field label="Working Day Pattern" required>
-                <select className={selectClassName()} name="workingScheduleLabel" value={form.workingScheduleLabel} onChange={handleInputChange} required>
+              <Field label="Working Day Pattern">
+                <select className={selectClassName()} name="workingScheduleLabel" value={form.workingScheduleLabel} onChange={handleInputChange}>
                   {WORKING_DAY_PRESETS.map((preset) => (
                     <option key={preset.label} value={preset.label}>
                       {preset.label}
@@ -907,8 +928,8 @@ export default function AddEmployee({
                   ))}
                 </select>
               </Field>
-              <Field label="Second Saturday Off" required>
-                <select className={selectClassName()} name="secondSaturdayOff" value={form.secondSaturdayOff} onChange={handleInputChange} required>
+              <Field label="Second Saturday Off">
+                <select className={selectClassName()} name="secondSaturdayOff" value={form.secondSaturdayOff} onChange={handleInputChange}>
                   <option>No</option>
                   <option>Yes</option>
                 </select>
@@ -937,13 +958,6 @@ export default function AddEmployee({
                 })}
               </div>
             </div>
-
-            <datalist id="department-options">
-              {departments.map((department) => (
-                <option key={department.id} value={department.name} />
-              ))}
-            </datalist>
-
             <datalist id="designation-options">
               {filteredDesignations.map((designation) => (
                 <option key={designation.id} value={designation.title} />
@@ -954,26 +968,26 @@ export default function AddEmployee({
 
           <Section title="Identity & Financials" subtitle="Save government identity numbers and banking details in the employee master record.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Aadhaar Number" required>
-                <input className={inputClassName()} name="aadhaarNumber" inputMode="numeric" maxLength={12} value={form.aadhaarNumber} onChange={handleInputChange} required />
+              <Field label="Aadhaar Number">
+                <input className={inputClassName()} name="aadhaarNumber" inputMode="numeric" maxLength={12} value={form.aadhaarNumber} onChange={handleInputChange} />
               </Field>
-              <Field label="PAN Number" required>
-                <input className={inputClassName()} name="panNumber" maxLength={10} value={form.panNumber} onChange={handleInputChange} required />
+              <Field label="PAN Number">
+                <input className={inputClassName()} name="panNumber" maxLength={10} value={form.panNumber} onChange={handleInputChange} />
               </Field>
-              <Field label="Passport Number" required>
-                <input className={inputClassName()} name="passportNumber" value={form.passportNumber} onChange={handleInputChange} required />
+              <Field label="Passport Number">
+                <input className={inputClassName()} name="passportNumber" value={form.passportNumber} onChange={handleInputChange} />
               </Field>
-              <Field label="Bank Account Number" required>
-                <input className={inputClassName()} name="bankAccountNumber" value={form.bankAccountNumber} onChange={handleInputChange} required />
+              <Field label="Bank Account Number">
+                <input className={inputClassName()} name="bankAccountNumber" value={form.bankAccountNumber} onChange={handleInputChange} />
               </Field>
-              <Field label="Bank Account Holder Name" required>
-                <input className={inputClassName()} name="bankAccountHolderName" value={form.bankAccountHolderName} onChange={handleInputChange} required />
+              <Field label="Bank Account Holder Name">
+                <input className={inputClassName()} name="bankAccountHolderName" value={form.bankAccountHolderName} onChange={handleInputChange} />
               </Field>
-              <Field label="IFSC Code" required>
-                <input className={inputClassName()} name="bankIfscCode" value={form.bankIfscCode} onChange={handleInputChange} required />
+              <Field label="IFSC Code">
+                <input className={inputClassName()} name="bankIfscCode" value={form.bankIfscCode} onChange={handleInputChange} />
               </Field>
-              <Field label="Bank Name" required>
-                <input className={inputClassName()} name="bankName" value={form.bankName} onChange={handleInputChange} required />
+              <Field label="Bank Name">
+                <input className={inputClassName()} name="bankName" value={form.bankName} onChange={handleInputChange} />
               </Field>
             </div>
           </Section>
@@ -1083,7 +1097,7 @@ export default function AddEmployee({
           <Section title="Documents Upload" subtitle="Upload the core compliance and onboarding documents for the employee file.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {DOCUMENT_TYPES.map((document) => (
-                <Field key={document.key} label={document.label} required={document.key === 'aadhaar_card'}>
+                <Field key={document.key} label={document.label}>
                   <label className={fileButtonClassName()}>
                     <span>{documents[document.key] ? documents[document.key]?.name : 'Choose File'}</span>
                     <input
@@ -1180,6 +1194,48 @@ export default function AddEmployee({
                     Close
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showErrorModal && error ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-6 backdrop-blur-sm">
+          <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-rose-200/80 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full border-[3px] border-rose-500 bg-rose-50 text-rose-600 shadow-[0_18px_40px_rgba(244,63,94,0.14)]">
+                <svg viewBox="0 0 24 24" className="h-10 w-10" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 8v5"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="12" cy="16.5" r="1.2" fill="currentColor" />
+                  <path
+                    d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Save Error</h2>
+              <p className="mt-3 text-base leading-7 text-slate-600">
+                {error}
+              </p>
+
+              <div className="mt-8 flex w-full flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowErrorModal(false)}
+                  className="w-full rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition hover:bg-rose-700"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

@@ -422,17 +422,33 @@ async function ensureDesignationId(title, departmentId) {
   const normalizedTitle = cleanText(title);
   if (!normalizedTitle) return null;
 
-  let query = adminClient
+  const titleQuery = adminClient
     .from('hrm_designations')
     .select('id')
     .ilike('title', normalizedTitle)
+    .limit(1)
+    .maybeSingle();
+
+  const { data: existingByTitle, error: existingByTitleError } = await titleQuery;
+
+  if (existingByTitleError) {
+    throw new Error(existingByTitleError.message || 'Failed to load designation');
+  }
+
+  if (existingByTitle?.id) return existingByTitle.id;
+
+  let departmentQuery = adminClient
+    .from('hrm_designations')
+    .select('id')
     .limit(1);
 
   if (departmentId) {
-    query = query.eq('department_id', departmentId);
+    departmentQuery = departmentQuery.eq('department_id', departmentId).ilike('title', normalizedTitle);
+  } else {
+    departmentQuery = departmentQuery.ilike('title', normalizedTitle);
   }
 
-  const { data: existing, error: existingError } = await query.maybeSingle();
+  const { data: existing, error: existingError } = await departmentQuery.maybeSingle();
 
   if (existingError) {
     throw new Error(existingError.message || 'Failed to load designation');
