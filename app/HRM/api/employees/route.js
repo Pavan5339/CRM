@@ -26,6 +26,11 @@ const DOCUMENT_TYPES = [
 
 const hrmEmployeeColumnSupportPromises = new Map();
 
+function isPublicEmployeeIntakeRequest(request) {
+  const { searchParams } = new URL(request.url);
+  return searchParams.get('public') === '1';
+}
+
 async function requireHrAdminAccess() {
   const supabase = await createClient();
   const {
@@ -44,6 +49,22 @@ async function requireHrAdminAccess() {
   }
 
   return { user, authContext };
+}
+
+async function requireEmployeeFormAccess(request) {
+  if (isPublicEmployeeIntakeRequest(request)) {
+    return { isPublic: true, authContext: null, user: null };
+  }
+
+  const auth = await requireHrAdminAccess();
+  if (auth.error) {
+    return auth;
+  }
+
+  return {
+    ...auth,
+    isPublic: false,
+  };
 }
 
 async function supportsHrmEmployeeColumn(columnName) {
@@ -731,6 +752,99 @@ async function fetchEmployeeFormMeta() {
   };
 }
 
+async function fetchPublicEmployeeFormMeta() {
+  const [employeesResult, superAdminsResult, departmentsResult, designationsResult] = await Promise.all([
+    adminClient
+      .from('hrm_employees')
+      .select('id, employee_id, name')
+      .order('name', { ascending: true }),
+    adminClient
+      .from('super_admins')
+      .select('id, name')
+      .eq('status', 'Active')
+      .order('name', { ascending: true }),
+    adminClient
+      .from('hrm_departments')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name', { ascending: true }),
+    adminClient
+      .from('hrm_designations')
+      .select('id, title, department_id')
+      .eq('is_active', true)
+      .order('title', { ascending: true }),
+  ]);
+
+  if (employeesResult.error) throw new Error(employeesResult.error.message || 'Failed to load employees');
+  if (superAdminsResult.error) throw new Error(superAdminsResult.error.message || 'Failed to load super admins');
+  if (departmentsResult.error) throw new Error(departmentsResult.error.message || 'Failed to load departments');
+  if (designationsResult.error) throw new Error(designationsResult.error.message || 'Failed to load designations');
+
+  return {
+    employeeOptions: employeesResult.data || [],
+    superAdminOptions: superAdminsResult.data || [],
+    departments: departmentsResult.data || [],
+    designations: designationsResult.data || [],
+  };
+}
+
+async function findExistingEmployeeByField(column, value) {
+  const normalizedValue = cleanText(value);
+  if (!normalizedValue) return null;
+
+  const query = adminClient
+    .from('hrm_employees')
+    .select('id, employee_id, name, email, phone, mobile_phone, alternate_phone')
+    .limit(1);
+
+  const { data, error } =
+    column === 'email'
+      ? await query.eq(column, normalizedValue.toLowerCase()).maybeSingle()
+      : column === 'employee_id'
+        ? await query.ilike(column, normalizedValue).maybeSingle()
+        : await query.eq(column, normalizedValue).maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || `Failed to verify duplicate ${column}`);
+  }
+
+  return data || null;
+}
+
+async function findExistingEmployeeByAnyPhone(value) {
+  const normalizedValue = cleanText(value);
+  if (!normalizedValue) return null;
+
+  for (const column of ['phone', 'mobile_phone', 'alternate_phone']) {
+    const existing = await findExistingEmployeeByField(column, normalizedValue);
+    if (existing) {
+      return existing;
+    }
+  }
+
+  return null;
+}
+
+async function assertPublicEmployeeSubmissionIsUnique({ employeeId, email, phone, mobile }) {
+  const existingEmployeeId = await findExistingEmployeeByField('employee_id', employeeId);
+  if (existingEmployeeId) {
+    throw new Error('An employee with this Employee ID already exists.');
+  }
+
+  const existingEmail = await findExistingEmployeeByField('email', email);
+  if (existingEmail) {
+    throw new Error('An employee with this work email already exists.');
+  }
+
+  const phoneCandidates = [...new Set([cleanText(phone), cleanText(mobile)].filter(Boolean))];
+  for (const phoneValue of phoneCandidates) {
+    const existingPhone = await findExistingEmployeeByAnyPhone(phoneValue);
+    if (existingPhone) {
+      throw new Error('An employee with this phone number already exists.');
+    }
+  }
+}
+
 function pickRelationRecord(value) {
   if (Array.isArray(value)) {
     return value[0] || null;
@@ -883,15 +997,25 @@ async function attachCreatorNames(rows = []) {
 
 export async function GET(request) {
   try {
-    const auth = await requireHrAdminAccess();
-    if (auth.error) {
-      return auth.error;
-    }
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const includeMeta = searchParams.get('includeMeta') === '1';
     const taskManagerOnly = searchParams.get('taskManagerOnly') === '1';
+    const isPublic = isPublicEmployeeIntakeRequest(request);
+
+    if (isPublic) {
+      if (!includeMeta || id || taskManagerOnly) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      const meta = await fetchPublicEmployeeFormMeta();
+      return NextResponse.json(meta, { status: 200 });
+    }
+
+    const auth = await requireHrAdminAccess();
+    if (auth.error) {
+      return auth.error;
+    }
 
     if (id) {
       const { data: employee, error } = await adminClient
@@ -983,12 +1107,12 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const auth = await requireHrAdminAccess();
+    const auth = await requireEmployeeFormAccess(request);
     if (auth.error) {
       return auth.error;
     }
 
-    const { authContext } = auth;
+    const { authContext, isPublic } = auth;
     const formData = await request.formData();
 
     const employeeId = cleanText(formData.get('employeeId'));
@@ -1000,12 +1124,23 @@ export async function POST(request) {
     const workingDays = normalizeWorkingDays(formData.get('workingDays'));
     const educationEntries = parseJsonArray(formData.get('educationEntries'));
     const certificationEntries = parseJsonArray(formData.get('certificationEntries'));
+    const phone = cleanText(formData.get('phone'));
+    const mobilePhone = cleanText(formData.get('mobile'));
 
     if (!employeeId || !name || !email || !password || !departmentName || !designationTitle) {
       return NextResponse.json(
         { error: 'Employee ID, full name, email, password, department, and designation are required.' },
         { status: 400 }
       );
+    }
+
+    if (isPublic) {
+      await assertPublicEmployeeSubmissionIsUnique({
+        employeeId,
+        email,
+        phone,
+        mobile: mobilePhone,
+      });
     }
 
     const reportingSuperAdminSupported = await supportsReportingSuperAdminColumn();
@@ -1049,7 +1184,7 @@ export async function POST(request) {
       name,
       role: 'employee',
       email,
-      phone: cleanText(formData.get('phone')),
+      phone,
       personal_email: cleanEmail(formData.get('personalEmail')),
       date_of_birth: parseDate(formData.get('dateOfBirth')),
       ...(genderSupported ? { gender: parseGender(formData.get('gender')) } : {}),
@@ -1073,7 +1208,7 @@ export async function POST(request) {
       permanent_country: cleanText(formData.get('permanentCountry')),
       permanent_pincode: cleanText(formData.get('permanentPincode')),
       alternate_phone: cleanText(formData.get('phone2')),
-      mobile_phone: cleanText(formData.get('mobile')),
+      mobile_phone: mobilePhone,
       emergency_contact_name: cleanText(formData.get('emergencyContactName')),
       emergency_contact_number: cleanText(formData.get('emergencyContactNumber')),
       date_of_joining: parseDate(formData.get('joinedOn')),
@@ -1109,7 +1244,7 @@ export async function POST(request) {
       password_set_at: null,
       profile_picture_url: profilePictureUrl,
       auth_user_id: null,
-      created_by: authContext.userId || null,
+      created_by: authContext?.userId || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -1215,7 +1350,7 @@ export async function POST(request) {
         crm: false,
         crm_role: null,
         hrm_admin: false,
-        granted_by: authContext.employee?.id || null,
+        granted_by: authContext?.employee?.id || null,
         granted_at: new Date().toISOString(),
       });
 
@@ -1233,9 +1368,11 @@ export async function POST(request) {
 
       return NextResponse.json(
         {
-          message: EMAIL_NOTIFICATIONS_ENABLED
-            ? 'Employee added successfully. Credentials email has been queued.'
-            : 'Employee added successfully. Credentials email is currently paused.',
+          message: isPublic
+            ? 'Employee information submitted successfully.'
+            : EMAIL_NOTIFICATIONS_ENABLED
+              ? 'Employee added successfully. Credentials email has been queued.'
+              : 'Employee added successfully. Credentials email is currently paused.',
           employee: { ...employeeRow, auth_user_id: authUserId },
         },
         { status: 201 }
