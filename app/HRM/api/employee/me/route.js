@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
-import { resolveAuthenticatedUserContext } from '@/utils/auth/context';
+import { hasLinkedEmployeeAccess, resolveAuthenticatedUserContext } from '@/utils/auth/context';
 import { deriveEmploymentFields } from '@/utils/hrm-employment';
 
 const EMPLOYEE_PROFILE_SELECT_BASE = `
@@ -75,7 +75,7 @@ export async function GET(request) {
 
     const authContext = await resolveAuthenticatedUserContext(supabase, user);
 
-    if (authContext?.accountType !== 'employee') {
+    if (!hasLinkedEmployeeAccess(authContext)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

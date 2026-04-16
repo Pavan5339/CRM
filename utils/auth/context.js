@@ -107,3 +107,7 @@ export async function resolveAuthenticatedUserContext(supabase, user) {
   };
 }
 
+export function hasLinkedEmployeeAccess(authContext) {
+  return Boolean(authContext?.employee?.id);
+}
+

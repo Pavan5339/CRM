@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
-import { resolveAuthenticatedUserContext } from '@/utils/auth/context';
+import { hasLinkedEmployeeAccess, resolveAuthenticatedUserContext } from '@/utils/auth/context';
 import {
   findEmployeeById,
   insertAssignmentActivityRows,
@@ -51,7 +51,7 @@ async function getEmployeeActor(request) {
 
   const authContext = await resolveAuthenticatedUserContext(supabase, user);
 
-  if (authContext?.accountType !== 'employee') {
+  if (!hasLinkedEmployeeAccess(authContext)) {
     return { error: 'Forbidden', status: 403 };
   }
 

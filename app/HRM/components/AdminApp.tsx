@@ -15,6 +15,7 @@ import EmployeeAnalytics from './views/admin/EmployeeAnalytics';
 import RegularizationInbox from './views/admin/RegularizationInbox';
 import HolidayManager from './views/admin/HolidayManager';
 import LeaveManagement from './views/admin/LeaveManagement';
+import { ShellSkeleton } from './ui/Skeleton';
 
 export default function AdminApp() {
   const searchParams = useSearchParams();
@@ -23,6 +24,10 @@ export default function AdminApp() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [admin, setAdmin] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({
+    [requestedTab || 'admin-dashboard']: true,
+  });
 
   useEffect(() => {
     let active = true;
@@ -41,6 +46,10 @@ export default function AdminApp() {
         if (active) {
           setAdmin(null);
         }
+      } finally {
+        if (active) {
+          setIsBootstrapping(false);
+        }
       }
     }
 
@@ -49,6 +58,10 @@ export default function AdminApp() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    setVisitedTabs((current) => (current[currentTab] ? current : { ...current, [currentTab]: true }));
+  }, [currentTab]);
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -72,45 +85,31 @@ export default function AdminApp() {
     }
   };
 
-  const renderContent = () => {
-    switch (currentTab) {
-      case 'admin-dashboard':
-        return <AdminDashboard admin={admin} setCurrentTab={setCurrentTab} />;
-      case 'admin-employee-list':
-        return (
-          <EmployeeList
-            setCurrentTab={setCurrentTab}
-            setSelectedEmployeeId={setSelectedEmployeeId}
-          />
-        );
-      case 'admin-payouts':
-        return <PayoutsPayroll />;
-      case 'admin-analytics':
-        return <EmployeeAnalytics />;
-      case 'admin-regularization':
-        return <RegularizationInbox />;
-      case 'admin-leaves':
-        return <LeaveManagement />;
-      case 'admin-holidays':
-        return <HolidayManager />;
-      // Detailed views
-      case 'admin-employee-profile':
-        return (
-          <DetailedEmployeeProfile
-            employeeId={selectedEmployeeId}
-            setCurrentTab={setCurrentTab}
-          />
-        );
-      case 'admin-add-employee':
-        return <AddEmployee setCurrentTab={setCurrentTab} />;
-      default:
-        return (
-          <div className="flex items-center justify-center p-12">
-            <p className="text-on-surface-variant text-lg">This view is under construction.</p>
-          </div>
-        );
-    }
+  const tabViews: Record<string, React.ReactNode> = {
+    'admin-dashboard': <AdminDashboard admin={admin} setCurrentTab={setCurrentTab} />,
+    'admin-employee-list': (
+      <EmployeeList
+        setCurrentTab={setCurrentTab}
+        setSelectedEmployeeId={setSelectedEmployeeId}
+      />
+    ),
+    'admin-payouts': <PayoutsPayroll />,
+    'admin-analytics': <EmployeeAnalytics />,
+    'admin-regularization': <RegularizationInbox />,
+    'admin-leaves': <LeaveManagement />,
+    'admin-holidays': <HolidayManager />,
+    'admin-employee-profile': (
+      <DetailedEmployeeProfile
+        employeeId={selectedEmployeeId}
+        setCurrentTab={setCurrentTab}
+      />
+    ),
+    'admin-add-employee': <AddEmployee setCurrentTab={setCurrentTab} />,
   };
+
+  if (isBootstrapping) {
+    return <ShellSkeleton />;
+  }
 
   return (
     <div className="flex min-h-screen bg-surface">
@@ -124,7 +123,22 @@ export default function AdminApp() {
       
       <div className="flex-1 flex flex-col ml-64 min-w-0">
         <main className="flex-1 relative">
-          {renderContent()}
+          {Object.entries(tabViews).map(([tabId, view]) => {
+            if (!visitedTabs[tabId]) {
+              return null;
+            }
+
+            return (
+              <div key={tabId} className={currentTab === tabId ? 'block' : 'hidden'}>
+                {view}
+              </div>
+            );
+          })}
+          {!tabViews[currentTab] ? (
+            <div className="flex items-center justify-center p-12">
+              <p className="text-on-surface-variant text-lg">This view is under construction.</p>
+            </div>
+          ) : null}
         </main>
       </div>
     </div>

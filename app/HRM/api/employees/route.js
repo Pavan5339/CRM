@@ -15,6 +15,12 @@ import {
 
 const EMAIL_NOTIFICATIONS_ENABLED = process.env.EMAIL_NOTIFICATIONS_ENABLED === 'true';
 const EMPLOYEE_FILES_BUCKET = 'employee-files';
+const PROFILE_PICTURE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
+const EMPLOYEE_FILE_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+const PROFILE_PICTURE_ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+const PROFILE_PICTURE_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const EMPLOYEE_FILE_ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+const EMPLOYEE_FILE_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const DOCUMENT_TYPES = [
   'aadhaar_card',
   'pan_card',
@@ -25,6 +31,54 @@ const DOCUMENT_TYPES = [
 ];
 
 const hrmEmployeeColumnSupportPromises = new Map();
+
+class IntakeFormError extends Error {
+  constructor({
+    message,
+    fieldErrors = {},
+    sectionErrors = {},
+    status = 400,
+    details = [],
+  }) {
+    super(message);
+    this.name = 'IntakeFormError';
+    this.fieldErrors = fieldErrors;
+    this.sectionErrors = sectionErrors;
+    this.status = status;
+    this.details = details;
+  }
+}
+
+function buildFriendlyErrorResponse(error, fallbackMessage = 'We could not save the employee form right now. Please try again or contact HR.') {
+  if (error instanceof IntakeFormError) {
+    const details = error.details?.length
+      ? error.details
+      : [
+          ...Object.values(error.fieldErrors || {}),
+          ...Object.values(error.sectionErrors || {}),
+        ].filter(Boolean);
+
+    return NextResponse.json(
+      {
+        error: error.message,
+        fieldErrors: error.fieldErrors || {},
+        sectionErrors: error.sectionErrors || {},
+        details,
+      },
+      { status: error.status || 400 }
+    );
+  }
+
+  return NextResponse.json(
+    {
+      error: fallbackMessage,
+      fieldErrors: {},
+      sectionErrors: {},
+      details: [fallbackMessage],
+    },
+    { status: 500 }
+  );
+}
 
 function isPublicEmployeeIntakeRequest(request) {
   const { searchParams } = new URL(request.url);
@@ -262,6 +316,79 @@ function parseJsonArray(value) {
   }
 }
 
+function getFileExtension(fileName) {
+  const normalized = String(fileName || '').trim();
+  if (!normalized.includes('.')) return '';
+  return normalized.split('.').pop().toLowerCase();
+}
+
+function sanitizeStorageSegment(value, fallback = 'file') {
+  const normalized = String(value || '')
+    .trim()
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return normalized || fallback;
+}
+
+function validateUploadedFile(file, {
+  fieldKey,
+  fieldLabel,
+  sectionKey,
+  allowedExtensions,
+  allowedMimeTypes,
+  maxSizeBytes,
+}) {
+  if (!file || typeof file === 'string' || file.size <= 0) {
+    return;
+  }
+
+  const extension = getFileExtension(file.name);
+  const mimeType = String(file.type || '').toLowerCase();
+  const isHeicLike = ['heic', 'heif'].includes(extension) || mimeType.includes('heic') || mimeType.includes('heif');
+
+  if (isHeicLike) {
+    const message = fieldKey === 'profilePicture'
+      ? 'This image format is not supported for the profile picture. Please upload JPG, PNG, or WebP.'
+      : `${fieldLabel} uses an unsupported image format. Please upload PDF, JPG, PNG, or WebP.`;
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted uploads and try again.',
+      fieldErrors: { [fieldKey]: message },
+      sectionErrors: { [sectionKey]: 'Some uploaded files need attention.' },
+      details: [message],
+      status: 400,
+    });
+  }
+
+  const extensionAllowed = !allowedExtensions?.length || allowedExtensions.includes(extension);
+  const mimeAllowed = !allowedMimeTypes?.length || allowedMimeTypes.includes(mimeType);
+
+  if (!extensionAllowed || !mimeAllowed) {
+    const supportedFormats = fieldKey === 'profilePicture' ? 'JPG, PNG, or WebP' : 'PDF, JPG, PNG, or WebP';
+    const message = `${fieldLabel} must be ${supportedFormats}.`;
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted uploads and try again.',
+      fieldErrors: { [fieldKey]: message },
+      sectionErrors: { [sectionKey]: 'Some uploaded files need attention.' },
+      details: [message],
+      status: 400,
+    });
+  }
+
+  if (Number.isFinite(maxSizeBytes) && file.size > maxSizeBytes) {
+    const maxSizeMb = Math.round((maxSizeBytes / (1024 * 1024)) * 10) / 10;
+    const message = `${fieldLabel} must be smaller than ${maxSizeMb} MB.`;
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted uploads and try again.',
+      fieldErrors: { [fieldKey]: message },
+      sectionErrors: { [sectionKey]: 'Some uploaded files need attention.' },
+      details: [message],
+      status: 400,
+    });
+  }
+}
+
 function normalizeWorkingDays(value) {
   const parsed = parseJsonArray(value);
   return parsed
@@ -296,8 +423,18 @@ async function uploadProfilePicture(profilePicture, employeeId) {
     return null;
   }
 
-  const fileExt = profilePicture.name.split('.').pop();
-  const fileName = `${employeeId}-${Date.now()}.${fileExt}`;
+  validateUploadedFile(profilePicture, {
+    fieldKey: 'profilePicture',
+    fieldLabel: 'Profile picture',
+    sectionKey: 'accountAccess',
+    allowedExtensions: PROFILE_PICTURE_ALLOWED_EXTENSIONS,
+    allowedMimeTypes: PROFILE_PICTURE_ALLOWED_MIME_TYPES,
+    maxSizeBytes: PROFILE_PICTURE_MAX_SIZE_BYTES,
+  });
+
+  const fileExt = getFileExtension(profilePicture.name) || 'jpg';
+  const safeEmployeeId = sanitizeStorageSegment(employeeId, 'employee');
+  const fileName = `${safeEmployeeId}-${Date.now()}.${fileExt}`;
   const bytes = await profilePicture.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
@@ -309,10 +446,37 @@ async function uploadProfilePicture(profilePicture, employeeId) {
     });
 
   if (uploadError) {
-    throw new Error('Failed to upload profile picture');
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted uploads and try again.',
+      fieldErrors: {
+        profilePicture: 'We could not upload the profile picture. Please try again with a JPG, PNG, or WebP image.',
+      },
+      sectionErrors: {
+        accountAccess: 'Some uploaded files need attention.',
+      },
+      details: ['We could not upload the profile picture. Please try again with a JPG, PNG, or WebP image.'],
+      status: 400,
+    });
   }
 
-  const { data: urlData } = adminClient.storage.from('employee-avatars').getPublicUrl(fileName);
+  let urlData = null;
+  try {
+    const result = adminClient.storage.from('employee-avatars').getPublicUrl(fileName);
+    urlData = result?.data || null;
+  } catch {
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted uploads and try again.',
+      fieldErrors: {
+        profilePicture: 'We could not process the profile picture. Please upload a JPG, PNG, or WebP image.',
+      },
+      sectionErrors: {
+        accountAccess: 'Some uploaded files need attention.',
+      },
+      details: ['We could not process the profile picture. Please upload a JPG, PNG, or WebP image.'],
+      status: 400,
+    });
+  }
+
   return urlData?.publicUrl || null;
 }
 
@@ -351,16 +515,26 @@ async function ensureEmployeeFilesBucket() {
   }
 }
 
-async function uploadEmployeeFile(file, employeeId, folder) {
+async function uploadEmployeeFile(file, employeeId, folder, fieldKey, fieldLabel, sectionKey) {
   if (!file || typeof file === 'string' || file.size <= 0) {
     return null;
   }
 
+  validateUploadedFile(file, {
+    fieldKey,
+    fieldLabel,
+    sectionKey,
+    allowedExtensions: EMPLOYEE_FILE_ALLOWED_EXTENSIONS,
+    allowedMimeTypes: EMPLOYEE_FILE_ALLOWED_MIME_TYPES,
+    maxSizeBytes: EMPLOYEE_FILE_MAX_SIZE_BYTES,
+  });
+
   await ensureEmployeeFilesBucket();
 
-  const fileExt = file.name.split('.').pop();
+  const fileExt = getFileExtension(file.name) || 'bin';
   const sanitizedFolder = String(folder || 'misc').replace(/[^a-z0-9/_-]+/gi, '-');
-  const fileName = `${employeeId}/${sanitizedFolder}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+  const safeEmployeeId = sanitizeStorageSegment(employeeId, 'employee');
+  const fileName = `${safeEmployeeId}/${sanitizedFolder}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
@@ -372,10 +546,31 @@ async function uploadEmployeeFile(file, employeeId, folder) {
     });
 
   if (uploadError) {
-    throw new Error(uploadError.message || `Failed to upload ${file.name}`);
+    const message = `We could not upload ${fieldLabel.toLowerCase()}. Please try again with a supported file.`;
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted uploads and try again.',
+      fieldErrors: { [fieldKey]: message },
+      sectionErrors: { [sectionKey]: 'Some uploaded files need attention.' },
+      details: [message],
+      status: 400,
+    });
   }
 
-  const { data: urlData } = adminClient.storage.from(EMPLOYEE_FILES_BUCKET).getPublicUrl(fileName);
+  let urlData = null;
+  try {
+    const result = adminClient.storage.from(EMPLOYEE_FILES_BUCKET).getPublicUrl(fileName);
+    urlData = result?.data || null;
+  } catch {
+    const message = `We could not process ${fieldLabel.toLowerCase()}. Please try again with a supported file.`;
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted uploads and try again.',
+      fieldErrors: { [fieldKey]: message },
+      sectionErrors: { [sectionKey]: 'Some uploaded files need attention.' },
+      details: [message],
+      status: 400,
+    });
+  }
+
   return {
     file_name: file.name,
     file_path: fileName,
@@ -510,11 +705,31 @@ async function ensureShiftId(name, startTime, endTime) {
 
 function validateEmployeeIdentityFields({ aadhaarNumber, panNumber }) {
   if (aadhaarNumber && !/^\d{12}$/.test(aadhaarNumber)) {
-    throw new Error('Aadhaar number must be exactly 12 digits');
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted fields and try again.',
+      fieldErrors: {
+        aadhaarNumber: 'Aadhaar number must be exactly 12 digits.',
+      },
+      sectionErrors: {
+        identityFinancials: 'Some identity details need attention.',
+      },
+      details: ['Aadhaar number must be exactly 12 digits.'],
+      status: 400,
+    });
   }
 
   if (panNumber && !/^[A-Z0-9]{10}$/.test(panNumber)) {
-    throw new Error('PAN number must be exactly 10 characters');
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted fields and try again.',
+      fieldErrors: {
+        panNumber: 'PAN number must be exactly 10 characters.',
+      },
+      sectionErrors: {
+        identityFinancials: 'Some identity details need attention.',
+      },
+      details: ['PAN number must be exactly 10 characters.'],
+      status: 400,
+    });
   }
 }
 
@@ -692,7 +907,18 @@ async function replaceEmployeeDocumentTypes(employeeId, employeeCode, documentEn
 
   const uploadedRows = [];
   for (const entry of validEntries) {
-    const uploaded = await uploadEmployeeFile(entry.file, employeeCode, `documents/${entry.document_type}`);
+    const documentLabel = entry.document_type
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+    const uploaded = await uploadEmployeeFile(
+      entry.file,
+      employeeCode,
+      `documents/${entry.document_type}`,
+      `document_${entry.document_type}`,
+      documentLabel,
+      'documents'
+    );
     if (!uploaded) continue;
 
     uploadedRows.push({
@@ -844,19 +1070,50 @@ async function findExistingEmployeeByAnyPhone(value) {
 async function assertPublicEmployeeSubmissionIsUnique({ employeeId, email, phone, mobile }) {
   const existingEmployeeId = await findExistingEmployeeByField('employee_id', employeeId);
   if (existingEmployeeId) {
-    throw new Error('An employee with this Employee ID already exists.');
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted fields and try again.',
+      fieldErrors: {
+        employeeId: 'This employee ID is already registered.',
+      },
+      sectionErrors: {
+        accountAccess: 'Some account details need attention.',
+      },
+      details: ['This employee ID is already registered.'],
+      status: 409,
+    });
   }
 
   const existingEmail = await findExistingEmployeeByField('email', email);
   if (existingEmail) {
-    throw new Error('An employee with this work email already exists.');
+    throw new IntakeFormError({
+      message: 'Please fix the highlighted fields and try again.',
+      fieldErrors: {
+        email: 'This work email is already registered.',
+      },
+      sectionErrors: {
+        accountAccess: 'Some account details need attention.',
+      },
+      details: ['This work email is already registered.'],
+      status: 409,
+    });
   }
 
   const phoneCandidates = [...new Set([cleanText(phone), cleanText(mobile)].filter(Boolean))];
   for (const phoneValue of phoneCandidates) {
     const existingPhone = await findExistingEmployeeByAnyPhone(phoneValue);
     if (existingPhone) {
-      throw new Error('An employee with this phone number already exists.');
+      throw new IntakeFormError({
+        message: 'Please fix the highlighted fields and try again.',
+        fieldErrors: {
+          phone: 'This phone number is already registered.',
+          mobile: 'This phone number is already registered.',
+        },
+        sectionErrors: {
+          accountAccess: 'Some account details need attention.',
+        },
+        details: ['This phone number is already registered.'],
+        status: 409,
+      });
     }
   }
 }
@@ -1144,9 +1401,25 @@ export async function POST(request) {
     const mobilePhone = cleanText(formData.get('mobile'));
 
     if (!employeeId || !name || !email || !password || !departmentName || !designationTitle) {
-      return NextResponse.json(
-        { error: 'Employee ID, full name, email, password, department, and designation are required.' },
-        { status: 400 }
+      const fieldErrors = {};
+      if (!employeeId) fieldErrors.employeeId = 'Employee ID is required.';
+      if (!name) fieldErrors.name = 'Full name is required.';
+      if (!email) fieldErrors.email = 'Work email is required.';
+      if (!password) fieldErrors.password = 'Password is required.';
+      if (!departmentName) fieldErrors.department = 'Department is required.';
+      if (!designationTitle) fieldErrors.designation = 'Designation is required.';
+
+      return buildFriendlyErrorResponse(
+        new IntakeFormError({
+          message: 'Please fix the highlighted fields and try again.',
+          fieldErrors,
+          sectionErrors: {
+            accountAccess: 'Some account details need attention.',
+            currentPosition: 'Some position details need attention.',
+          },
+          details: Object.values(fieldErrors),
+          status: 400,
+        })
       );
     }
 
@@ -1166,12 +1439,18 @@ export async function POST(request) {
     const designationId = await ensureDesignationId(designationTitle, departmentId);
     const reportingTarget = await resolveReportingTarget(formData.get('reportingTo'));
     if (reportingTarget.reportingSuperAdminId && !reportingSuperAdminSupported) {
-      return NextResponse.json(
-        {
-          error:
-            'Reporting To cannot be saved as Super Admin yet because the hrm_employees.reporting_super_admin_id column is missing in the database. Please run the reporting super admin migration first.',
-        },
-        { status: 400 }
+      return buildFriendlyErrorResponse(
+        new IntakeFormError({
+          message: 'Please review the reporting details and try again.',
+          fieldErrors: {
+            reportingTo: 'Super Admin reporting is not available yet. Please choose an employee reporting manager for now.',
+          },
+          sectionErrors: {
+            currentPosition: 'Some position details need attention.',
+          },
+          details: ['Super Admin reporting is not available yet. Please choose an employee reporting manager for now.'],
+          status: 400,
+        })
       );
     }
     const taskManagerEnabled = parseBoolean(formData.get('taskManagerAccess'));
@@ -1281,7 +1560,13 @@ export async function POST(request) {
         await removeProfilePicture(profilePictureUrl);
       }
 
-      return NextResponse.json({ error: insertError?.message || 'Failed to create employee' }, { status: 500 });
+      return buildFriendlyErrorResponse(
+        new IntakeFormError({
+          message: 'We could not save the employee form right now. Please try again or contact HR.',
+          status: 500,
+          details: ['We could not save the employee form right now. Please try again or contact HR.'],
+        })
+      );
     }
 
     try {
@@ -1314,7 +1599,14 @@ export async function POST(request) {
         if (!level) continue;
 
         const file = formData.get(entry?.fileKey || '');
-        const uploaded = await uploadEmployeeFile(file, employeeId, `education/${level}`);
+        const uploaded = await uploadEmployeeFile(
+          file,
+          employeeId,
+          `education/${level}`,
+          entry?.fileKey || `education_file_${educationRows.length}`,
+          `${level.replace(/_/g, ' ')} education file`,
+          'education'
+        );
         educationRows.push({
           education_level: level,
           institution_name: cleanText(entry?.institutionName),
@@ -1334,7 +1626,14 @@ export async function POST(request) {
         if (!certificationName) continue;
 
         const file = formData.get(entry?.fileKey || '');
-        const uploaded = await uploadEmployeeFile(file, employeeId, 'certifications');
+        const uploaded = await uploadEmployeeFile(
+          file,
+          employeeId,
+          'certifications',
+          entry?.fileKey || `certification_file_${certificationRows.length}`,
+          `${certificationName} certificate`,
+          'certifications'
+        );
         certificationRows.push({
           certification_name: certificationName,
           issuer: cleanText(entry?.issuer),
@@ -1348,7 +1647,18 @@ export async function POST(request) {
       const documentRows = [];
       for (const documentType of DOCUMENT_TYPES) {
         const file = formData.get(`document_${documentType}`);
-        const uploaded = await uploadEmployeeFile(file, employeeId, `documents/${documentType}`);
+        const documentLabel = documentType
+          .split('_')
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(' ');
+        const uploaded = await uploadEmployeeFile(
+          file,
+          employeeId,
+          `documents/${documentType}`,
+          `document_${documentType}`,
+          documentLabel,
+          'documents'
+        );
         if (uploaded) {
           documentRows.push({
             document_type: documentType,
@@ -1405,14 +1715,11 @@ export async function POST(request) {
         await removeProfilePicture(profilePictureUrl);
       }
 
-      return NextResponse.json(
-        { error: error.message || 'Failed to provision employee account' },
-        { status: 500 }
-      );
+      return buildFriendlyErrorResponse(error);
     }
   } catch (error) {
     console.error('Error in POST /HRM/api/employees:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return buildFriendlyErrorResponse(error);
   }
 }
 

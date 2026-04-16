@@ -37,6 +37,8 @@ type CertificationEntry = {
 };
 
 type DocumentState = Record<string, File | null>;
+type ErrorMap = Record<string, string>;
+type SectionErrorMap = Record<string, string>;
 
 type FormState = {
   employeeId: string;
@@ -134,6 +136,12 @@ const DOCUMENT_TYPES = [
   { key: 'experience_letter', label: 'Experience Letter' },
   { key: 'salary_slip', label: 'Salary Slip' },
 ];
+const PROFILE_PICTURE_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const PROFILE_PICTURE_ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+const EMPLOYEE_FILE_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const EMPLOYEE_FILE_ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+const PROFILE_PICTURE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
+const EMPLOYEE_FILE_MAX_SIZE_BYTES = 10 * 1024 * 1024;
 
 const defaultEducation = (): EducationEntry[] => [
   { educationLevel: '10th', institutionName: '', boardUniversity: '', specialization: '', passingYear: '', score: '', file: null },
@@ -227,10 +235,12 @@ function Section({
 function Field({
   label,
   required = false,
+  error,
   children,
 }: {
   label: string;
   required?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -240,20 +250,83 @@ function Field({
         {required ? <span className="ml-1 text-rose-600">*</span> : null}
       </span>
       {children}
+      {error ? <span className="text-sm font-medium text-rose-600">{error}</span> : null}
     </label>
   );
 }
 
-function inputClassName(multiline = false) {
-  return `w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ${multiline ? 'min-h-[120px] resize-y' : ''}`;
+function inputClassName(multiline = false, hasError = false) {
+  return `w-full rounded-2xl border ${hasError ? 'border-rose-400 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100' : 'border-slate-300 bg-white focus:border-slate-900 focus:ring-slate-200'} px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 ${multiline ? 'min-h-[120px] resize-y' : ''}`;
 }
 
-function selectClassName() {
-  return 'w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200';
+function selectClassName(hasError = false) {
+  return `w-full rounded-2xl border ${hasError ? 'border-rose-400 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100' : 'border-slate-300 bg-white focus:border-slate-900 focus:ring-slate-200'} px-4 py-3 text-sm text-slate-900 outline-none transition`;
 }
 
-function fileButtonClassName() {
-  return 'inline-flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-500 hover:bg-slate-100';
+function fileButtonClassName(hasError = false) {
+  return `inline-flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border ${hasError ? 'border-rose-400 bg-rose-50 text-rose-700 hover:border-rose-500 hover:bg-rose-100/70' : 'border-slate-300 bg-slate-50 text-slate-800 hover:border-slate-500 hover:bg-slate-100'} px-4 py-3 text-sm font-semibold transition`;
+}
+
+function SectionError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{message}</div>;
+}
+
+function getFileExtension(fileName: string) {
+  const normalized = String(fileName || '').trim();
+  if (!normalized.includes('.')) return '';
+  return normalized.split('.').pop()?.toLowerCase() || '';
+}
+
+function formatMaxSize(maxSizeBytes: number) {
+  return `${Math.round((maxSizeBytes / (1024 * 1024)) * 10) / 10} MB`;
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function isValidDateValue(value: string) {
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return !Number.isNaN(Date.parse(`${value}T00:00:00`));
+}
+
+function validateFileAgainstRules(
+  file: File | null,
+  label: string,
+  allowedTypes: string[],
+  allowedExtensions: string[],
+  maxSizeBytes: number
+) {
+  if (!file) return null;
+
+  const extension = getFileExtension(file.name);
+  const mimeType = String(file.type || '').toLowerCase();
+  const isHeicLike = ['heic', 'heif'].includes(extension) || mimeType.includes('heic') || mimeType.includes('heif');
+
+  if (isHeicLike) {
+    if (label === 'Profile picture') {
+      return 'This image format is not supported. Please upload JPG, PNG, or WebP.';
+    }
+
+    return `${label} uses an unsupported image format. Please upload PDF, JPG, PNG, or WebP.`;
+  }
+
+  if (!allowedExtensions.includes(extension) || !allowedTypes.includes(mimeType)) {
+    const supportedFormats = label === 'Profile picture' ? 'JPG, PNG, or WebP' : 'PDF, JPG, PNG, or WebP';
+    return `${label} must be ${supportedFormats}.`;
+  }
+
+  if (file.size > maxSizeBytes) {
+    return `${label} must be smaller than ${formatMaxSize(maxSizeBytes)}.`;
+  }
+
+  return null;
+}
+
+function isUploadErrorKey(key: string) {
+  return key === 'profilePicture' || key.startsWith('document_') || key.startsWith('education_file_') || key.startsWith('certification_file_');
 }
 
 const CURRENT_TO_PERMANENT_FIELD_MAP: Record<string, keyof FormState> = {
@@ -309,7 +382,11 @@ export default function AddEmployee({
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<ErrorMap>({});
+  const [uploadErrors, setUploadErrors] = useState<ErrorMap>({});
+  const [sectionErrors, setSectionErrors] = useState<SectionErrorMap>({});
+  const [submitErrorDetails, setSubmitErrorDetails] = useState<string[]>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
 
@@ -318,7 +395,7 @@ export default function AddEmployee({
 
     async function loadMeta() {
       setLoadingMeta(true);
-      setError('');
+      setFormError('');
       setShowErrorModal(false);
 
       try {
@@ -339,7 +416,9 @@ export default function AddEmployee({
         setSuperAdmins((result.superAdminOptions || []).map((item) => ({ ...item, optionType: 'super_admin' })));
       } catch (requestError) {
         if (active) {
-          setError(requestError instanceof Error ? requestError.message : 'Failed to load employee form data');
+          const nextError = requestError instanceof Error ? requestError.message : 'Failed to load employee form data';
+          setFormError(nextError);
+          setSubmitErrorDetails([nextError]);
           setShowErrorModal(true);
         }
       } finally {
@@ -364,15 +443,196 @@ export default function AddEmployee({
     return designations.filter((designation) => !designation.department_id || designation.department_id === selectedDepartment.id);
   }, [departments, designations, form.department]);
 
+  const clearFieldError = (fieldKey: string) => {
+    setFieldErrors((current) => {
+      if (!current[fieldKey]) return current;
+      const next = { ...current };
+      delete next[fieldKey];
+      return next;
+    });
+  };
+
+  const clearUploadError = (fieldKey: string) => {
+    setUploadErrors((current) => {
+      if (!current[fieldKey]) return current;
+      const next = { ...current };
+      delete next[fieldKey];
+      return next;
+    });
+  };
+
+  const clearSectionError = (sectionKey: string) => {
+    setSectionErrors((current) => {
+      if (!current[sectionKey]) return current;
+      const next = { ...current };
+      delete next[sectionKey];
+      return next;
+    });
+  };
+
+  const clearSubmitState = () => {
+    setMessage('');
+    setFormError('');
+    setSubmitErrorDetails([]);
+    setShowErrorModal(false);
+  };
+
+  const applyStructuredErrors = ({
+    error,
+    fieldErrors: nextFieldErrors = {},
+    uploadErrors: nextUploadErrors = {},
+    sectionErrors: nextSectionErrors = {},
+    details = [],
+  }: {
+    error: string;
+    fieldErrors?: ErrorMap;
+    uploadErrors?: ErrorMap;
+    sectionErrors?: SectionErrorMap;
+    details?: string[];
+  }) => {
+    setFormError(error);
+    setFieldErrors(nextFieldErrors);
+    setUploadErrors(nextUploadErrors);
+    setSectionErrors(nextSectionErrors);
+    setSubmitErrorDetails(details.length ? details : [error]);
+    setShowErrorModal(true);
+  };
+
+  const validateForm = () => {
+    const nextFieldErrors: ErrorMap = {};
+    const nextUploadErrors: ErrorMap = {};
+    const nextSectionErrors: SectionErrorMap = {};
+
+    if (!form.employeeId.trim()) nextFieldErrors.employeeId = 'Employee ID is required.';
+    if (!form.name.trim()) nextFieldErrors.name = 'Full name is required.';
+    if (!form.email.trim()) {
+      nextFieldErrors.email = 'Work email is required.';
+    } else if (!isValidEmail(form.email)) {
+      nextFieldErrors.email = 'Please enter a valid work email address.';
+    }
+
+    if (!form.password.trim()) {
+      nextFieldErrors.password = 'Password is required.';
+    } else if (form.password.trim().length < 8) {
+      nextFieldErrors.password = 'Password must be at least 8 characters.';
+    }
+
+    if (!form.department.trim()) nextFieldErrors.department = 'Department is required.';
+    if (!form.designation.trim()) nextFieldErrors.designation = 'Designation is required.';
+
+    if (form.personalEmail.trim() && !isValidEmail(form.personalEmail)) {
+      nextFieldErrors.personalEmail = 'Please enter a valid personal email address.';
+    }
+
+    if (!isValidDateValue(form.dateOfBirth)) nextFieldErrors.dateOfBirth = 'Please enter a valid date of birth.';
+    if (!isValidDateValue(form.joinedOn)) nextFieldErrors.joinedOn = 'Please enter a valid joining date.';
+    if (!isValidDateValue(form.confirmationDate)) nextFieldErrors.confirmationDate = 'Please enter a valid confirmation date.';
+
+    if (form.aadhaarNumber.trim() && !/^\d{12}$/.test(form.aadhaarNumber.trim())) {
+      nextFieldErrors.aadhaarNumber = 'Aadhaar number must be exactly 12 digits.';
+    }
+
+    if (form.panNumber.trim() && !/^[A-Z0-9]{10}$/i.test(form.panNumber.trim())) {
+      nextFieldErrors.panNumber = 'PAN number must be exactly 10 characters.';
+    }
+
+    const profilePictureError = validateFileAgainstRules(
+      form.profilePicture,
+      'Profile picture',
+      PROFILE_PICTURE_ALLOWED_TYPES,
+      PROFILE_PICTURE_ALLOWED_EXTENSIONS,
+      PROFILE_PICTURE_MAX_SIZE_BYTES
+    );
+
+    if (profilePictureError) {
+      nextUploadErrors.profilePicture = profilePictureError;
+      nextSectionErrors.accountAccess = 'Some account details need attention.';
+    }
+
+    DOCUMENT_TYPES.forEach((document) => {
+      const key = `document_${document.key}`;
+      const error = validateFileAgainstRules(
+        documents[document.key],
+        document.label,
+        EMPLOYEE_FILE_ALLOWED_TYPES,
+        EMPLOYEE_FILE_ALLOWED_EXTENSIONS,
+        EMPLOYEE_FILE_MAX_SIZE_BYTES
+      );
+
+      if (error) {
+        nextUploadErrors[key] = error;
+        nextSectionErrors.documents = 'Some uploaded documents need attention.';
+      }
+    });
+
+    educationEntries.forEach((entry, index) => {
+      const key = `education_file_${index}`;
+      const label = `${entry.educationLevel.replace(/_/g, ' ')} education file`;
+      const error = validateFileAgainstRules(
+        entry.file,
+        label,
+        EMPLOYEE_FILE_ALLOWED_TYPES,
+        EMPLOYEE_FILE_ALLOWED_EXTENSIONS,
+        EMPLOYEE_FILE_MAX_SIZE_BYTES
+      );
+
+      if (error) {
+        nextUploadErrors[key] = error;
+        nextSectionErrors.education = 'Some education uploads need attention.';
+      }
+    });
+
+    certificationEntries.forEach((entry, index) => {
+      const key = `certification_file_${index}`;
+      const label = entry.certificationName.trim() ? `${entry.certificationName.trim()} certificate` : 'Certification file';
+      const error = validateFileAgainstRules(
+        entry.file,
+        label,
+        EMPLOYEE_FILE_ALLOWED_TYPES,
+        EMPLOYEE_FILE_ALLOWED_EXTENSIONS,
+        EMPLOYEE_FILE_MAX_SIZE_BYTES
+      );
+
+      if (error) {
+        nextUploadErrors[key] = error;
+        nextSectionErrors.certifications = 'Some certification uploads need attention.';
+      }
+    });
+
+    const details = [
+      ...Object.values(nextFieldErrors),
+      ...Object.values(nextUploadErrors),
+    ];
+
+    return {
+      isValid: details.length === 0,
+      fieldErrors: nextFieldErrors,
+      uploadErrors: nextUploadErrors,
+      sectionErrors: nextSectionErrors,
+      details,
+    };
+  };
+
   const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, files } = event.target as HTMLInputElement;
-    setMessage('');
-    setError('');
-    setShowErrorModal(false);
+    clearSubmitState();
 
     if (name === 'profilePicture') {
+      clearUploadError('profilePicture');
+      clearSectionError('accountAccess');
       setForm((current) => ({ ...current, profilePicture: files?.[0] || null }));
       return;
+    }
+
+    clearFieldError(name);
+    if (['employeeId', 'email', 'password', 'phone'].includes(name)) {
+      clearSectionError('accountAccess');
+    }
+    if (['department', 'designation', 'reportingTo'].includes(name)) {
+      clearSectionError('currentPosition');
+    }
+    if (['aadhaarNumber', 'panNumber'].includes(name)) {
+      clearSectionError('identityFinancials');
     }
 
     setForm((current) => {
@@ -406,6 +666,11 @@ export default function AddEmployee({
   };
 
   const updateEducationEntry = (index: number, key: keyof EducationEntry, value: string | File | null) => {
+    clearSubmitState();
+    if (key === 'file') {
+      clearUploadError(`education_file_${index}`);
+      clearSectionError('education');
+    }
     setEducationEntries((current) =>
       current.map((entry, entryIndex) =>
         entryIndex === index
@@ -423,6 +688,12 @@ export default function AddEmployee({
     key: keyof CertificationEntry,
     value: string | File | null
   ) => {
+    clearSubmitState();
+    const targetIndex = certificationEntries.findIndex((entry) => entry.id === id);
+    if (key === 'file' && targetIndex >= 0) {
+      clearUploadError(`certification_file_${targetIndex}`);
+      clearSectionError('certifications');
+    }
     setCertificationEntries((current) =>
       current.map((entry) =>
         entry.id === id
@@ -453,6 +724,9 @@ export default function AddEmployee({
   };
 
   const handleDocumentChange = (type: string, file: File | null) => {
+    clearSubmitState();
+    clearUploadError(`document_${type}`);
+    clearSectionError('documents');
     setDocuments((current) => ({
       ...current,
       [type]: file,
@@ -486,16 +760,37 @@ export default function AddEmployee({
       experience_letter: null,
       salary_slip: null,
     });
+    setFormError('');
+    setFieldErrors({});
+    setUploadErrors({});
+    setSectionErrors({});
+    setSubmitErrorDetails([]);
   };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitting(true);
     setMessage('');
-    setError('');
+    setFormError('');
+    setFieldErrors({});
+    setUploadErrors({});
+    setSectionErrors({});
+    setSubmitErrorDetails([]);
     setShowErrorModal(false);
 
     try {
+      const validation = validateForm();
+      if (!validation.isValid) {
+        applyStructuredErrors({
+          error: 'Please fix the highlighted fields and try again.',
+          fieldErrors: validation.fieldErrors,
+          uploadErrors: validation.uploadErrors,
+          sectionErrors: validation.sectionErrors,
+          details: validation.details,
+        });
+        return;
+      }
+
       const payload = new FormData();
 
       Object.entries(form).forEach(([key, value]) => {
@@ -557,15 +852,36 @@ export default function AddEmployee({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to save employee');
+        const nextFieldErrors: ErrorMap = {};
+        const nextUploadErrors: ErrorMap = {};
+        Object.entries(result.fieldErrors || {}).forEach(([key, value]) => {
+          if (typeof value !== 'string' || !value) return;
+          if (isUploadErrorKey(key)) {
+            nextUploadErrors[key] = value;
+            return;
+          }
+          nextFieldErrors[key] = value;
+        });
+
+        applyStructuredErrors({
+          error: result.error || 'Please fix the highlighted fields and try again.',
+          fieldErrors: nextFieldErrors,
+          uploadErrors: nextUploadErrors,
+          sectionErrors: result.sectionErrors || {},
+          details: Array.isArray(result.details) ? result.details.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0) : [],
+        });
+        return;
       }
 
       setMessage(result.message || 'Employee added successfully.');
       setShowSuccessModal(true);
       resetForm();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Failed to save employee');
-      setShowErrorModal(true);
+      const nextError = requestError instanceof Error ? requestError.message : 'We could not save the employee form right now. Please try again or contact HR.';
+      applyStructuredErrors({
+        error: nextError,
+        details: [nextError],
+      });
     } finally {
       setSubmitting(false);
     }
@@ -616,36 +932,37 @@ export default function AddEmployee({
           </div>
         )}
 
-        {error && (
+        {formError && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-4 text-sm font-medium text-red-700">
-            {error}
+            {formError}
           </div>
         )}
 
         <form id="add-employee-form" className="space-y-8" onSubmit={handleSubmit}>
           <Section title="Account & Access" subtitle="Create the login credentials and primary employee access.">
+            <SectionError message={sectionErrors.accountAccess} />
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Employee ID">
-                <input className={inputClassName()} name="employeeId" value={form.employeeId} onChange={handleInputChange} />
+              <Field label="Employee ID" required error={fieldErrors.employeeId}>
+                <input className={inputClassName(false, !!fieldErrors.employeeId)} name="employeeId" value={form.employeeId} onChange={handleInputChange} />
               </Field>
-              <Field label="Work Email">
+              <Field label="Work Email" required error={fieldErrors.email}>
                 <div className="space-y-2">
-                  <input className={inputClassName()} name="email" type="email" value={form.email} onChange={handleInputChange} />
+                  <input className={inputClassName(false, !!fieldErrors.email)} name="email" type="email" value={form.email} onChange={handleInputChange} />
                   <p className="text-xs text-on-surface-variant">
                     Use your BNC email if you have., If not, then use personal email
                   </p>
                 </div>
               </Field>
-              <Field label="Password">
+              <Field label="Password" required error={fieldErrors.password}>
                 <div className="space-y-2">
-                  <input className={inputClassName()} name="password" type="text" value={form.password} onChange={handleInputChange} />
+                  <input className={inputClassName(false, !!fieldErrors.password)} name="password" type="text" value={form.password} onChange={handleInputChange} />
                   <p className="text-xs text-on-surface-variant">
                     Create a password for logging in. This is not your email password.
                   </p>
                 </div>
               </Field>
-              <Field label="Phone Number">
-                <input className={inputClassName()} name="phone" value={form.phone} onChange={handleInputChange} />
+              <Field label="Phone Number" error={fieldErrors.phone}>
+                <input className={inputClassName(false, !!fieldErrors.phone)} name="phone" value={form.phone} onChange={handleInputChange} />
               </Field>
               <Field label="Task Manager Access">
                 <select className={selectClassName()} name="taskManagerAccess" value={form.taskManagerAccess} onChange={handleInputChange}>
@@ -653,25 +970,28 @@ export default function AddEmployee({
                   <option>No</option>
                 </select>
               </Field>
-              <Field label="Profile Picture">
-                <label className={fileButtonClassName()}>
-                  <span>{form.profilePicture ? form.profilePicture.name : 'Choose Profile Image'}</span>
-                  <input className="hidden" name="profilePicture" type="file" accept="image/*" onChange={handleInputChange} />
-                </label>
+              <Field label="Profile Picture" error={uploadErrors.profilePicture}>
+                <div className="space-y-2">
+                  <label className={fileButtonClassName(!!uploadErrors.profilePicture)}>
+                    <span>{form.profilePicture ? form.profilePicture.name : 'Choose Profile Image'}</span>
+                    <input className="hidden" name="profilePicture" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={handleInputChange} />
+                  </label>
+                  <p className="text-xs text-on-surface-variant">Supported formats: JPG, PNG, WebP up to {formatMaxSize(PROFILE_PICTURE_MAX_SIZE_BYTES)}.</p>
+                </div>
               </Field>
             </div>
           </Section>
 
           <Section title="Personal Information" subtitle="Capture the employee's core identity and personal details.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Full Name">
-                <input className={inputClassName()} name="name" value={form.name} onChange={handleInputChange} />
+              <Field label="Full Name" required error={fieldErrors.name}>
+                <input className={inputClassName(false, !!fieldErrors.name)} name="name" value={form.name} onChange={handleInputChange} />
               </Field>
-              <Field label="Personal Email">
-                <input className={inputClassName()} name="personalEmail" type="email" value={form.personalEmail} onChange={handleInputChange} />
+              <Field label="Personal Email" error={fieldErrors.personalEmail}>
+                <input className={inputClassName(false, !!fieldErrors.personalEmail)} name="personalEmail" type="email" value={form.personalEmail} onChange={handleInputChange} />
               </Field>
-              <Field label="Date Of Birth">
-                <input className={inputClassName()} name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleInputChange} />
+              <Field label="Date Of Birth" error={fieldErrors.dateOfBirth}>
+                <input className={inputClassName(false, !!fieldErrors.dateOfBirth)} name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleInputChange} />
               </Field>
               <Field label="Gender">
                 <select className={selectClassName()} name="gender" value={form.gender} onChange={handleInputChange}>
@@ -833,11 +1153,11 @@ export default function AddEmployee({
                   ))}
                 </select>
               </Field>
-              <Field label="Joining Date">
-                <input className={inputClassName()} name="joinedOn" type="date" value={form.joinedOn} onChange={handleInputChange} />
+              <Field label="Joining Date" error={fieldErrors.joinedOn}>
+                <input className={inputClassName(false, !!fieldErrors.joinedOn)} name="joinedOn" type="date" value={form.joinedOn} onChange={handleInputChange} />
               </Field>
-              <Field label="Confirmation Date">
-                <input className={inputClassName()} name="confirmationDate" type="date" value={form.confirmationDate} onChange={handleInputChange} />
+              <Field label="Confirmation Date" error={fieldErrors.confirmationDate}>
+                <input className={inputClassName(false, !!fieldErrors.confirmationDate)} name="confirmationDate" type="date" value={form.confirmationDate} onChange={handleInputChange} />
               </Field>
               <Field label="Probation Period (days)">
                 <select className={selectClassName()} name="probationPeriodDays" value={form.probationPeriodDays} onChange={handleInputChange}>
@@ -866,9 +1186,10 @@ export default function AddEmployee({
           </Section>
 
           <Section title="Current Position" subtitle="Define reporting structure, work schedule, and position details.">
+            <SectionError message={sectionErrors.currentPosition} />
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Department">
-                <select className={selectClassName()} name="department" value={form.department} onChange={handleInputChange}>
+              <Field label="Department" required error={fieldErrors.department}>
+                <select className={selectClassName(!!fieldErrors.department)} name="department" value={form.department} onChange={handleInputChange}>
                   <option value="">Select department</option>
                   {FIXED_DEPARTMENT_OPTIONS.map((department) => (
                     <option key={department} value={department}>
@@ -880,11 +1201,11 @@ export default function AddEmployee({
               <Field label="Division">
                 <input className={inputClassName()} name="division" value={form.division} onChange={handleInputChange} />
               </Field>
-              <Field label="Designation">
-                <input className={inputClassName()} list="designation-options" name="designation" value={form.designation} onChange={handleInputChange} />
+              <Field label="Designation" required error={fieldErrors.designation}>
+                <input className={inputClassName(false, !!fieldErrors.designation)} list="designation-options" name="designation" value={form.designation} onChange={handleInputChange} />
               </Field>
-              <Field label="Reporting To">
-                <select className={selectClassName()} name="reportingTo" value={form.reportingTo} onChange={handleInputChange}>
+              <Field label="Reporting To" error={fieldErrors.reportingTo}>
+                <select className={selectClassName(!!fieldErrors.reportingTo)} name="reportingTo" value={form.reportingTo} onChange={handleInputChange}>
                   <option value="">Select reporting to</option>
                   {superAdmins.length > 0 ? (
                     <optgroup label="Super Admins">
@@ -967,12 +1288,13 @@ export default function AddEmployee({
           </Section>
 
           <Section title="Identity & Financials" subtitle="Save government identity numbers and banking details in the employee master record.">
+            <SectionError message={sectionErrors.identityFinancials} />
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Aadhaar Number">
-                <input className={inputClassName()} name="aadhaarNumber" inputMode="numeric" maxLength={12} value={form.aadhaarNumber} onChange={handleInputChange} />
+              <Field label="Aadhaar Number" error={fieldErrors.aadhaarNumber}>
+                <input className={inputClassName(false, !!fieldErrors.aadhaarNumber)} name="aadhaarNumber" inputMode="numeric" maxLength={12} value={form.aadhaarNumber} onChange={handleInputChange} />
               </Field>
-              <Field label="PAN Number">
-                <input className={inputClassName()} name="panNumber" maxLength={10} value={form.panNumber} onChange={handleInputChange} />
+              <Field label="PAN Number" error={fieldErrors.panNumber}>
+                <input className={inputClassName(false, !!fieldErrors.panNumber)} name="panNumber" maxLength={10} value={form.panNumber} onChange={handleInputChange} />
               </Field>
               <Field label="Passport Number">
                 <input className={inputClassName()} name="passportNumber" value={form.passportNumber} onChange={handleInputChange} />
@@ -993,6 +1315,7 @@ export default function AddEmployee({
           </Section>
 
           <Section title="Education" subtitle="Capture 10th, 12th, graduation, and post-graduation records with document uploads.">
+            <SectionError message={sectionErrors.education} />
             <div className="space-y-6">
               {educationEntries.map((entry, index) => (
                 <div key={entry.educationLevel} className="rounded-[1.5rem] border border-slate-300 bg-white p-6 shadow-sm">
@@ -1016,10 +1339,10 @@ export default function AddEmployee({
                     <Field label="Percentage / CGPA">
                       <input className={inputClassName()} value={entry.score} onChange={(event) => updateEducationEntry(index, 'score', event.target.value)} />
                     </Field>
-                    <Field label="Upload Degree / Marksheet">
-                      <label className={fileButtonClassName()}>
+                    <Field label="Upload Degree / Marksheet" error={uploadErrors[`education_file_${index}`]}>
+                      <label className={fileButtonClassName(!!uploadErrors[`education_file_${index}`])}>
                         <span>{entry.file ? entry.file.name : 'Choose File'}</span>
-                        <input type="file" className="hidden" onChange={(event) => updateEducationEntry(index, 'file', event.target.files?.[0] || null)} />
+                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => updateEducationEntry(index, 'file', event.target.files?.[0] || null)} />
                       </label>
                     </Field>
                   </div>
@@ -1043,6 +1366,7 @@ export default function AddEmployee({
           </Section>
 
           <Section title="Certifications" subtitle="Add advanced certifications and upload supporting PDFs or certificates.">
+            <SectionError message={sectionErrors.certifications} />
             <div className="space-y-6">
               <div className="flex justify-end">
                 <button
@@ -1082,10 +1406,10 @@ export default function AddEmployee({
                     <Field label="Issued Year">
                       <input className={inputClassName()} value={entry.issuedYear} onChange={(event) => updateCertificationEntry(entry.id, 'issuedYear', event.target.value)} />
                     </Field>
-                    <Field label="Upload Certificate">
-                      <label className={fileButtonClassName()}>
+                    <Field label="Upload Certificate" error={uploadErrors[`certification_file_${certificationEntries.findIndex((item) => item.id === entry.id)}`]}>
+                      <label className={fileButtonClassName(!!uploadErrors[`certification_file_${certificationEntries.findIndex((item) => item.id === entry.id)}`])}>
                         <span>{entry.file ? entry.file.name : 'Choose File'}</span>
-                        <input type="file" className="hidden" onChange={(event) => updateCertificationEntry(entry.id, 'file', event.target.files?.[0] || null)} />
+                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => updateCertificationEntry(entry.id, 'file', event.target.files?.[0] || null)} />
                       </label>
                     </Field>
                   </div>
@@ -1095,14 +1419,16 @@ export default function AddEmployee({
           </Section>
 
           <Section title="Documents Upload" subtitle="Upload the core compliance and onboarding documents for the employee file.">
+            <SectionError message={sectionErrors.documents} />
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {DOCUMENT_TYPES.map((document) => (
-                <Field key={document.key} label={document.label}>
-                  <label className={fileButtonClassName()}>
+                <Field key={document.key} label={document.label} error={uploadErrors[`document_${document.key}`]}>
+                  <label className={fileButtonClassName(!!uploadErrors[`document_${document.key}`])}>
                     <span>{documents[document.key] ? documents[document.key]?.name : 'Choose File'}</span>
                     <input
                       type="file"
                       className="hidden"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
                       onChange={(event) => handleDocumentChange(document.key, event.target.files?.[0] || null)}
                     />
                   </label>
@@ -1200,7 +1526,7 @@ export default function AddEmployee({
         </div>
       ) : null}
 
-      {showErrorModal && error ? (
+      {showErrorModal && formError ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-6 backdrop-blur-sm">
           <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-rose-200/80 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
             <div className="flex flex-col items-center text-center">
@@ -1225,8 +1551,19 @@ export default function AddEmployee({
 
               <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Save Error</h2>
               <p className="mt-3 text-base leading-7 text-slate-600">
-                {error}
+                {formError}
               </p>
+
+              {submitErrorDetails.length > 0 ? (
+                <div className="mt-6 w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4 text-left">
+                  <p className="text-sm font-semibold text-rose-800">Please check these details:</p>
+                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-rose-700">
+                    {submitErrorDetails.map((detail, index) => (
+                      <li key={`${detail}-${index}`}>{detail}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               <div className="mt-8 flex w-full flex-col gap-3">
                 <button

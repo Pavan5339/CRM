@@ -15,8 +15,6 @@ const MONTHLY_DEFAULTS = {
 const PAID_DEFAULTS = {
   'Casual Leave': true,
   'Sick Leave': true,
-  'Annual Leave': true,
-  'Maternity/Paternity': true,
 };
 
 function toNumber(value, fallback = 0) {

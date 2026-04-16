@@ -10,6 +10,54 @@ type HolidayItem = {
   type: string;
 };
 
+function RollingDigit({
+  value,
+  sizeClass,
+  muted = false,
+}: {
+  value: string;
+  sizeClass: string;
+  muted?: boolean;
+}) {
+  const digit = Number.parseInt(value, 10) || 0;
+
+  return (
+    <span className={`relative inline-flex h-[1.08em] w-[0.7em] overflow-hidden ${sizeClass} ${muted ? 'text-violet-300' : 'text-violet-500'}`}>
+      <span
+        className="absolute left-0 top-0 flex w-full flex-col items-center transition-transform duration-500 ease-out"
+        style={{ transform: `translateY(-${digit * 1.08}em)` }}
+      >
+        {Array.from({ length: 10 }, (_, index) => (
+          <span
+            key={index}
+            className="flex h-[1.08em] w-full items-center justify-center font-mono tabular-nums"
+          >
+            {index}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+function RollingTimeGroup({
+  value,
+  sizeClass,
+  muted = false,
+}: {
+  value: string;
+  sizeClass: string;
+  muted?: boolean;
+}) {
+  return (
+    <span className="inline-flex items-center">
+      {value.split('').map((digit, index) => (
+        <RollingDigit key={`${digit}-${index}`} value={digit} sizeClass={sizeClass} muted={muted} />
+      ))}
+    </span>
+  );
+}
+
 // Dummy holiday data for the dashboard card and full calendar modal
 const holidays = [
   {
@@ -118,6 +166,8 @@ export default function Dashboard({
   const [attendanceSetupPending, setAttendanceSetupPending] = useState(false);
   const [isAttendanceUpdating, setIsAttendanceUpdating] = useState(false);
   const [holidayItems, setHolidayItems] = useState<HolidayItem[]>([]);
+  const attendanceButtonClassName =
+    'group relative flex-1 overflow-hidden rounded-2xl bg-gradient-to-b from-violet-400 via-violet-500 to-violet-600 px-4 py-3 text-xs font-semibold text-white shadow-[0_14px_28px_rgba(139,92,246,0.28)] transition-all duration-200 before:absolute before:inset-x-4 before:top-1 before:h-[42%] before:rounded-full before:bg-white/20 before:blur-md hover:-translate-y-0.5 hover:shadow-[0_18px_32px_rgba(139,92,246,0.34)] active:translate-y-1 active:shadow-[0_8px_18px_rgba(139,92,246,0.22)] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0';
   const attendanceMonth = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}`;
   const todayDateKey = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
 
@@ -442,15 +492,15 @@ export default function Dashboard({
 
     return weekdayOrder
       .map((dayName, index) => ({ dayName, index }))
-      .filter(({ dayName }) => normalizedWorkingDays.includes(dayName))
-      .map(({ index }) => {
+      .map(({ dayName, index }) => {
       const date = new Date(monday);
       date.setDate(monday.getDate() + index);
       const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       const record = attendanceRecords.find((item) => item.date === dateKey);
       const match = record?.workHours?.match(/(\d+)h\s+(\d+)m/);
       const workMinutes = match ? (Number(match[1]) * 60) + Number(match[2]) : 0;
-      const heightPercent = workMinutes ? Math.max(14, Math.min(100, Math.round((workMinutes / 540) * 100))) : 14;
+      const isWorkingDay = normalizedWorkingDays.includes(dayName);
+      const heightPercent = workMinutes ? Math.max(14, Math.min(100, Math.round((workMinutes / 540) * 100))) : isWorkingDay ? 18 : 12;
 
       return {
         label: date.toLocaleDateString('en-GB', { weekday: 'short' }),
@@ -458,6 +508,7 @@ export default function Dashboard({
         workLabel: workMinutes ? `${Math.floor(workMinutes / 60)}h ${String(workMinutes % 60).padStart(2, '0')}m` : '0h 00m',
         heightPercent,
         hasData: Boolean(record && workMinutes),
+        isWorkingDay,
       };
     });
   }, [attendanceRecords, employee?.working_days]);
@@ -554,12 +605,12 @@ export default function Dashboard({
                     <span className="text-[10px] font-semibold text-on-surface-variant">{bar.workLabel}</span>
                     <div className="flex h-28 w-full items-end justify-center">
                       <div
-                        className={`${bar.hasData ? 'bg-primary/20 hover:bg-primary/80' : 'bg-slate-200/80'} w-full max-w-[2.75rem] rounded-t-xl transition-colors`}
+                        className={`${bar.hasData ? 'bg-violet-400 hover:bg-violet-500' : bar.isWorkingDay ? 'bg-violet-200/90' : 'bg-violet-100/80'} w-full max-w-[2.75rem] rounded-t-xl transition-colors`}
                         style={{ height: `${bar.heightPercent}%` }}
                         title={`${bar.dayName}: ${bar.workLabel}`}
                       />
                     </div>
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">{bar.label}</span>
+                    <span className={`text-[11px] font-bold uppercase tracking-wide ${bar.isWorkingDay ? 'text-on-surface-variant' : 'text-violet-300'}`}>{bar.label}</span>
                   </div>
                 ))}
               </div>
@@ -649,13 +700,7 @@ export default function Dashboard({
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-white via-slate-50 to-slate-100 border border-slate-200/60 p-6 rounded-2xl text-on-surface flex flex-col h-full min-h-65 shadow-sm relative overflow-hidden group">
-            {/* Subtle background pattern */}
-            <div className="absolute inset-0 opacity-40">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/5 to-transparent rounded-full blur-2xl"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-violet-500/10 to-transparent rounded-full blur-2xl"></div>
-            </div>
-            
+          <div className="bg-white border border-slate-200/80 p-6 rounded-2xl text-on-surface flex flex-col h-full min-h-65 shadow-sm relative overflow-hidden">
             {/* Live indicator */}
             <div className="absolute top-5 right-5 flex items-center gap-2">
               <span className="relative flex h-2.5 w-2.5">
@@ -677,22 +722,19 @@ export default function Dashboard({
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-medium text-slate-500">{dayName}</span>
                   <span className="w-px h-3 bg-slate-300" />
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gradient-to-r from-violet-50 to-fuchsia-50 border border-violet-100">
+                  <span className="inline-flex items-center rounded-md border border-violet-100 bg-violet-50 px-2.5 py-1">
                     <span className="text-[11px] font-bold text-violet-600 font-mono">{loginId}</span>
                   </span>
                 </div>
               </div>
 
               <div className="flex flex-1 items-center justify-center">
-                <div className="flex items-end justify-center gap-0 text-center">
-                  <span className="font-mono text-5xl md:text-6xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-500 tracking-tight">
-                    {timeString.hours}
-                  </span>
-                  <span className="font-mono text-5xl md:text-6xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-500 tracking-tight animate-pulse">:</span>
-                  <span className="font-mono text-5xl md:text-6xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-500 tracking-tight">
-                    {timeString.minutes}
-                  </span>
-                  <span className="font-mono text-2xl md:text-3xl font-medium text-slate-400 ml-2 mb-1">:{timeString.seconds}</span>
+                <div className="flex items-end justify-center gap-1 text-center">
+                  <RollingTimeGroup value={timeString.hours} sizeClass="text-5xl md:text-6xl font-semibold tracking-tight" />
+                  <span className="mb-1 font-mono text-4xl md:text-5xl font-semibold text-violet-300">:</span>
+                  <RollingTimeGroup value={timeString.minutes} sizeClass="text-5xl md:text-6xl font-semibold tracking-tight" />
+                  <span className="mb-0.5 ml-2 font-mono text-2xl md:text-3xl font-medium text-violet-300">:</span>
+                  <RollingTimeGroup value={timeString.seconds} sizeClass="text-2xl md:text-3xl font-medium tracking-tight" muted />
                 </div>
               </div>
             </div>
@@ -701,7 +743,7 @@ export default function Dashboard({
             <div className="flex items-center gap-3 mt-6 relative z-10">
               <button 
                 onClick={() => setIsSwipesModalOpen(true)}
-                className="group flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:border-violet-300 hover:text-violet-600 hover:shadow-md hover:shadow-violet-500/10 transition-all duration-200"
+                className="group flex items-center gap-2 px-4 py-2.5 bg-white border border-violet-100 rounded-xl text-xs font-semibold text-violet-700 hover:border-violet-200 hover:bg-violet-50/70 hover:shadow-sm transition-all duration-200"
               >
                 <span className="material-symbols-outlined text-base group-hover:scale-110 transition-transform">badge</span>
                 View Swipes
@@ -709,12 +751,14 @@ export default function Dashboard({
               <button
                 onClick={handleAttendanceAction}
                 disabled={isAttendanceUpdating}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:from-violet-700 hover:to-fuchsia-600 text-white rounded-xl text-xs font-semibold shadow-md shadow-violet-500/25 hover:shadow-lg hover:shadow-violet-500/30 hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+                className={attendanceButtonClassName}
               >
-                <span className="material-symbols-outlined text-base">
-                  {attendanceActionLabel === 'Check Out' ? 'logout' : 'login'}
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-base">
+                    {attendanceActionLabel === 'Check Out' ? 'logout' : 'login'}
+                  </span>
+                  {isAttendanceUpdating ? 'Updating...' : attendanceActionLabel}
                 </span>
-                {isAttendanceUpdating ? 'Updating...' : attendanceActionLabel}
               </button>
             </div>
           </div>

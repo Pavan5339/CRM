@@ -8,12 +8,15 @@ import Profile from './views/Profile';
 import Leave from './views/Leave';
 import Attendance from './views/Attendance';
 import RegularizeAttendance from './views/RegularizeAttendance';
+import { ShellSkeleton } from './ui/Skeleton';
 import { createClient } from '@/utils/supabase/client';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('home');
   const [employee, setEmployee] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({ home: true });
 
   useEffect(() => {
     let active = true;
@@ -32,6 +35,10 @@ export default function App() {
         if (active) {
           setEmployee(null);
         }
+      } finally {
+        if (active) {
+          setIsBootstrapping(false);
+        }
       }
     }
 
@@ -41,6 +48,10 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    setVisitedTabs((current) => (current[currentTab] ? current : { ...current, [currentTab]: true }));
+  }, [currentTab]);
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -64,25 +75,12 @@ export default function App() {
     }
   };
 
-  const renderContent = () => {
-    switch (currentTab) {
-      case 'home':
-        return <Dashboard employee={employee} setCurrentTab={setCurrentTab} onLogout={handleLogout} isLoggingOut={isLoggingOut} />;
-      case 'attendance':
-        return <Attendance onOpenRegularizeAttendance={() => setCurrentTab('regularize-attendance')} />;
-      case 'regularize-attendance':
-        return <RegularizeAttendance />;
-      case 'leave':
-        return <Leave />;
-      case 'profile':
-        return <Profile employee={employee} />;
-      default:
-        return (
-          <div className="flex items-center justify-center h-[60vh]">
-            <p className="text-on-surface-variant">This view is under construction.</p>
-          </div>
-        );
-    }
+  const tabViews: Record<string, React.ReactNode> = {
+    home: <Dashboard employee={employee} setCurrentTab={setCurrentTab} onLogout={handleLogout} isLoggingOut={isLoggingOut} />,
+    attendance: <Attendance onOpenRegularizeAttendance={() => setCurrentTab('regularize-attendance')} />,
+    'regularize-attendance': <RegularizeAttendance />,
+    leave: <Leave />,
+    profile: <Profile employee={employee} />,
   };
 
   const getTitle = () => {
@@ -95,6 +93,10 @@ export default function App() {
       default: return 'Sanctuary HR';
     }
   };
+
+  if (isBootstrapping) {
+    return <ShellSkeleton />;
+  }
 
   return (
     <div className="flex min-h-screen bg-surface">
@@ -110,7 +112,22 @@ export default function App() {
         <TopBar title={getTitle()} />
         
         <main className="flex-1 relative px-5 pt-4 pb-8 pr-8 lg:px-6 lg:pr-10 lg:pt-5">
-          {renderContent()}
+          {Object.entries(tabViews).map(([tabId, view]) => {
+            if (!visitedTabs[tabId]) {
+              return null;
+            }
+
+            return (
+              <div key={tabId} className={currentTab === tabId ? 'block' : 'hidden'}>
+                {view}
+              </div>
+            );
+          })}
+          {!tabViews[currentTab] ? (
+            <div className="flex items-center justify-center h-[60vh]">
+              <p className="text-on-surface-variant">This view is under construction.</p>
+            </div>
+          ) : null}
         </main>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminClient } from '@/utils/supabase/admin';
 import { createClient } from '@/utils/supabase/server';
-import { resolveAuthenticatedUserContext } from '@/utils/auth/context';
+import { hasLinkedEmployeeAccess, resolveAuthenticatedUserContext } from '@/utils/auth/context';
 import {
   getCurrentDateInTimeZone,
   getDateRangeForMonth,
@@ -53,7 +53,7 @@ async function requireEmployeeContext() {
   }
 
   const authContext = await resolveAuthenticatedUserContext(supabase, user);
-  if (authContext?.accountType !== 'employee' || !authContext.employee?.id) {
+  if (!hasLinkedEmployeeAccess(authContext)) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
