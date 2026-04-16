@@ -69,12 +69,15 @@ function buildFriendlyErrorResponse(error, fallbackMessage = 'We could not save 
     );
   }
 
+  const directErrorMessage = String(error?.message || '').trim();
+  const errorMessage = directErrorMessage || fallbackMessage;
+
   return NextResponse.json(
     {
-      error: fallbackMessage,
+      error: errorMessage,
       fieldErrors: {},
       sectionErrors: {},
-      details: [fallbackMessage],
+      details: [errorMessage],
     },
     { status: 500 }
   );

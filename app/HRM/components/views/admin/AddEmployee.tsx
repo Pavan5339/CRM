@@ -142,6 +142,7 @@ const EMPLOYEE_FILE_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'a
 const EMPLOYEE_FILE_ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
 const PROFILE_PICTURE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const EMPLOYEE_FILE_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+const TOTAL_UPLOAD_MAX_SIZE_BYTES = 30 * 1024 * 1024;
 
 const defaultEducation = (): EducationEntry[] => [
   { educationLevel: '10th', institutionName: '', boardUniversity: '', specialization: '', passingYear: '', score: '', file: null },
@@ -286,6 +287,22 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function isDigitsOnly(value: string) {
+  return /^\d+$/.test(value.trim());
+}
+
+function isAlphaText(value: string) {
+  return /^[A-Za-z][A-Za-z\s.'-]*$/.test(value.trim());
+}
+
+function isAlphaNumericText(value: string) {
+  return /^[A-Za-z0-9\s./&(),'-]+$/.test(value.trim());
+}
+
+function isStrongPassword(value: string) {
+  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(value.trim());
+}
+
 function isValidDateValue(value: string) {
   if (!value) return true;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -323,6 +340,60 @@ function validateFileAgainstRules(
   }
 
   return null;
+}
+
+function getTotalUploadSizeBytes({
+  profilePicture,
+  documents,
+  educationEntries,
+  certificationEntries,
+}: {
+  profilePicture: File | null;
+  documents: DocumentState;
+  educationEntries: EducationEntry[];
+  certificationEntries: CertificationEntry[];
+}) {
+  const files = [
+    profilePicture,
+    ...Object.values(documents),
+    ...educationEntries.map((entry) => entry.file),
+    ...certificationEntries.map((entry) => entry.file),
+  ];
+
+  return files.reduce((total, file) => total + (file?.size || 0), 0);
+}
+
+function extractPlainErrorText(rawText: string) {
+  const normalized = String(rawText || '').trim();
+  if (!normalized) return '';
+  if (normalized.startsWith('<!DOCTYPE') || normalized.startsWith('<html')) {
+    return '';
+  }
+  return normalized;
+}
+
+async function parseApiResponse(response: Response) {
+  const rawText = await response.text();
+  const contentType = response.headers.get('content-type') || '';
+  const plainText = extractPlainErrorText(rawText);
+
+  if (!rawText) {
+    return { data: null as Record<string, unknown> | null, plainText: '' };
+  }
+
+  if (contentType.includes('application/json')) {
+    try {
+      return { data: JSON.parse(rawText) as Record<string, unknown>, plainText };
+    } catch {
+      return { data: null, plainText };
+    }
+  }
+
+  try {
+    return { data: JSON.parse(rawText) as Record<string, unknown>, plainText };
+  } catch {
+    return { data: null, plainText };
+  }
 }
 
 function isUploadErrorKey(key: string) {
@@ -400,20 +471,35 @@ export default function AddEmployee({
 
       try {
         const response = await fetch(metaUrl);
-        const result = await response.json();
+        const { data: result, plainText } = await parseApiResponse(response);
 
         if (!response.ok) {
-          throw new Error(result.error || 'Failed to load employee form data');
+          throw new Error(
+            (typeof result?.error === 'string' && result.error) ||
+            plainText ||
+            'Failed to load employee form data'
+          );
         }
 
         if (!active) {
           return;
         }
 
-        setDepartments(result.departments || []);
-        setDesignations(result.designations || []);
-        setEmployees(result.employeeOptions || result.employees || []);
-        setSuperAdmins((result.superAdminOptions || []).map((item) => ({ ...item, optionType: 'super_admin' })));
+        setDepartments(Array.isArray(result?.departments) ? result.departments as Option[] : []);
+        setDesignations(Array.isArray(result?.designations) ? result.designations as Option[] : []);
+        setEmployees(
+          Array.isArray(result?.employeeOptions)
+            ? result.employeeOptions as Option[]
+            : Array.isArray(result?.employees)
+              ? result.employees as Option[]
+              : []
+        );
+        setSuperAdmins(
+          (Array.isArray(result?.superAdminOptions) ? result.superAdminOptions : []).map((item) => ({
+            ...(item as Option),
+            optionType: 'super_admin',
+          }))
+        );
       } catch (requestError) {
         if (active) {
           const nextError = requestError instanceof Error ? requestError.message : 'Failed to load employee form data';
@@ -513,12 +599,20 @@ export default function AddEmployee({
 
     if (!form.password.trim()) {
       nextFieldErrors.password = 'Password is required.';
-    } else if (form.password.trim().length < 8) {
-      nextFieldErrors.password = 'Password must be at least 8 characters.';
+    } else if (!isStrongPassword(form.password)) {
+      nextFieldErrors.password = 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character.';
     }
 
     if (!form.department.trim()) nextFieldErrors.department = 'Department is required.';
     if (!form.designation.trim()) nextFieldErrors.designation = 'Designation is required.';
+
+    if (form.employeeId.trim() && !isAlphaNumericText(form.employeeId)) {
+      nextFieldErrors.employeeId = 'Employee ID can contain only letters, numbers, spaces, and basic separators.';
+    }
+
+    if (form.name.trim() && !isAlphaText(form.name)) {
+      nextFieldErrors.name = 'Full name can contain only letters and common name characters.';
+    }
 
     if (form.personalEmail.trim() && !isValidEmail(form.personalEmail)) {
       nextFieldErrors.personalEmail = 'Please enter a valid personal email address.';
@@ -534,6 +628,61 @@ export default function AddEmployee({
 
     if (form.panNumber.trim() && !/^[A-Z0-9]{10}$/i.test(form.panNumber.trim())) {
       nextFieldErrors.panNumber = 'PAN number must be exactly 10 characters.';
+    }
+
+    if (form.phone.trim() && (!isDigitsOnly(form.phone) || form.phone.trim().length < 10 || form.phone.trim().length > 15)) {
+      nextFieldErrors.phone = 'Phone number must contain only digits and be between 10 and 15 digits.';
+    }
+
+    if (form.phone2.trim() && (!isDigitsOnly(form.phone2) || form.phone2.trim().length < 10 || form.phone2.trim().length > 15)) {
+      nextFieldErrors.phone2 = 'Alternate phone must contain only digits and be between 10 and 15 digits.';
+    }
+
+    if (form.mobile.trim() && (!isDigitsOnly(form.mobile) || form.mobile.trim().length < 10 || form.mobile.trim().length > 15)) {
+      nextFieldErrors.mobile = 'Mobile number must contain only digits and be between 10 and 15 digits.';
+    }
+
+    if (
+      form.emergencyContactNumber.trim() &&
+      (!isDigitsOnly(form.emergencyContactNumber) || form.emergencyContactNumber.trim().length < 10 || form.emergencyContactNumber.trim().length > 15)
+    ) {
+      nextFieldErrors.emergencyContactNumber = 'Emergency contact number must contain only digits and be between 10 and 15 digits.';
+    }
+
+    if (form.emergencyContactName.trim() && !isAlphaText(form.emergencyContactName)) {
+      nextFieldErrors.emergencyContactName = 'Emergency contact name can contain only letters and common name characters.';
+    }
+
+    if (form.fatherName.trim() && !isAlphaText(form.fatherName)) {
+      nextFieldErrors.fatherName = 'Father name can contain only letters and common name characters.';
+    }
+
+    if (form.spouseName.trim() && !isAlphaText(form.spouseName)) {
+      nextFieldErrors.spouseName = 'Spouse name can contain only letters and common name characters.';
+    }
+
+    if (form.pincode.trim() && (!isDigitsOnly(form.pincode) || form.pincode.trim().length !== 6)) {
+      nextFieldErrors.pincode = 'Pincode must contain exactly 6 digits.';
+    }
+
+    if (form.permanentPincode.trim() && (!isDigitsOnly(form.permanentPincode) || form.permanentPincode.trim().length !== 6)) {
+      nextFieldErrors.permanentPincode = 'Permanent pincode must contain exactly 6 digits.';
+    }
+
+    if (form.salary.trim() && Number.isNaN(Number(form.salary.trim()))) {
+      nextFieldErrors.salary = 'Salary must be a valid number.';
+    }
+
+    if (form.bankAccountNumber.trim() && !isDigitsOnly(form.bankAccountNumber)) {
+      nextFieldErrors.bankAccountNumber = 'Bank account number must contain only digits.';
+    }
+
+    if (form.bankAccountHolderName.trim() && !isAlphaText(form.bankAccountHolderName)) {
+      nextFieldErrors.bankAccountHolderName = 'Account holder name can contain only letters and common name characters.';
+    }
+
+    if (form.passportNumber.trim() && !/^[A-Z0-9]{6,20}$/i.test(form.passportNumber.trim())) {
+      nextFieldErrors.passportNumber = 'Passport number can contain only letters and numbers.';
     }
 
     const profilePictureError = validateFileAgainstRules(
@@ -598,6 +747,18 @@ export default function AddEmployee({
         nextSectionErrors.certifications = 'Some certification uploads need attention.';
       }
     });
+
+    const totalUploadSizeBytes = getTotalUploadSizeBytes({
+      profilePicture: form.profilePicture,
+      documents,
+      educationEntries,
+      certificationEntries,
+    });
+
+    if (totalUploadSizeBytes > TOTAL_UPLOAD_MAX_SIZE_BYTES) {
+      nextSectionErrors.documents = 'The total upload size is too large.';
+      nextUploadErrors.documents = `Total uploaded files must be smaller than ${formatMaxSize(TOTAL_UPLOAD_MAX_SIZE_BYTES)}.`;
+    }
 
     const details = [
       ...Object.values(nextFieldErrors),
@@ -849,12 +1010,12 @@ export default function AddEmployee({
         method: 'POST',
         body: payload,
       });
-      const result = await response.json();
+      const { data: result, plainText } = await parseApiResponse(response);
 
       if (!response.ok) {
         const nextFieldErrors: ErrorMap = {};
         const nextUploadErrors: ErrorMap = {};
-        Object.entries(result.fieldErrors || {}).forEach(([key, value]) => {
+        Object.entries((result?.fieldErrors as Record<string, unknown>) || {}).forEach(([key, value]) => {
           if (typeof value !== 'string' || !value) return;
           if (isUploadErrorKey(key)) {
             nextUploadErrors[key] = value;
@@ -863,17 +1024,28 @@ export default function AddEmployee({
           nextFieldErrors[key] = value;
         });
 
+        const responseError =
+          (typeof result?.error === 'string' && result.error) ||
+          plainText ||
+          'Please fix the highlighted fields and try again.';
+
+        const responseDetails = Array.isArray(result?.details)
+          ? result.details.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
+          : plainText
+            ? [plainText]
+            : [responseError];
+
         applyStructuredErrors({
-          error: result.error || 'Please fix the highlighted fields and try again.',
+          error: responseError,
           fieldErrors: nextFieldErrors,
           uploadErrors: nextUploadErrors,
-          sectionErrors: result.sectionErrors || {},
-          details: Array.isArray(result.details) ? result.details.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0) : [],
+          sectionErrors: (result?.sectionErrors as SectionErrorMap) || {},
+          details: responseDetails,
         });
         return;
       }
 
-      setMessage(result.message || 'Employee added successfully.');
+      setMessage((typeof result?.message === 'string' && result.message) || 'Employee added successfully.');
       setShowSuccessModal(true);
       resetForm();
     } catch (requestError) {
