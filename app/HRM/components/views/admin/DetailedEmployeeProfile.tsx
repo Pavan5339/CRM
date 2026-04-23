@@ -231,18 +231,7 @@ function getDocumentIcon(documentType?: string | null, fileName?: string | null)
 }
 
 function formatReportingTarget(employee: any) {
-  const name = employee?.reporting_manager_name || 'Not assigned';
-  const kind = employee?.reporting_manager_kind || '';
-
-  if (!employee?.reporting_manager_name) {
-    return name;
-  }
-
-  if (kind === 'super_admin') {
-    return `${name} (Super Admin)`;
-  }
-
-  return name;
+  return employee?.reporting_manager_name || 'Not assigned';
 }
 
 function normalizeEmployeeToForm(employee: any) {

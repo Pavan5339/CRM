@@ -8,6 +8,7 @@ import {
   type AttendanceResponse,
   type AttendanceStatus,
 } from './attendanceShared';
+import EmployeePageHeader from '../ui/EmployeePageHeader';
 
 interface AttendanceProps {
   onOpenRegularizeAttendance: () => void;
@@ -21,8 +22,8 @@ const STATUS_CONFIG: Record<AttendanceStatus, { label: string; bg: string; text:
   late: { label: 'Late', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500', icon: 'schedule' },
   halfday: { label: 'Half Day', bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500', icon: 'timelapse' },
   weekend: { label: 'Weekend', bg: 'bg-surface-container-low', text: 'text-on-surface-variant', dot: 'bg-on-surface/20', icon: 'weekend' },
-  holiday: { label: 'Holiday', bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500', icon: 'celebration' },
-  on_leave: { label: 'On Leave', bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500', icon: 'event_available' },
+  holiday: { label: 'Holiday', bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-500', icon: 'celebration' },
+  on_leave: { label: 'On Leave', bg: 'bg-sky-50', text: 'text-sky-700', dot: 'bg-sky-500', icon: 'event_available' },
 };
 
 function getMonthKey(date: Date) {
@@ -122,67 +123,73 @@ export default function Attendance({ onOpenRegularizeAttendance }: AttendancePro
   };
 
   const hasNoRecord = (dateStr: string) => !recordMap[dateStr];
+  const kpiItems = [
+    {
+      label: 'On Time',
+      value: String(summary.presentCount).padStart(2, '0'),
+      helper: 'Days you closed attendance within shift timing',
+      icon: 'check_circle',
+      shell: 'bg-emerald-50',
+    },
+    {
+      label: 'Late In',
+      value: String(summary.lateCount).padStart(2, '0'),
+      helper: 'Days with delayed check-in recorded this month',
+      icon: 'schedule',
+      shell: 'bg-amber-50',
+    },
+    {
+      label: 'Absent',
+      value: String(summary.absentCount).padStart(2, '0'),
+      helper: 'Working days marked without attendance activity',
+      icon: 'event_busy',
+      shell: 'bg-rose-50',
+    },
+  ];
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-8">
+      <EmployeePageHeader
+        icon="calendar_today"
+        title="Attendance Overview"
+        description="Track daily presence, review the monthly calendar, and open regularization quickly when a swipe is missed."
+      />
+
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-surface-container-lowest p-5 rounded-2xl editorial-shadow flex flex-col justify-between group hover:bg-primary transition-all duration-300">
-            <div className="flex justify-between items-start">
-              <span className="material-symbols-outlined p-2 bg-secondary-container text-primary rounded-lg group-hover:bg-on-primary group-hover:text-primary transition-colors text-xl">check_circle</span>
-              <span className="text-[10px] font-bold tracking-widest text-on-surface-variant group-hover:text-on-primary/80 uppercase">On-Time</span>
+          {kpiItems.map((item) => (
+            <div
+              key={item.label}
+              className={`rounded-3xl border border-white/70 ${item.shell} px-5 py-4 shadow-[0_16px_34px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[25px] text-black">{item.icon}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">{item.label}</span>
+              </div>
+              <div className="mt-5 text-center">
+                <p className="text-3xl font-headline font-bold tracking-tight text-on-surface">{item.value}</p>
+                <p className="mt-3 text-[11px] leading-5 text-on-surface-variant">{item.helper}</p>
+              </div>
             </div>
-            <div className="mt-4">
-              <p className="text-3xl font-headline font-extrabold text-on-surface group-hover:text-on-primary transition-colors">
-                {String(summary.presentCount).padStart(2, '0')}
-              </p>
-              <p className="text-sm font-medium text-on-surface-variant group-hover:text-on-primary/70 transition-colors">This month</p>
-            </div>
-          </div>
-
-          <div className="bg-surface-container-lowest p-5 rounded-2xl editorial-shadow flex flex-col justify-between group hover:bg-error transition-all duration-300">
-            <div className="flex justify-between items-start">
-              <span className="material-symbols-outlined p-2 bg-error-container/20 text-error rounded-lg group-hover:bg-on-error group-hover:text-error transition-colors text-xl">schedule</span>
-              <span className="text-[10px] font-bold tracking-widest text-on-surface-variant group-hover:text-on-error/80 uppercase">Late-In</span>
-            </div>
-            <div className="mt-4">
-              <p className="text-3xl font-headline font-extrabold text-on-surface group-hover:text-on-error transition-colors">
-                {String(summary.lateCount).padStart(2, '0')}
-              </p>
-              <p className="text-sm font-medium text-on-surface-variant group-hover:text-on-error/70 transition-colors">This month</p>
-            </div>
-          </div>
-
-          <div className="bg-surface-container-lowest p-5 rounded-2xl editorial-shadow flex flex-col justify-between group hover:bg-surface-dim transition-all duration-300">
-            <div className="flex justify-between items-start">
-              <span className="material-symbols-outlined p-2 bg-surface-container text-on-surface-variant rounded-lg group-hover:bg-on-surface group-hover:text-surface-dim transition-colors text-xl">block</span>
-              <span className="text-[10px] font-bold tracking-widest text-on-surface-variant group-hover:text-on-surface/80 uppercase">Absent</span>
-            </div>
-            <div className="mt-4">
-              <p className="text-3xl font-headline font-extrabold text-on-surface group-hover:text-on-surface transition-colors">
-                {String(summary.absentCount).padStart(2, '0')}
-              </p>
-              <p className="text-sm font-medium text-on-surface-variant group-hover:text-on-surface/70 transition-colors">This month</p>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <div className="col-span-12 lg:col-span-4 bg-tertiary-container/30 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-center editorial-shadow">
+        <div className="col-span-12 lg:col-span-4 bg-[#F6ECFF] rounded-2xl p-5 relative overflow-hidden flex flex-col justify-center editorial-shadow">
           <div className="z-10">
-            <h3 className="font-headline text-lg font-bold text-on-tertiary-container mb-1">Missed a swipe?</h3>
-            <p className="text-xs text-on-tertiary-container/80 mb-4 max-w-[200px]">Submit a regularization request for the current pay period.</p>
+            <h3 className="font-headline text-lg font-bold text-slate-900 mb-1">Missed a swipe?</h3>
+            <p className="text-xs text-slate-600 mb-4 max-w-[200px]">Submit a regularization request for the current pay period.</p>
             <button
               type="button"
               onClick={onOpenRegularizeAttendance}
-              className="bg-on-tertiary-container text-tertiary-container px-5 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all"
+              className="bg-white text-violet-700 px-5 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all"
             >
               <span className="material-symbols-outlined text-sm">edit_note</span>
               Regularize Attendance
             </button>
           </div>
-          <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-tertiary-container rounded-full opacity-40 blur-3xl" />
+          <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-violet-200 rounded-full opacity-40 blur-3xl" />
           <div className="absolute top-0 right-0 p-4">
-            <span className="material-symbols-outlined text-tertiary-container/40 text-6xl">auto_stories</span>
+            <span className="material-symbols-outlined text-violet-300 text-6xl">auto_stories</span>
           </div>
         </div>
       </div>

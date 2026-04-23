@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import { Download } from 'lucide-react';
 
 function getInitials(name = '') {
   return String(name)
@@ -33,48 +34,91 @@ function formatBirthday(value) {
   });
 }
 
-function getBirthdayCopy(employee) {
-  if (!employee) {
+function formatBirthdayNames(employees = []) {
+  const names = employees
+    .map((employee) => String(employee?.name || '').trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  if (names.length === 0) {
+    return 'Your team';
+  }
+
+  if (names.length === 1) {
+    return names[0];
+  }
+
+  if (names.length === 2) {
+    return `${names[0]} & ${names[1]}`;
+  }
+
+  return `${names[0]}, ${names[1]} & ${names[2]}`;
+}
+
+function getBirthdayCopy(employees = []) {
+  const leadEmployee = employees[0];
+  const groupedNames = formatBirthdayNames(employees);
+
+  if (!leadEmployee) {
     return {
       heading: 'No birthdays lined up yet',
       body: 'Add employee birth dates in the HR master record to show upcoming birthdays here.',
     };
   }
 
-  if (employee.daysUntilBirthday === 0) {
+  if (employees.length > 1) {
+    if (leadEmployee.daysUntilBirthday === 0) {
+      return {
+        heading: `Happy Birthday ${groupedNames}!`,
+        body: 'Wishing them joy, laughter, and a truly beautiful celebration together.',
+      };
+    }
+
+    if (leadEmployee.daysUntilBirthday === 1) {
+      return {
+        heading: `${groupedNames} celebrate tomorrow`,
+        body: 'A lovely celebration is almost here. Wishing them smiles and happy moments ahead.',
+      };
+    }
+
     return {
-      heading: `Today is ${employee.name}'s birthday`,
-      body: 'Birthday information is available in the employee record.',
+      heading: `Happy Birthday ${groupedNames}`,
+      body: 'Sending warm wishes for a joyful celebration and a wonderful year ahead.',
     };
   }
 
-  if (employee.daysUntilBirthday === 1) {
+  if (leadEmployee.daysUntilBirthday === 0) {
     return {
-      heading: `${employee.name}'s birthday is tomorrow`,
-      body: 'Birthday information is available in the employee record.',
+      heading: `Today is ${leadEmployee.name}'s birthday`,
+      body: 'Wishing them happiness, celebration, and a day full of special moments.',
+    };
+  }
+
+  if (leadEmployee.daysUntilBirthday === 1) {
+    return {
+      heading: `${leadEmployee.name}'s birthday is tomorrow`,
+      body: 'A special day is almost here. Sending warm wishes for a joyful celebration.',
     };
   }
 
   return {
-    heading: `${employee.name}'s birthday is coming up`,
-    body: `Only ${employee.daysUntilBirthday} day${employee.daysUntilBirthday === 1 ? '' : 's'} left.`,
+    heading: `${leadEmployee.name}'s birthday is coming up`,
+    body: 'A special celebration is on the way. Sending warm wishes for a beautiful birthday ahead.',
   };
 }
 
 function MetricCard({ title, value, subtitle, icon, tone }) {
   return (
-    <div className={`rounded-[1.75rem] border border-outline-variant/10 p-5 shadow-sm ${tone}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-on-surface-variant/70">{title}</p>
-          <p className="mt-4 text-4xl font-headline font-extrabold text-on-surface">{value}</p>
-          <p className="mt-2 text-sm text-on-surface-variant">{subtitle}</p>
-        </div>
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
-          <span className="material-symbols-outlined block text-2xl leading-none text-on-surface">
-            {icon}
-          </span>
+    <div className={`rounded-[1.5rem] border border-white/70 p-4 shadow-[0_16px_32px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.92)] ${tone}`}>
+      <div className="flex items-center gap-3">
+        <span className="material-symbols-outlined block text-[25px] leading-none text-on-surface">
+          {icon}
         </span>
+        <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-on-surface-variant/70">{title}</p>
+      </div>
+      <div className="mt-6 text-center">
+        <p className="text-3xl font-headline font-extrabold text-on-surface">{value}</p>
+        <p className="mt-3 text-sm text-on-surface-variant">{subtitle}</p>
       </div>
     </div>
   );
@@ -84,6 +128,7 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isDownloadingBirthdayCard, setIsDownloadingBirthdayCard] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -93,7 +138,7 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
       setError('');
 
       try {
-        const response = await fetch('/HRM/api/admin/dashboard', { method: 'GET', cache: 'no-store' });
+        const response = await fetch('/HRM/api/admin/dashboard', { method: 'GET' });
         const result = await response.json();
 
         if (!response.ok) {
@@ -135,23 +180,88 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
     departmentCount: 0,
     designationCount: 0,
   };
-  const featuredBirthday = dashboard?.upcomingBirthdays?.[0] || null;
-  const birthdayCopy = getBirthdayCopy(featuredBirthday);
+  const featuredBirthdayGroup = useMemo(() => {
+    const upcomingBirthdays = dashboard?.upcomingBirthdays || [];
+    if (!upcomingBirthdays.length) {
+      return [];
+    }
+
+    const nearestOffset = upcomingBirthdays[0].daysUntilBirthday;
+    return upcomingBirthdays.filter((employee) => employee.daysUntilBirthday === nearestOffset);
+  }, [dashboard?.upcomingBirthdays]);
+  const featuredBirthday = featuredBirthdayGroup[0] || null;
+  const birthdayCopy = getBirthdayCopy(featuredBirthdayGroup);
+  const birthdayLabel = featuredBirthday?.daysUntilBirthday === 0 ? 'Today Birthday' : 'Upcoming Birthday';
+  const visibleBirthdayEmployees = featuredBirthdayGroup.slice(0, 4);
+  const avatarLayoutClassName =
+    visibleBirthdayEmployees.length <= 2
+      ? 'flex w-full items-center justify-center gap-2'
+      : 'grid w-full grid-cols-2 gap-x-2 gap-y-3';
+
+  const handleBirthdayCardDownload = async () => {
+    if (isDownloadingBirthdayCard || !featuredBirthday) {
+      return;
+    }
+
+    try {
+      setIsDownloadingBirthdayCard(true);
+      const normalizedDate = formatBirthday(featuredBirthday.date_of_birth).replace(/\s+/g, '-').toLowerCase();
+      const response = await fetch('/HRM/api/admin/birthday-card', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          label: birthdayLabel,
+          heading: birthdayCopy.heading,
+          message: birthdayCopy.body,
+          dateLabel: formatBirthday(featuredBirthday.date_of_birth),
+          moreCount: Math.max(0, featuredBirthdayGroup.length - visibleBirthdayEmployees.length),
+          employees: visibleBirthdayEmployees.map((employee) => ({
+            id: employee.id,
+            name: employee.name,
+            profilePictureUrl: employee.profile_picture_url || '',
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.error || 'Unable to generate birthday card image.');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `birthday-card-${normalizedDate}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (downloadError) {
+      window.alert(downloadError?.message || 'Unable to download the birthday card right now.');
+    } finally {
+      setIsDownloadingBirthdayCard(false);
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-7xl p-10">
-      <section className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto max-w-7xl p-7">
+      <section className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm uppercase tracking-[0.3em] text-on-surface-variant">HR Command Center</p>
-          <h2 className="mt-3 font-headline text-4xl font-extrabold tracking-tight text-on-surface lg:text-5xl">
-            Welcome, {greetingName}
-          </h2>
-          <p className="mt-3 text-base font-medium text-on-surface-variant">{helperText}</p>
+          <div className="flex items-center gap-3">
+            <span className="text-3xl leading-none lg:text-4xl" aria-hidden="true">👋</span>
+            <h2 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface lg:text-[2.5rem]">
+              Welcome, {greetingName}
+            </h2>
+          </div>
+          <p className="mt-2 pl-12 text-sm font-medium text-on-surface-variant lg:pl-14">{helperText}</p>
         </div>
         <button
           type="button"
           onClick={() => setCurrentTab?.('admin-add-employee')}
-          className="rounded-2xl bg-primary px-7 py-3.5 text-sm font-bold text-on-primary shadow-lg shadow-primary/20"
+          className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary shadow-lg shadow-primary/20"
         >
           Add New Employee
         </button>
@@ -170,19 +280,19 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
       )}
 
       {!loading && !error && dashboard && (
-        <div className="space-y-8">
-          <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="space-y-7">
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard title="Total Employees" value={metrics.employeeCount} subtitle={`${metrics.activeEmployeeCount} active right now`} icon="groups" tone="bg-gradient-to-br from-violet-50 via-white to-fuchsia-100/70" />
             <MetricCard title="Employees On Leave" value={metrics.onLeaveEmployeeCount} subtitle="Pulled from live employee status" icon="event_busy" tone="bg-gradient-to-br from-amber-50 via-white to-orange-100/60" />
             <MetricCard title="HR Admins" value={metrics.hrAdminCount} subtitle={`${metrics.departmentCount} departments supported`} icon="admin_panel_settings" tone="bg-gradient-to-br from-purple-50 via-white to-violet-100/70" />
             <MetricCard title="Designations" value={metrics.designationCount} subtitle="Current organization structure" icon="badge" tone="bg-gradient-to-br from-emerald-50 via-white to-teal-100/70" />
           </section>
 
-          <section className="grid grid-cols-1 items-start gap-8 xl:grid-cols-[minmax(0,1.7fr)_300px]">
-            <div className="self-start rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-7 shadow-sm">
-              <div className="mb-6 flex items-center justify-between gap-4">
+          <section className="grid grid-cols-1 items-start gap-7 xl:grid-cols-[minmax(0,1.7fr)_300px]">
+            <div className="self-start rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-4">
                 <div>
-                  <h3 className="font-headline text-2xl font-bold text-on-surface">Recent Employees</h3>
+                  <h3 className="font-headline text-xl font-bold text-on-surface">Recent Employees</h3>
                   <p className="mt-1 text-sm text-on-surface-variant">Latest employee records created in the HRM system.</p>
                 </div>
                 <button
@@ -193,58 +303,58 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
                   View Directory
                 </button>
               </div>
-
-              <div className="overflow-hidden rounded-[1.5rem] border border-outline-variant/10 bg-surface">
+              <div className="overflow-hidden rounded-[1.25rem] border border-outline-variant/10">
                 {(dashboard.recentEmployees || []).length === 0 ? (
-                  <p className="px-5 py-8 text-sm text-on-surface-variant">No employee records are available yet.</p>
+                  <p className="px-4 py-7 text-sm text-on-surface-variant">No employee records are available yet.</p>
                 ) : (
                   <div className="divide-y divide-outline-variant/10">
+                    <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_120px_110px] gap-4 border-b border-outline-variant/10 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/70">
+                      <p>Employee</p>
+                      <p>Designation</p>
+                      <p>ID</p>
+                      <p>Created</p>
+                    </div>
                     {(dashboard.recentEmployees || []).map((employee) => (
                       <div
                         key={employee.id}
-                        className="flex flex-col gap-4 px-5 py-4 transition-colors hover:bg-surface-container-low/35 md:flex-row md:items-center md:justify-between"
+                        className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_120px_110px] gap-4 px-4 py-3 transition-colors hover:bg-surface-container-low/20"
                       >
-                        <div className="flex min-w-0 items-center gap-4">
+                        <div className="flex min-w-0 items-center gap-3">
                           {employee.profile_picture_url ? (
                             <Image
                               src={employee.profile_picture_url}
                               alt={employee.name || 'Employee'}
-                              width={48}
-                              height={48}
-                              className="h-12 w-12 rounded-full object-cover border border-outline-variant/10"
+                              width={38}
+                              height={38}
+                              className="h-[38px] w-[38px] rounded-full object-cover border border-outline-variant/10"
                               unoptimized
                             />
                           ) : (
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                            <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                               {getInitials(employee.name)}
                             </div>
                           )}
                           <div className="min-w-0">
-                            <p className="truncate text-base font-bold text-on-surface">{employee.name || 'Employee'}</p>
-                            <p className="truncate text-sm text-on-surface-variant">{employee.email || 'No email added'}</p>
+                            <p className="truncate text-sm font-bold text-on-surface">{employee.name || 'Employee'}</p>
+                            <p className="truncate text-xs text-on-surface-variant">{employee.email || 'No email added'}</p>
                           </div>
                         </div>
 
-                        <div className="grid gap-3 md:min-w-[380px] md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-on-surface">
-                              {employee.designation?.title || 'Designation not set'}
-                            </p>
-                            <p className="truncate text-xs text-on-surface-variant">
-                              {employee.department?.name || 'Department not set'}
-                            </p>
-                          </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-on-surface">
+                            {employee.designation?.title || 'Designation not set'}
+                          </p>
+                          <p className="truncate text-xs text-on-surface-variant">
+                            {employee.department?.name || 'Department not set'}
+                          </p>
+                        </div>
 
-                          <div className="inline-flex w-fit rounded-full bg-surface-container-low px-3 py-1.5 text-xs font-semibold text-on-surface-variant">
-                            {employee.employee_id || 'No ID'}
-                          </div>
+                        <div className="text-xs font-semibold text-on-surface-variant">
+                          {employee.employee_id || 'No ID'}
+                        </div>
 
-                          <div className="text-left md:text-right">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/60">Created</p>
-                            <p className="mt-1 text-sm font-semibold text-on-surface">
-                              {formatDate(employee.created_at?.slice?.(0, 10) || employee.created_at)}
-                            </p>
-                          </div>
+                        <div className="text-xs font-semibold text-on-surface">
+                          {formatDate(employee.created_at?.slice?.(0, 10) || employee.created_at)}
                         </div>
                       </div>
                     ))}
@@ -253,57 +363,82 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
               </div>
             </div>
 
-            <div className="relative self-start overflow-hidden rounded-[2rem] border border-[#E9D8FF] bg-[#F6ECFF] p-5 shadow-[0_22px_70px_rgba(137,92,246,0.16)] xl:max-w-[300px]">
-              <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-[#D8B4FE]/60 blur-3xl" />
-              <div className="pointer-events-none absolute left-1/2 top-0 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F0ABFC]/45 blur-2xl" />
-              <div className="pointer-events-none absolute -left-8 bottom-12 h-28 w-28 rounded-full bg-[#BFDBFE]/35 blur-3xl" />
-              <div className="pointer-events-none absolute right-6 top-16 h-2.5 w-2.5 rounded-full bg-[#A855F7]/65" />
-              <div className="pointer-events-none absolute right-12 top-24 h-1.5 w-1.5 rounded-full bg-[#EC4899]/70" />
-              <div className="pointer-events-none absolute left-8 top-20 h-2 w-2 rounded-full bg-[#8B5CF6]/60" />
+            <div className="relative self-start xl:max-w-[300px]">
+              {(dashboard.upcomingBirthdays || []).length > 0 ? (
+                <button
+                  type="button"
+                  onClick={handleBirthdayCardDownload}
+                  disabled={isDownloadingBirthdayCard}
+                  className="absolute right-3 top-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/70 bg-white/85 text-[#9A3412] shadow-md backdrop-blur-sm transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                  title="Download birthday card"
+                  aria-label="Download birthday card"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              ) : null}
 
-              <div className="relative flex h-full flex-col">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-[#B45309]">Upcoming Birthday</p>
-                  </div>
-                  <span className="material-symbols-outlined text-[28px] text-[#EA580C]">celebration</span>
-                </div>
+              <div className="relative overflow-hidden rounded-[2rem] border border-[#E9D8FF] bg-[#F6ECFF] p-5 shadow-[0_22px_70px_rgba(137,92,246,0.16)]">
+                <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-[#D8B4FE]/60 blur-3xl" />
+                <div className="pointer-events-none absolute left-1/2 top-0 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F0ABFC]/45 blur-2xl" />
+                <div className="pointer-events-none absolute -left-8 bottom-12 h-28 w-28 rounded-full bg-[#BFDBFE]/35 blur-3xl" />
+                <div className="pointer-events-none absolute right-6 top-16 h-2.5 w-2.5 rounded-full bg-[#A855F7]/65" />
+                <div className="pointer-events-none absolute right-12 top-24 h-1.5 w-1.5 rounded-full bg-[#EC4899]/70" />
+                <div className="pointer-events-none absolute left-8 top-20 h-2 w-2 rounded-full bg-[#8B5CF6]/60" />
 
-                {(dashboard.upcomingBirthdays || []).length === 0 ? (
-                  <div className="mt-6 rounded-[1.5rem] bg-white/45 px-5 py-7 text-sm text-[#7C5A49] backdrop-blur-sm">
-                    No employee birthdays are available yet.
-                  </div>
-                ) : (
-                  <div className="mt-6 flex flex-col items-center px-1 pb-1 text-center">
-                    {featuredBirthday?.profile_picture_url ? (
-                      <Image
-                        src={featuredBirthday.profile_picture_url}
-                        alt={featuredBirthday.name || 'Birthday employee'}
-                        width={168}
-                        height={168}
-                        className="h-36 w-36 rounded-full object-cover border-4 border-white/90 shadow-[0_18px_36px_rgba(139,92,246,0.22)]"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="flex h-36 w-36 items-center justify-center rounded-full border-4 border-white/90 bg-white text-4xl font-extrabold text-[#7C3AED] shadow-[0_18px_36px_rgba(139,92,246,0.22)]">
-                        {getInitials(featuredBirthday?.name)}
-                      </div>
-                    )}
-                    <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.24em] text-[#C2410C]">
-                      {featuredBirthday?.employee_id || 'Employee milestone'}
-                    </p>
-                    <p className="mt-3 text-xl font-extrabold leading-tight text-[#4A2412]">
-                      {birthdayCopy.heading}
-                    </p>
-                    <p className="mt-3 max-w-[15rem] text-sm leading-6 text-[#7C5A49]">
-                      {birthdayCopy.body}
-                    </p>
-                    <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-sm font-bold text-[#9A3412] shadow-sm">
-                      <span className="material-symbols-outlined text-[18px] text-[#EA580C]">cake</span>
-                      {formatBirthday(featuredBirthday?.date_of_birth)}
+                <div className="relative flex h-full flex-col">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-[#B45309]">{birthdayLabel}</p>
                     </div>
+                    <span className="material-symbols-outlined text-[28px] text-[#EA580C]">celebration</span>
                   </div>
-                )}
+
+                  {(dashboard.upcomingBirthdays || []).length === 0 ? (
+                    <div className="mt-6 rounded-[1.5rem] bg-white/45 px-5 py-7 text-sm text-[#7C5A49] backdrop-blur-sm">
+                      No employee birthdays are available yet.
+                    </div>
+                  ) : (
+                    <div className="mt-6 flex flex-col items-center px-1 pb-1 text-center">
+                      <div className={avatarLayoutClassName}>
+                        {visibleBirthdayEmployees.map((employee) => (
+                          <div key={employee.id} className="flex flex-col items-center text-center">
+                            {employee?.profile_picture_url ? (
+                              <Image
+                                src={employee.profile_picture_url}
+                                alt={employee.name || 'Birthday employee'}
+                                width={88}
+                                height={88}
+                                className="h-[88px] w-[88px] rounded-full object-cover border-4 border-white/90 shadow-[0_18px_36px_rgba(139,92,246,0.22)]"
+                                unoptimized
+                              />
+                            ) : (
+                              <div
+                                className="flex h-[88px] w-[88px] items-center justify-center rounded-full border-4 border-white/90 bg-white text-2xl font-extrabold text-[#7C3AED] shadow-[0_18px_36px_rgba(139,92,246,0.22)]"
+                              >
+                                {getInitials(employee?.name)}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {featuredBirthdayGroup.length > 4 ? (
+                        <p className="mt-4 text-xs font-bold uppercase tracking-[0.2em] text-[#C2410C]">
+                          +{featuredBirthdayGroup.length - 4} more on the same date
+                        </p>
+                      ) : null}
+                      <p className="mt-5 text-xl font-extrabold leading-tight text-[#4A2412]">
+                        {birthdayCopy.heading}
+                      </p>
+                      <p className="mt-3 max-w-[15rem] text-sm leading-6 text-[#7C5A49]">
+                        {birthdayCopy.body}
+                      </p>
+                      <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-sm font-bold text-[#9A3412] shadow-sm">
+                        <span className="material-symbols-outlined text-[18px] text-[#EA580C]">cake</span>
+                        {formatBirthday(featuredBirthday?.date_of_birth)}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </section>

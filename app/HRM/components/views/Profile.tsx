@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import React, { useMemo, useState } from 'react';
 import { formatEmploymentValue, getEmployeeTypeLabel } from '@/utils/hrm-employment';
+import EmployeePageHeader from '../ui/EmployeePageHeader';
 
 function InfoRow({
   label,
@@ -46,18 +47,7 @@ function formatStatus(status?: string | null) {
 }
 
 function formatReportingTarget(employee?: any) {
-  const name = employee?.reporting_manager_name || employee?.directory_reporting_manager || 'Not assigned';
-  const kind = employee?.reporting_manager_kind || '';
-
-  if (!employee?.reporting_manager_name && !employee?.directory_reporting_manager) {
-    return name;
-  }
-
-  if (kind === 'super_admin') {
-    return `${name} (Super Admin)`;
-  }
-
-  return name;
+  return employee?.reporting_manager_name || employee?.directory_reporting_manager || 'Not assigned';
 }
 
 function pickFirstText(...values: Array<string | number | null | undefined>) {
@@ -414,6 +404,12 @@ export default function Profile({ employee }: { employee?: any }) {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-8">
+      <EmployeePageHeader
+        icon="person"
+        title="Profile Overview"
+        description="View your personal details, reporting structure, documents, and employment information in one place."
+      />
+
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-8 bg-surface-container-lowest p-6 rounded-3xl flex flex-col md:flex-row gap-6 items-center md:items-start relative overflow-hidden editorial-shadow">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary-container/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
@@ -471,7 +467,7 @@ export default function Profile({ employee }: { employee?: any }) {
 
         <div className="lg:col-span-4 grid grid-cols-2 gap-4">
           <div className="bg-surface-container-lowest p-5 rounded-3xl flex flex-col justify-center items-center text-center editorial-shadow">
-            <span className="text-2xl font-extrabold font-headline text-on-surface">{status}</span>
+            <span className="text-2xl font-extrabold font-headline text-on-surface">{lifecycleStatus}</span>
             <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mt-1">Status</span>
           </div>
           <div className="bg-tertiary-container p-5 rounded-3xl flex flex-col justify-center items-center text-center editorial-shadow">

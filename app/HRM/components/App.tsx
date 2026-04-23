@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import Sidebar from './layout/Sidebar';
-import TopBar from './layout/TopBar';
 import Dashboard from './views/Dashboard';
 import Profile from './views/Profile';
 import Leave from './views/Leave';
 import Attendance from './views/Attendance';
 import RegularizeAttendance from './views/RegularizeAttendance';
+import Salary from './views/Salary';
 import { ShellSkeleton } from './ui/Skeleton';
 import { createClient } from '@/utils/supabase/client';
 
@@ -80,18 +80,8 @@ export default function App() {
     attendance: <Attendance onOpenRegularizeAttendance={() => setCurrentTab('regularize-attendance')} />,
     'regularize-attendance': <RegularizeAttendance />,
     leave: <Leave />,
+    salary: <Salary employee={employee} />,
     profile: <Profile employee={employee} />,
-  };
-
-  const getTitle = () => {
-    switch (currentTab) {
-      case 'home': return '';
-      case 'attendance': return 'Attendance';
-      case 'regularize-attendance': return 'Regularization';
-      case 'leave': return 'Leave Management';
-      case 'profile': return 'Profile';
-      default: return 'Sanctuary HR';
-    }
   };
 
   if (isBootstrapping) {
@@ -109,9 +99,7 @@ export default function App() {
       />
       
       <div className="flex-1 flex flex-col ml-64">
-        <TopBar title={getTitle()} />
-        
-        <main className="flex-1 relative px-5 pt-4 pb-8 pr-8 lg:px-6 lg:pr-10 lg:pt-5">
+        <main className="flex-1 relative px-5 pt-6 pb-8 pr-8 lg:px-6 lg:pr-10 lg:pt-6">
           {Object.entries(tabViews).map(([tabId, view]) => {
             if (!visitedTabs[tabId]) {
               return null;

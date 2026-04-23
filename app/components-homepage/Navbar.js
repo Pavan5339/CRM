@@ -6,10 +6,10 @@ import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 
 export function Navbar({
-  isOthersOpen = false,
-  onToggleOthers = () => {},
   workspaceHref = '/login',
   workspaceLabel = 'Login',
+  othersHref = '/other-modules',
+  isOthersActive = false,
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -23,7 +23,7 @@ export function Navbar({
   }, []);
 
   const navLinks = [
-    { name: 'Home', href: '#', external: true },
+    { name: 'Home', href: '/' },
     { name: workspaceLabel, href: workspaceHref, external: false },
   ];
 
@@ -37,7 +37,7 @@ export function Navbar({
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
         <div className="flex items-center justify-between">
-          <a href="#" className="flex items-center gap-2 group">
+          <Link href="/" className="flex items-center gap-2 group">
             <div className="w-15 h-15 flex items-center justify-center bg-transparent transform transition-transform group-hover:rotate-12">
               <Image
                 src="/assets/logo_color.png"
@@ -49,37 +49,26 @@ export function Navbar({
               />
             </div>
             <span className="text-xl font-bold text-dark">TaskSphere</span>
-          </a>
+          </Link>
 
           <div className="hidden md:flex items-center gap-1 bg-gray-50/50 p-1 rounded-full border border-gray-100 backdrop-blur-sm">
             {navLinks.map((link) => (
-              link.external ? (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  className="px-4 py-2 text-sm font-medium text-dark hover:bg-dark hover:text-white rounded-full transition-colors"
-                >
-                  {link.name}
-                </a>
-              ) : (
-                <Link
-                  key={link.name}
-                  href={link.href}
-                  className="px-4 py-2 text-sm font-medium text-dark hover:bg-dark hover:text-white rounded-full transition-colors"
-                >
-                  {link.name}
-                </Link>
-              )
+              <Link
+                key={link.name}
+                href={link.href}
+                className="px-4 py-2 text-sm font-medium text-dark hover:bg-dark hover:text-white rounded-full transition-colors"
+              >
+                {link.name}
+              </Link>
             ))}
-            <button
-              type="button"
-              onClick={onToggleOthers}
+            <Link
+              href={othersHref}
               className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
-                isOthersOpen ? 'bg-dark text-white' : 'text-dark hover:bg-dark hover:text-white'
+                isOthersActive ? 'bg-dark text-white' : 'text-dark hover:bg-dark hover:text-white'
               }`}
             >
               Others
-            </button>
+            </Link>
           </div>
 
           <button
@@ -94,38 +83,24 @@ export function Navbar({
       {isMobileMenuOpen && (
         <div className="md:hidden absolute top-full left-0 right-0 bg-white border-b border-gray-100 p-4 flex flex-col gap-4 shadow-lg">
           {navLinks.map((link) => (
-            link.external ? (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-base font-medium text-dark py-2 px-4 hover:bg-gray-50 rounded-lg"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {link.name}
-              </a>
-            ) : (
-              <Link
-                key={link.name}
-                href={link.href}
-                className="text-base font-medium text-dark py-2 px-4 hover:bg-gray-50 rounded-lg"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {link.name}
-              </Link>
-            )
+            <Link
+              key={link.name}
+              href={link.href}
+              className="text-base font-medium text-dark py-2 px-4 hover:bg-gray-50 rounded-lg"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              {link.name}
+            </Link>
           ))}
-          <button
-            type="button"
+          <Link
+            href={othersHref}
             className={`text-left text-base font-medium py-2 px-4 rounded-lg transition-colors ${
-              isOthersOpen ? 'bg-dark text-white' : 'text-dark hover:bg-gray-50'
+              isOthersActive ? 'bg-dark text-white' : 'text-dark hover:bg-gray-50'
             }`}
-            onClick={() => {
-              onToggleOthers();
-              setIsMobileMenuOpen(false);
-            }}
+            onClick={() => setIsMobileMenuOpen(false)}
           >
             Others
-          </button>
+          </Link>
         </div>
       )}
     </nav>

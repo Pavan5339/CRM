@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { resolveAuthenticatedUserContext } from '@/utils/auth/context';
-import { getHrAdminDashboardData } from '@/utils/hr-admins';
+import { getHrAdminDashboardSnapshot } from '@/utils/hr-admins';
 import { deriveEmploymentFields } from '@/utils/hrm-employment';
 
 function getUpcomingBirthdays(employees = []) {
@@ -48,8 +48,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { hrAdmins, employees, departments, designations } = await getHrAdminDashboardData();
-    const recentEmployees = employees.slice(0, 6);
+    const { hrAdmins, employees, recentEmployees, departmentCount, designationCount } = await getHrAdminDashboardSnapshot();
 
     return NextResponse.json({
       success: true,
@@ -64,8 +63,8 @@ export async function GET() {
         employeeCount: employees.length,
         activeEmployeeCount: employees.filter((employee) => deriveEmploymentFields(employee).employmentLifecycleStatus === 'active').length,
         onLeaveEmployeeCount: employees.filter((employee) => deriveEmploymentFields(employee).currentStage === 'on_leave').length,
-        departmentCount: departments.length,
-        designationCount: designations.length,
+        departmentCount,
+        designationCount,
       },
       recentEmployees,
       recentHrAdmins: hrAdmins.slice(0, 5),

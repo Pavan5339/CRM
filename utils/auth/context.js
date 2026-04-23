@@ -14,17 +14,14 @@ export async function resolveAuthenticatedUserContext(supabase, user) {
     return null;
   }
 
-  const [{ data: profile, error: profileError }, { data: employeeByAuth, error: employeeError }, hrAdmin, superAdmin] =
-    await Promise.all([
-      supabase.from('hrm_profiles').select('role, full_name, email, employee_id').eq('id', user.id).maybeSingle(),
-      adminClient
-        .from('hrm_employees')
-        .select('id, employee_id, name, email, role, profile_picture_url, auth_user_id')
-        .eq('auth_user_id', user.id)
-        .maybeSingle(),
-      findHrAdminByAuthUserId(user.id),
-      findSuperAdminByAuthUserId(user.id),
-    ]);
+  const [{ data: profile, error: profileError }, { data: employeeByAuth, error: employeeError }] = await Promise.all([
+    supabase.from('hrm_profiles').select('role, full_name, email, employee_id').eq('id', user.id).maybeSingle(),
+    adminClient
+      .from('hrm_employees')
+      .select('id, employee_id, name, email, role, profile_picture_url, auth_user_id')
+      .eq('auth_user_id', user.id)
+      .maybeSingle(),
+  ]);
 
   if (profileError) {
     throw new Error(profileError.message || 'Failed to load user profile');
@@ -68,6 +65,17 @@ export async function resolveAuthenticatedUserContext(supabase, user) {
 
   if (!accountType) {
     return null;
+  }
+
+  let hrAdmin = null;
+  let superAdmin = null;
+
+  if (accountType === 'hr_admin') {
+    hrAdmin = await findHrAdminByAuthUserId(user.id);
+  }
+
+  if (accountType === 'super_admin') {
+    superAdmin = await findSuperAdminByAuthUserId(user.id);
   }
 
   if (accountType === 'super_admin' && !superAdmin) {

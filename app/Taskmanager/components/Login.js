@@ -3,11 +3,16 @@
 import { useEffect, useState } from "react";
 import Image from 'next/image';
 import Link from 'next/link';
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 import { useData } from "./DataContext";
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 
 const supabase = createSupabaseClient();
+const LOGIN_OPTIONS = [
+  { id: 'super_admin', label: 'Super Admin' },
+  { id: 'hr_admin', label: 'HR Admin' },
+  { id: 'employee', label: 'Employee' },
+];
 
 export default function Login({ onSuccess }) {
   const { login } = useData();
@@ -25,6 +30,7 @@ export default function Login({ onSuccess }) {
   const [info, setInfo] = useState('');
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [recoveryReady, setRecoveryReady] = useState(false);
+  const activeLoginIndex = Math.max(0, LOGIN_OPTIONS.findIndex((option) => option.id === loginAs));
 
   useEffect(() => {
     let active = true;
@@ -194,26 +200,27 @@ export default function Login({ onSuccess }) {
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Sign In As
               </p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {[
-                  { id: 'super_admin', label: 'Super Admin', hint: 'Company-level controls' },
-                  { id: 'hr_admin', label: 'HR Admin', hint: 'HR and employee management' },
-                  { id: 'employee', label: 'Employee', hint: 'Attendance, leave, and daily work' },
-                ].map((option) => {
+              <div className="relative flex w-full max-w-[28rem] rounded-full bg-[#F1F4F5] p-1.5 shadow-[inset_0_1px_1px_rgba(148,163,184,0.16)]">
+                <div
+                  className="pointer-events-none absolute inset-y-1.5 left-1.5 rounded-full bg-[#7F40EE] shadow-[0_12px_28px_rgba(127,64,238,0.22)] transition-transform duration-300 ease-out"
+                  style={{
+                    width: 'calc((100% - 0.75rem) / 3)',
+                    transform: `translateX(calc(${activeLoginIndex} * 100%))`,
+                  }}
+                />
+                {LOGIN_OPTIONS.map((option) => {
                   const isActive = loginAs === option.id;
                   return (
                     <button
                       key={option.id}
                       type="button"
                       onClick={() => setLoginAs(option.id)}
-                      className={`rounded-2xl border px-4 py-4 text-left transition-all ${
-                        isActive
-                          ? 'border-[#7F40EE] bg-violet-50 shadow-sm'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
+                        className={`relative z-10 flex flex-1 items-center justify-center gap-2 rounded-full px-2.5 py-2.5 text-[13px] font-semibold transition-colors duration-300 ${
+                          isActive ? 'text-white' : 'text-slate-600 hover:text-slate-900'
+                        }`}
                     >
-                      <div className="text-sm font-semibold text-slate-900">{option.label}</div>
-                      <div className="mt-1 text-xs text-slate-500">{option.hint}</div>
+                      {isActive ? <Lock size={16} strokeWidth={2.2} /> : null}
+                      <span className="whitespace-nowrap">{option.label}</span>
                     </button>
                   );
                 })}
@@ -246,14 +253,14 @@ export default function Login({ onSuccess }) {
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Employee ID or Work Email
+                  Work Email
                 </label>
                 <input
                   type="text"
                   value={identifier}
                   onChange={(event) => setIdentifier(event.target.value)}
                   required
-                  placeholder="e046 or john@example.com"
+                  placeholder="john@example.com"
                   className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-black"
                 />
               </div>
@@ -284,14 +291,14 @@ export default function Login({ onSuccess }) {
           ) : !isRecoveryMode ? (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Employee ID or Work Email
+                Work Email
               </label>
               <input
                 type="text"
                 value={identifier}
                 onChange={(event) => setIdentifier(event.target.value)}
                 required
-                placeholder="e046 or john@example.com"
+                placeholder="john@example.com"
                 className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-black"
               />
             </div>

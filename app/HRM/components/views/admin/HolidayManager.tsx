@@ -157,11 +157,15 @@ export default function HolidayManager() {
   return (
     <div className="p-10 pb-16">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
-        <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-on-surface-variant">HR Admin / Holiday Calendar</p>
-            <h1 className="mt-3 text-5xl font-extrabold tracking-tight text-on-surface">Holiday Management</h1>
-            <p className="mt-3 max-w-3xl text-lg text-on-surface-variant">
+        <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100/90 text-violet-700 shadow-sm">
+                <span className="material-symbols-outlined text-[22px]">calendar_month</span>
+              </div>
+              <h1 className="text-3xl font-headline font-bold text-on-background">Holiday Calendar Management</h1>
+            </div>
+            <p className="pl-14 text-sm leading-6 text-on-surface-variant">
               Add, update, and manage the yearly holiday list used across employee attendance and dashboard views.
             </p>
           </div>
@@ -179,11 +183,70 @@ export default function HolidayManager() {
           </div>
         )}
 
-        <div className="grid gap-8 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-on-surface">Holiday List</h2>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">
+                Loading holidays...
+              </div>
+            ) : nextSerialRows.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-outline-variant/20 bg-surface px-5 py-6 text-sm text-on-surface-variant">
+                No holidays have been added yet.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-outline-variant/10">
+                <table className="w-full border-collapse text-left text-sm">
+                  <thead className="bg-surface-container-low text-on-surface">
+                    <tr>
+                      <th className="px-4 py-3 font-bold">Sl No.</th>
+                      <th className="px-4 py-3 font-bold">Date</th>
+                      <th className="px-4 py-3 font-bold">Holiday</th>
+                      <th className="px-4 py-3 font-bold">Holiday Type</th>
+                      <th className="px-4 py-3 font-bold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {nextSerialRows.map((holiday) => (
+                      <tr key={holiday.id} className="border-t border-outline-variant/10 bg-white">
+                        <td className="px-4 py-3">{holiday.serialNumber}</td>
+                        <td className="px-4 py-3">{new Date(`${holiday.date}T00:00:00`).toLocaleDateString('en-GB')}</td>
+                        <td className="px-4 py-3 font-semibold text-on-surface">{holiday.name}</td>
+                        <td className="px-4 py-3">{formatHolidayTypeLabel(holiday.type || 'company')}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(holiday)}
+                              className="rounded-xl border border-outline-variant/15 bg-surface px-3 py-2 text-xs font-bold text-on-surface"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(holiday.id)}
+                              className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="self-start rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm xl:sticky xl:top-8">
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-on-surface">{editingId ? 'Edit Holiday' : 'Add Holiday'}</h2>
-              <p className="mt-2 text-sm text-on-surface-variant">Fill the same holiday details you maintain in your yearly sheet.</p>
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
@@ -240,67 +303,6 @@ export default function HolidayManager() {
                 )}
               </div>
             </form>
-          </section>
-
-          <section className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold text-on-surface">Holiday List</h2>
-                <p className="mt-2 text-sm text-on-surface-variant">All holidays stored in `hrm_holidays`.</p>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">
-                Loading holidays...
-              </div>
-            ) : nextSerialRows.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-outline-variant/20 bg-surface px-5 py-6 text-sm text-on-surface-variant">
-                No holidays have been added yet.
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-outline-variant/10">
-                <table className="w-full border-collapse text-left text-sm">
-                  <thead className="bg-surface-container-low text-on-surface">
-                    <tr>
-                      <th className="px-4 py-3 font-bold">Sl No.</th>
-                      <th className="px-4 py-3 font-bold">Date</th>
-                      <th className="px-4 py-3 font-bold">Holiday</th>
-                      <th className="px-4 py-3 font-bold">Holiday Type</th>
-                      <th className="px-4 py-3 font-bold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {nextSerialRows.map((holiday) => (
-                      <tr key={holiday.id} className="border-t border-outline-variant/10 bg-white">
-                        <td className="px-4 py-3">{holiday.serialNumber}</td>
-                        <td className="px-4 py-3">{new Date(`${holiday.date}T00:00:00`).toLocaleDateString('en-GB')}</td>
-                        <td className="px-4 py-3 font-semibold text-on-surface">{holiday.name}</td>
-                        <td className="px-4 py-3">{formatHolidayTypeLabel(holiday.type || 'company')}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(holiday)}
-                              className="rounded-xl border border-outline-variant/15 bg-surface px-3 py-2 text-xs font-bold text-on-surface"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(holiday.id)}
-                              className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </section>
         </div>
       </div>

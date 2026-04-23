@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import type { AttendanceRecord, AttendanceResponse } from './attendanceShared';
+import EmployeePageHeader from '../ui/EmployeePageHeader';
 
 type HolidayItem = {
   id: string;
@@ -138,6 +139,32 @@ function formatHolidayTypeLabel(type) {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
+function getGreetingMeta(date: Date) {
+  const hours = date.getHours();
+
+  if (hours < 12) {
+    return {
+      title: 'Good Morning',
+      emoji: '🌤️',
+      note: 'Start the day with clarity and stay ahead of your tasks.',
+    };
+  }
+
+  if (hours < 17) {
+    return {
+      title: 'Good Afternoon',
+      emoji: '☀️',
+      note: 'Everything you need for the workday is lined up here.',
+    };
+  }
+
+  return {
+    title: 'Good Evening',
+    emoji: '🌙',
+    note: 'Wrap up the day smoothly and keep tomorrow prepared.',
+  };
+}
+
 export default function Dashboard({
   employee,
   setCurrentTab,
@@ -252,7 +279,7 @@ export default function Dashboard({
 
     async function loadHolidays() {
       try {
-        const response = await fetch('/HRM/api/holidays', { method: 'GET', cache: 'no-store' });
+        const response = await fetch('/HRM/api/holidays', { method: 'GET' });
         const result = await response.json();
 
         if (!response.ok || !active) {
@@ -289,6 +316,7 @@ export default function Dashboard({
   const formattedFullDate = currentTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const formattedShortDate = currentTime.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const dayName = currentTime.toLocaleDateString('en-GB', { weekday: 'long' });
+  const greetingMeta = getGreetingMeta(currentTime);
   
   const hours = currentTime.getHours().toString().padStart(2, '0');
   const minutes = currentTime.getMinutes().toString().padStart(2, '0');
@@ -545,20 +573,20 @@ export default function Dashboard({
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-8">
       {/* Welcome Hero Section */}
-      <section className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="text-3xl font-extrabold font-headline text-on-background mb-1 tracking-tight">
-            Good Afternoon, {displayName}
-          </h2>
-          <p className="text-on-surface-variant text-base">
-            Your login ID is {loginId}. Have a productive session!
-          </p>
-        </div>
-        <div className="shrink-0 text-left lg:text-right">
-          <p className="text-base font-bold font-headline text-on-surface">{formattedFullDate}</p>
-          <p className="text-sm text-on-surface-variant">{dayName}</p>
-        </div>
-      </section>
+      <EmployeePageHeader
+        icon="space_dashboard"
+        title={`${greetingMeta.title}, ${displayName}`}
+        description={`${greetingMeta.note} Your login ID is ${loginId}.`}
+        action={(
+          <div className="flex items-center gap-4 rounded-3xl border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 editorial-shadow">
+            <span className="text-3xl leading-none">{greetingMeta.emoji}</span>
+            <div>
+              <p className="text-sm font-headline font-bold text-on-surface">{formattedFullDate}</p>
+              <p className="text-xs text-on-surface-variant">{dayName}</p>
+            </div>
+          </div>
+        )}
+      />
 
       {/* Bento Grid Layout */}
       <div className="grid grid-cols-12 gap-6">

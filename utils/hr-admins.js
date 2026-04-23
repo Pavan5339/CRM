@@ -151,6 +151,110 @@ export async function getHrAdminDashboardData() {
   };
 }
 
+function isMissingEmploymentColumnError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('employee_type') ||
+    message.includes('employment_lifecycle_status') ||
+    message.includes('current_stage') ||
+    message.includes('could not find the column') ||
+    (message.includes('column') && message.includes('does not exist'))
+  );
+}
+
+async function loadEmployeeStateRowsForDashboard() {
+  const withEmploymentFields = await adminClient
+    .from('hrm_employees')
+    .select(
+      'id, auth_user_id, employee_id, name, email, profile_picture_url, date_of_birth, employee_status, employee_type, employment_lifecycle_status, current_stage'
+    )
+    .order('date_of_birth', { ascending: true, nullsFirst: false });
+
+  if (!withEmploymentFields.error) {
+    return withEmploymentFields;
+  }
+
+  if (!isMissingEmploymentColumnError(withEmploymentFields.error)) {
+    return withEmploymentFields;
+  }
+
+  return adminClient
+    .from('hrm_employees')
+    .select('id, auth_user_id, employee_id, name, email, profile_picture_url, date_of_birth, employee_status')
+    .order('date_of_birth', { ascending: true, nullsFirst: false });
+}
+
+async function loadRecentEmployeesForDashboard() {
+  return adminClient
+    .from('hrm_employees')
+    .select(`
+      id,
+      auth_user_id,
+      employee_id,
+      name,
+      email,
+      created_at,
+      profile_picture_url,
+      department:hrm_departments (id, name),
+      designation:hrm_designations (id, title)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(12);
+}
+
+export async function getHrAdminDashboardSnapshot() {
+  const [hrAdminsResult, employeeStateResult, recentEmployeesResult, departmentsResult, designationsResult] = await Promise.all([
+    adminClient
+      .from('hr_admins')
+      .select('id, sr_no, auth_user_id, email, name, created_at', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .limit(5),
+    loadEmployeeStateRowsForDashboard(),
+    loadRecentEmployeesForDashboard(),
+    adminClient
+      .from('hrm_departments')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_active', true),
+    adminClient
+      .from('hrm_designations')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_active', true),
+  ]);
+
+  if (hrAdminsResult.error) {
+    throw new Error(hrAdminsResult.error.message || 'Failed to load HR admins');
+  }
+  if (employeeStateResult.error) {
+    throw new Error(employeeStateResult.error.message || 'Failed to load employee dashboard state');
+  }
+  if (recentEmployeesResult.error) {
+    throw new Error(recentEmployeesResult.error.message || 'Failed to load recent employees');
+  }
+  if (departmentsResult.error) {
+    throw new Error(departmentsResult.error.message || 'Failed to load departments');
+  }
+  if (designationsResult.error) {
+    throw new Error(designationsResult.error.message || 'Failed to load designations');
+  }
+
+  const hrAdmins = hrAdminsResult.data || [];
+  const hrAdminUserIds = new Set(hrAdmins.map((row) => row.auth_user_id).filter(Boolean));
+  const hrAdminEmails = new Set(hrAdmins.map((row) => String(row.email || '').toLowerCase()).filter(Boolean));
+
+  const isEmployeeRecord = (employee) => {
+    const normalizedEmail = String(employee?.email || '').toLowerCase();
+    return !hrAdminUserIds.has(employee?.auth_user_id) && !hrAdminEmails.has(normalizedEmail);
+  };
+
+  return {
+    hrAdmins,
+    employees: (employeeStateResult.data || []).filter(isEmployeeRecord),
+    recentEmployees: (recentEmployeesResult.data || []).filter(isEmployeeRecord).slice(0, 6),
+    departmentCount: departmentsResult.count || 0,
+    designationCount: designationsResult.count || 0,
+  };
+}
+
 export async function listHrAdminApprovers() {
   const { data, error } = await adminClient
     .from('hr_admins')

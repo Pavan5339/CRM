@@ -121,7 +121,7 @@ export default function AdminApp() {
         isLoggingOut={isLoggingOut}
       />
       
-      <div className="flex-1 flex flex-col ml-64 min-w-0">
+      <div className="flex-1 flex flex-col ml-60 min-w-0">
         <main className="flex-1 relative">
           {Object.entries(tabViews).map(([tabId, view]) => {
             if (!visitedTabs[tabId]) {

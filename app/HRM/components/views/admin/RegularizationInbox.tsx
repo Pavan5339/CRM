@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
-type InboxTab = 'pending' | 'cc' | 'history';
+type InboxTab = 'pending' | 'history';
 
 interface AdminRegularizationItem {
   id: string;
@@ -24,115 +24,15 @@ interface AdminRegularizationItem {
   employeeCode: string;
 }
 
-function StatusBadge({ status }: { status: AdminRegularizationItem['status'] }) {
-  const className =
-    status === 'Approved'
-      ? 'bg-emerald-50 text-emerald-700'
-      : status === 'Rejected'
-        ? 'bg-rose-50 text-rose-600'
-        : 'bg-amber-50 text-amber-700';
-
-  return <span className={`px-3 py-1 rounded-full text-xs font-bold ${className}`}>{status}</span>;
-}
-
-function RequestCard({
-  item,
-  onReview,
-  isReviewing,
-}: {
-  item: AdminRegularizationItem;
-  onReview: (id: string, decision: 'approved' | 'rejected', approvalOutcome?: 'full_day' | 'half_day') => Promise<void>;
-  isReviewing: boolean;
-}) {
-  return (
-    <div className="bg-surface-container-lowest rounded-[1.5rem] border border-outline-variant/10 p-6 shadow-sm">
-      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h3 className="text-xl font-bold font-headline text-on-surface">{item.employeeName}</h3>
-            <StatusBadge status={item.status} />
-          </div>
-          <p className="text-sm text-on-surface-variant mt-2">
-            {item.employeeCode || 'Employee'} | {item.employeeEmail || '-'}
-          </p>
-          <p className="text-sm text-on-surface-variant mt-1">
-            {item.date} | {item.requestType}
-            {item.currentStatusLabel ? ` | Current status: ${item.currentStatusLabel}` : ''}
-          </p>
-        </div>
-
-        <div className="text-sm text-on-surface-variant">Applied on {item.appliedOn}</div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-        <div className="rounded-2xl bg-surface-container-low p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">Requested Time</p>
-          <p className="text-sm font-semibold text-on-surface">{item.timeRange}</p>
-        </div>
-        <div className="rounded-2xl bg-surface-container-low p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">Send To HR</p>
-          <p className="text-sm font-semibold text-on-surface">{item.sentToHr || '-'}</p>
-        </div>
-        <div className="rounded-2xl bg-surface-container-low p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">Reporting Manager</p>
-          <p className="text-sm font-semibold text-on-surface">{item.reportingManager || '-'}</p>
-        </div>
-        <div className="rounded-2xl bg-surface-container-low p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">Approval Result</p>
-          <p className="text-sm font-semibold text-on-surface">{item.approvalOutcome || '-'}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 mt-4">
-        <div className="rounded-2xl bg-surface-container-low p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2">Reason</p>
-          <p className="text-sm font-semibold text-on-surface">{item.reason}</p>
-        </div>
-      </div>
-
-      <div className="mt-5 pt-4 border-t border-outline-variant/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="text-sm text-on-surface-variant">
-          {item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : item.status === 'Pending' ? 'Awaiting approver action' : 'Request reviewed'}
-          {item.reviewedAt ? ` on ${item.reviewedAt}` : ''}
-        </div>
-
-        {item.canReview ? (
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={isReviewing}
-              onClick={() => onReview(item.id, 'rejected')}
-              className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
-            >
-              Reject
-            </button>
-            <button
-              type="button"
-              disabled={isReviewing}
-              onClick={() => onReview(item.id, 'approved', 'half_day')}
-              className="rounded-xl border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
-            >
-              Approve Half Day
-            </button>
-            <button
-              type="button"
-              disabled={isReviewing}
-              onClick={() => onReview(item.id, 'approved', 'full_day')}
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50"
-            >
-              Approve Full Day
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
+function statusTone(status: AdminRegularizationItem['status']) {
+  if (status === 'Approved') return 'bg-emerald-50 text-emerald-700';
+  if (status === 'Rejected') return 'bg-rose-50 text-rose-600';
+  return 'bg-amber-50 text-amber-700';
 }
 
 export default function RegularizationInbox() {
   const [activeTab, setActiveTab] = useState<InboxTab>('pending');
   const [pendingForMe, setPendingForMe] = useState<AdminRegularizationItem[]>([]);
-  const [ccItems, setCcItems] = useState<AdminRegularizationItem[]>([]);
   const [history, setHistory] = useState<AdminRegularizationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isReviewingId, setIsReviewingId] = useState('');
@@ -152,7 +52,6 @@ export default function RegularizationInbox() {
       }
 
       setPendingForMe(result.pendingForMe || []);
-      setCcItems(result.ccItems || []);
       setHistory(result.history || []);
       setSetupPending(Boolean(result.setupPending));
     } catch (requestError) {
@@ -167,7 +66,11 @@ export default function RegularizationInbox() {
     loadInbox();
   }, []);
 
-  const handleReview = async (id: string, decision: 'approved' | 'rejected', approvalOutcome?: 'full_day' | 'half_day') => {
+  const handleReview = async (
+    id: string,
+    decision: 'approved' | 'rejected',
+    approvalOutcome?: 'full_day' | 'half_day'
+  ) => {
     if (!id) {
       window.alert('This request is missing its id, so it cannot be reviewed yet.');
       return;
@@ -197,66 +100,216 @@ export default function RegularizationInbox() {
     }
   };
 
-  const list = activeTab === 'pending' ? pendingForMe : activeTab === 'cc' ? ccItems : history;
+  const list = activeTab === 'pending' ? pendingForMe : history;
+
+  const switchTabs = useMemo(
+    () => [
+      { key: 'pending' as const, label: 'Pending', count: pendingForMe.length, icon: 'hourglass_top' },
+      { key: 'history' as const, label: 'History', count: history.length, icon: 'history' },
+    ],
+    [history.length, pendingForMe.length]
+  );
+
+  const activeTabIndex = switchTabs.findIndex((tab) => tab.key === activeTab);
 
   return (
-    <div className="p-10 max-w-7xl mx-auto space-y-8">
-      <section className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4">
-        <div>
-          <h1 className="text-4xl font-extrabold font-headline text-on-surface tracking-tight mb-3">Attendance Regularization</h1>
-          <p className="text-on-surface-variant text-lg leading-relaxed max-w-3xl">
-            Review attendance regularization requests sent to you, track copied requests, and keep approval history visible for audit.
-          </p>
+    <div className="mx-auto max-w-7xl space-y-6 px-6 py-6">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100/90 text-violet-700 shadow-sm">
+              <span className="material-symbols-outlined text-[22px]">fact_check</span>
+            </div>
+            <h1 className="text-3xl font-headline font-bold text-on-background">Attendance Regularization</h1>
+          </div>
         </div>
       </section>
 
-      <div className="inline-flex rounded-2xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
-        {([
-          { key: 'pending', label: `Pending for Me (${pendingForMe.length})` },
-          { key: 'cc', label: `CC / FYI (${ccItems.length})` },
-          { key: 'history', label: `History (${history.length})` },
-        ] as { key: InboxTab; label: string }[]).map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-6 py-3 text-base font-medium transition-colors ${
-              activeTab === tab.key ? 'bg-primary text-on-primary' : 'text-on-surface hover:bg-surface-container-low'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <section className="overflow-x-auto">
+        <div className="relative inline-grid min-w-[420px] grid-cols-2 items-center overflow-hidden rounded-[1.05rem] bg-[#F1F4F5] p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
+          <div
+            className="absolute inset-y-1 left-1 w-[calc((100%-0.5rem)/2)] rounded-[0.8rem] bg-[linear-gradient(180deg,#eadcff_0%,#cfbdfd_100%)] shadow-[0_6px_14px_rgba(167,139,250,0.18)] transition-transform duration-300 ease-out"
+            style={{ transform: `translateX(calc(${activeTabIndex} * 100%))` }}
+          />
+          {switchTabs.map((tab) => {
+            const isActive = activeTab === tab.key;
 
-      {isLoading ? (
-        <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">
-          Loading regularization inbox...
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`relative z-10 inline-flex items-center justify-center gap-1.5 rounded-[0.8rem] px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  isActive ? 'text-violet-950' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[14px]">{tab.icon}</span>
+                <span className="whitespace-nowrap">{tab.label}</span>
+                <span
+                  className={`inline-flex min-w-4 items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-bold ${
+                    isActive ? 'bg-white/55 text-violet-900' : 'bg-white/80 text-slate-500'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
-      ) : error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">
-          {error}
-        </div>
-      ) : setupPending ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-medium text-amber-700">
-          Regularization database setup is pending. Apply the latest migration so the recipient table exists in Supabase.
-        </div>
-      ) : list.length === 0 ? (
-        <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">
-          No requests in this section yet.
-        </div>
-      ) : (
-        <div className="grid gap-5">
-          {list.map((item) => (
-            <RequestCard
-              key={item.id}
-              item={item}
-              onReview={handleReview}
-              isReviewing={isReviewingId === item.id}
-            />
-          ))}
-        </div>
-      )}
+      </section>
+
+      <section className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+        {isLoading ? (
+          <div className="rounded-2xl bg-surface-container-low px-5 py-12 text-center text-sm text-on-surface-variant">
+            Loading regularization inbox...
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">
+            {error}
+          </div>
+        ) : setupPending ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-medium text-amber-700">
+            Regularization database setup is pending. Apply the latest migration so the recipient table exists in Supabase.
+          </div>
+        ) : list.length === 0 ? (
+          <div className="rounded-2xl bg-surface-container-low px-5 py-12 text-center text-sm text-on-surface-variant">
+            No requests in this section yet.
+          </div>
+        ) : activeTab === 'pending' ? (
+          <>
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-headline font-bold text-on-background">Pending</h2>
+                <p className="mt-1 text-sm text-on-surface-variant">Review employee regularization requests in a cleaner approval queue.</p>
+              </div>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                {pendingForMe.length} pending
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1160px] text-left">
+                <thead>
+                  <tr className="border-b border-outline-variant/10">
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Employee</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Date</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Request Type</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Current Status</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Requested Time</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Reporting Manager</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Reason</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Applied On</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Status</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {pendingForMe.map((item) => (
+                    <tr key={item.id} className="align-top">
+                      <td className="px-4 py-4 text-sm text-on-surface">
+                        <p className="font-semibold">{item.employeeName}</p>
+                        <p className="text-xs text-on-surface-variant">{item.employeeCode}</p>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-on-surface">
+                        <p>{item.date}</p>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.requestType}</td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.currentStatusLabel || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.timeRange}</td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.reportingManager || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.reason || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.appliedOn}</td>
+                      <td className="px-4 py-4">
+                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${statusTone(item.status)}`}>{item.status}</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        {item.canReview ? (
+                          <div className="flex flex-nowrap gap-2 whitespace-nowrap">
+                            <button
+                              type="button"
+                              disabled={isReviewingId === item.id}
+                              onClick={() => handleReview(item.id, 'rejected')}
+                              className="rounded-full border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isReviewingId === item.id}
+                              onClick={() => handleReview(item.id, 'approved', 'half_day')}
+                              className="rounded-full border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                            >
+                              Half Day
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isReviewingId === item.id}
+                              onClick={() => handleReview(item.id, 'approved', 'full_day')}
+                              className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-on-primary disabled:opacity-50"
+                            >
+                              Full Day
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-on-surface-variant">Awaiting action</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-headline font-bold text-on-background">History</h2>
+                <p className="mt-1 text-sm text-on-surface-variant">View reviewed regularization requests with final decisions and audit trail.</p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                {history.length} records
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1080px] text-left">
+                <thead>
+                  <tr className="border-b border-outline-variant/10">
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Employee</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Date</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Requested Time</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Status</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Approval Result</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Reviewed By</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Reviewed At</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant/70">Reason</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {history.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-4 text-sm text-on-surface">
+                        <p className="font-semibold">{item.employeeName}</p>
+                        <p className="text-xs text-on-surface-variant">{item.employeeCode}</p>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.date}</td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.timeRange}</td>
+                      <td className="px-4 py-4">
+                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${statusTone(item.status)}`}>{item.status}</span>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.approvalOutcome || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.reviewedBy || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.reviewedAt || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-on-surface">{item.reason || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
 }

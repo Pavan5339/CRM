@@ -36,7 +36,7 @@ export default function AdminSidebar({
   ];
 
   return (
-    <aside className="h-screen w-64 fixed left-0 top-0 overflow-y-auto bg-surface-container-low flex flex-col py-6 pr-4 border-r border-outline-variant/20 z-50">
+    <aside className="fixed left-0 top-0 z-50 flex h-screen w-60 flex-col overflow-y-auto border-r border-outline-variant/15 bg-[#EEF2F5] py-6 pr-4">
       <div className="mb-8 px-6 text-center">
         <h1 className="text-2xl font-extrabold tracking-tight text-on-background font-headline">HR Admin</h1>
       </div>
@@ -96,10 +96,6 @@ export default function AdminSidebar({
       </nav>
 
       <div className="mt-auto border-t border-outline-variant/10 pt-6 space-y-2">
-        <Link href="/HRM/hrm" className="w-full flex items-center gap-3 px-5 py-2.5 text-on-surface-variant hover:text-primary transition-colors">
-          <span className="material-symbols-outlined">exit_to_app</span>
-          <span className="font-body text-sm font-medium">Exit Admin Mode</span>
-        </Link>
         <button
           type="button"
           onClick={onLogout}
@@ -109,6 +105,10 @@ export default function AdminSidebar({
           <span className="material-symbols-outlined">logout</span>
           <span className="font-body text-sm font-medium">{isLoggingOut ? 'Logging Out...' : 'Log Out'}</span>
         </button>
+        <Link href="/" className="w-full flex items-center gap-3 px-5 py-2.5 text-on-surface-variant hover:text-primary transition-colors">
+          <span className="material-symbols-outlined">home</span>
+          <span className="font-body text-sm font-medium">Home Page</span>
+        </Link>
       </div>
     </aside>
   );

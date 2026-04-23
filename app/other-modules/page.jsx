@@ -1,15 +1,12 @@
 'use client';
 
 import { Navbar } from '@/app/components-homepage/Navbar';
-import { Hero } from '@/app/components-homepage/Hero';
-import { LogoTicker } from '@/app/components-homepage/LogoTicker';
-import { FeatureSteps } from '@/app/components-homepage/FeatureSteps';
 import { Footer } from '@/app/components-homepage/Footer';
+import { OthersSection } from '@/app/components-homepage/OthersSection';
 import { useWorkspaceRouting } from '@/app/components-homepage/useWorkspaceRouting';
 
-export default function HomeShell() {
+export default function OtherModulesPage() {
   const { isAuthenticated, taskManagerHref } = useWorkspaceRouting();
-
   const workspaceLabel = isAuthenticated ? 'Workspace' : 'Login';
 
   return (
@@ -18,10 +15,11 @@ export default function HomeShell() {
         workspaceHref={taskManagerHref}
         workspaceLabel={workspaceLabel}
         othersHref="/other-modules"
+        isOthersActive
       />
-      <Hero taskManagerHref={taskManagerHref} />
-      <LogoTicker />
-      <FeatureSteps />
+      <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef6ff_100%)] pt-20 md:pt-[5.5rem]">
+        <OthersSection taskManagerHref={taskManagerHref} className="pt-10 pb-24 md:pt-12 md:pb-24" />
+      </main>
       <Footer taskManagerHref={taskManagerHref} />
     </>
   );
