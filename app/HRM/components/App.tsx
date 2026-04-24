@@ -10,6 +10,7 @@ import RegularizeAttendance from './views/RegularizeAttendance';
 import Salary from './views/Salary';
 import Tickets from './views/Tickets';
 import Expenses from './views/Expenses';
+import OrganizationChart from './views/admin/OrganizationChart';
 import { ShellSkeleton } from './ui/Skeleton';
 import { createClient } from '@/utils/supabase/client';
 
@@ -83,6 +84,7 @@ export default function App() {
     'regularize-attendance': <RegularizeAttendance />,
     tickets: <Tickets variant="employee" />,
     expenses: <Expenses variant="employee" />,
+    'organization-chart': <OrganizationChart apiPath="/HRM/api/employee/organization-chart" />,
     leave: <Leave />,
     salary: <Salary employee={employee} />,
     profile: <Profile employee={employee} />,
@@ -102,7 +104,7 @@ export default function App() {
         isLoggingOut={isLoggingOut}
       />
       
-      <div className="flex-1 flex flex-col ml-64">
+      <div className="flex-1 flex min-w-0 flex-col ml-64">
         <main className="flex-1 relative px-5 pt-6 pb-8 pr-8 lg:px-6 lg:pr-10 lg:pt-6">
           {Object.entries(tabViews).map(([tabId, view]) => {
             if (!visitedTabs[tabId]) {

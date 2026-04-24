@@ -8,13 +8,12 @@ import { createClient } from '@/utils/supabase/client';
 // We will import the actual views here once they are created
 import AdminDashboard from './views/admin/AdminDashboard';
 import PayoutsPayroll from './views/admin/PayoutsPayroll';
-import EmployeeList from './views/admin/EmployeeList';
-import DetailedEmployeeProfile from './views/admin/DetailedEmployeeProfile';
-import AddEmployee from './views/admin/AddEmployee';
 import EmployeeAnalytics from './views/admin/EmployeeAnalytics';
 import RegularizationInbox from './views/admin/RegularizationInbox';
 import HolidayManager from './views/admin/HolidayManager';
 import LeaveManagement from './views/admin/LeaveManagement';
+import EmployeeDirectoryWorkspace from './views/admin/EmployeeDirectoryWorkspace';
+import OrganizationChart from './views/admin/OrganizationChart';
 import Tickets from './views/Tickets';
 import Expenses from './views/Expenses';
 import { ShellSkeleton } from './ui/Skeleton';
@@ -90,25 +89,37 @@ export default function AdminApp() {
   const tabViews: Record<string, React.ReactNode> = {
     'admin-dashboard': <AdminDashboard admin={admin} setCurrentTab={setCurrentTab} />,
     'admin-employee-list': (
-      <EmployeeList
+      <EmployeeDirectoryWorkspace
+        currentTab={currentTab}
         setCurrentTab={setCurrentTab}
+        selectedEmployeeId={selectedEmployeeId}
         setSelectedEmployeeId={setSelectedEmployeeId}
       />
     ),
     'admin-payouts': <PayoutsPayroll />,
     'admin-analytics': <EmployeeAnalytics />,
+    'admin-organization-chart': <OrganizationChart />,
     'admin-regularization': <RegularizationInbox />,
     'admin-tickets': <Tickets variant="admin" />,
     'admin-expenses': <Expenses variant="admin" />,
     'admin-leaves': <LeaveManagement />,
     'admin-holidays': <HolidayManager />,
     'admin-employee-profile': (
-      <DetailedEmployeeProfile
-        employeeId={selectedEmployeeId}
+      <EmployeeDirectoryWorkspace
+        currentTab={currentTab}
         setCurrentTab={setCurrentTab}
+        selectedEmployeeId={selectedEmployeeId}
+        setSelectedEmployeeId={setSelectedEmployeeId}
       />
     ),
-    'admin-add-employee': <AddEmployee setCurrentTab={setCurrentTab} />,
+    'admin-add-employee': (
+      <EmployeeDirectoryWorkspace
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+        selectedEmployeeId={selectedEmployeeId}
+        setSelectedEmployeeId={setSelectedEmployeeId}
+      />
+    ),
   };
 
   if (isBootstrapping) {

@@ -234,6 +234,18 @@ function formatReportingTarget(employee: any) {
   return employee?.reporting_manager_name || 'Not assigned';
 }
 
+function formatEducationLevelLabel(value?: string | null) {
+  const normalized = String(value || '').trim();
+  if (!normalized) return 'Education Record';
+  if (normalized === '10th' || normalized === '12th') return normalized;
+
+  return normalized
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function normalizeEmployeeToForm(employee: any) {
   const access = Array.isArray(employee?.module_access) ? employee.module_access[0] : employee?.module_access;
 
@@ -340,9 +352,13 @@ function SectionShell({
 export default function DetailedEmployeeProfile({
   employeeId,
   setCurrentTab,
+  embedded = false,
+  onBack,
 }: {
   employeeId?: string | null;
   setCurrentTab?: (tab: string) => void;
+  embedded?: boolean;
+  onBack?: () => void;
 }) {
   const [employee, setEmployee] = useState<any>(null);
   const [form, setForm] = useState(defaultForm);
@@ -356,6 +372,8 @@ export default function DetailedEmployeeProfile({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('personal');
+  const [pendingStatusAction, setPendingStatusAction] = useState<string | null>(null);
+  const [feedbackModal, setFeedbackModal] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -411,6 +429,16 @@ export default function DetailedEmployeeProfile({
       active = false;
     };
   }, [employeeId]);
+
+  useEffect(() => {
+    if (!message) return;
+    setFeedbackModal({ type: 'success', text: message });
+  }, [message]);
+
+  useEffect(() => {
+    if (!error) return;
+    setFeedbackModal({ type: 'error', text: error });
+  }, [error]);
 
   const reportingManagerOptions = useMemo(() => {
     return (meta.employees || []).filter((item: any) => item.id !== employee?.id);
@@ -543,10 +571,8 @@ export default function DetailedEmployeeProfile({
     }
   }
 
-  async function handleStatusUpdate(nextStatus: string) {
+  async function applyStatusUpdate(nextStatus: string) {
     if (!employee?.id) return;
-    const confirmed = window.confirm(`Mark this employee as ${formatStatus(nextStatus)}?`);
-    if (!confirmed) return;
 
     try {
       setSaving(true);
@@ -578,7 +604,13 @@ export default function DetailedEmployeeProfile({
       setError(requestError?.message || 'Failed to update employee status');
     } finally {
       setSaving(false);
+      setPendingStatusAction(null);
     }
+  }
+
+  function handleStatusUpdate(nextStatus: string) {
+    if (!employee?.id || saving) return;
+    setPendingStatusAction(nextStatus);
   }
 
   async function handleDelete() {
@@ -771,7 +803,7 @@ export default function DetailedEmployeeProfile({
             <input name="emergencyContactNumber" value={form.emergencyContactNumber} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
           </Field>
           <div className="md:col-span-2 xl:col-span-3 mt-2">
-            <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-low px-5 py-5">
+            <div className="rounded-[1.2rem] border border-slate-200 bg-white px-5 py-5">
               <p className="text-sm font-bold text-on-surface">Current Address</p>
               <p className="mt-1 text-xs text-on-surface-variant">Primary address used for present communication.</p>
               <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -799,7 +831,7 @@ export default function DetailedEmployeeProfile({
             </div>
           </div>
           <div className="md:col-span-2 xl:col-span-3">
-            <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-low px-5 py-5">
+            <div className="rounded-[1.2rem] border border-slate-200 bg-white px-5 py-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-bold text-on-surface">Permanent Address</p>
@@ -1016,40 +1048,86 @@ export default function DetailedEmployeeProfile({
     );
   }
 
+  function renderEducationSection() {
+    const educationRows = Array.isArray(employee?.education) ? employee.education : [];
+
+    return (
+      <SectionShell
+        title="Educational Details"
+        subtitle="Academic qualifications and educational records saved for this employee."
+      >
+        {educationRows.length === 0 ? (
+          <div className="rounded-[1.25rem] border border-slate-200 bg-white px-6 py-10 text-center text-sm text-on-surface-variant">
+            No educational details have been added for this employee yet.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {educationRows.map((entry: any, index: number) => (
+              <div
+                key={entry.id || `${entry.education_level || 'education'}-${index}`}
+                className="rounded-[1.4rem] border border-slate-200 bg-white p-6"
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                      {formatEducationLevelLabel(entry.education_level)}
+                    </p>
+                    <h3 className="mt-2 text-xl font-bold text-on-surface">
+                      {entry.institution_name || 'Institution not provided'}
+                    </h3>
+                    <p className="mt-1 text-sm text-on-surface-variant">
+                      {entry.board_university || 'Board / University not provided'}
+                    </p>
+                  </div>
+
+                  {entry.file_url ? (
+                    <a
+                      href={entry.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                      View File
+                    </a>
+                  ) : null}
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Specialization</p>
+                    <p className="mt-2 text-sm font-semibold text-on-surface">{entry.specialization || '--'}</p>
+                  </div>
+                  <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Passing Year</p>
+                    <p className="mt-2 text-sm font-semibold text-on-surface">{entry.passing_year || '--'}</p>
+                  </div>
+                  <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Score</p>
+                    <p className="mt-2 text-sm font-semibold text-on-surface">{entry.score || '--'}</p>
+                  </div>
+                  <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Updated</p>
+                    <p className="mt-2 text-sm font-semibold text-on-surface">
+                      {toDisplayDate(entry.updated_at || entry.created_at)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionShell>
+    );
+  }
+
   function renderDocumentsSection() {
     return (
       <SectionShell
-        title="Documents & Record Snapshot"
-        subtitle="See all required document slots and upload, replace, or delete files from one simple panel."
+        title="Documents"
+        subtitle="Keep each employee document in a simple card and replace files when needed."
       >
-        <div className="space-y-5">
-          <div className="rounded-[1.75rem] border border-outline-variant/10 bg-white/85 p-6 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.35)] backdrop-blur">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary/75">Employee Documents</p>
-                <h3 className="mt-2 text-2xl font-bold text-on-surface">All required employee documents</h3>
-                <p className="mt-2 text-sm text-on-surface-variant">
-                  Every required document stays visible here, including missing ones, so HR can upload or replace them anytime.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3 lg:min-w-[360px] lg:grid-cols-3">
-                <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Uploaded</p>
-                  <p className="mt-2 text-lg font-bold text-on-surface">{documentSummary.totalDocuments}</p>
-                </div>
-                <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Storage</p>
-                  <p className="mt-2 text-lg font-bold text-on-surface">{documentSummary.totalSizeLabel}</p>
-                </div>
-                <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 col-span-2 lg:col-span-1">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Latest Update</p>
-                  <p className="mt-2 text-lg font-bold text-on-surface">{documentSummary.latestUpdatedLabel}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {documentSlots.map((slot) => {
               const item = slot.document;
               const isBusy = activeDocumentType === slot.key;
@@ -1058,61 +1136,37 @@ export default function DetailedEmployeeProfile({
               return (
                 <div
                   key={slot.key}
-                  className="rounded-[1.5rem] border border-outline-variant/10 bg-white p-5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.18)]"
+                  className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${hasDocument ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center text-slate-500">
                         <span className="material-symbols-outlined text-[24px]">
                           {getDocumentIcon(slot.key, item?.file_name)}
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex rounded-full bg-primary/8 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-primary">
-                            {slot.label}
-                          </span>
-                          <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${hasDocument ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-amber-200 bg-amber-50 text-amber-700'}`}>
-                            {hasDocument ? 'Uploaded' : 'Missing'}
-                          </span>
-                        </div>
-                        <h4 className="mt-3 break-words text-lg font-bold text-on-surface">
-                          {item?.file_name || 'No file uploaded yet'}
-                        </h4>
-                        <p className="mt-1 text-sm text-on-surface-variant">
-                          {hasDocument
-                            ? `Updated ${toDisplayDate(item.updated_at || item.created_at)}`
-                            : 'Upload this required document for the employee record.'}
+                        <p className="text-sm font-bold text-on-surface">{slot.label}</p>
+                        <p className={`mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${hasDocument ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {hasDocument ? 'Available' : 'Missing'}
+                        </p>
+                        <p className="mt-2 truncate text-xs text-on-surface-variant">
+                          {hasDocument ? item?.file_name || 'Uploaded file' : 'Upload a file for this document slot.'}
                         </p>
                       </div>
                     </div>
-                    {hasDocument ? (
-                      <a
-                        href={item.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-outline-variant/10 bg-surface-container-lowest text-on-surface-variant transition hover:border-primary/20 hover:text-primary"
-                      >
-                        <span className="material-symbols-outlined">open_in_new</span>
-                      </a>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-surface-container-lowest px-4 py-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">File Size</p>
-                      <p className="mt-1 text-sm font-semibold text-on-surface">{hasDocument ? formatFileSize(item.file_size) : '--'}</p>
-                    </div>
-                    <div className="rounded-2xl bg-surface-container-lowest px-4 py-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Updated</p>
-                      <p className="mt-1 text-sm font-semibold text-on-surface">
+                    <div className="shrink-0 text-right">
+                      <p className="text-[11px] font-semibold text-on-surface-variant">
+                        {hasDocument ? formatFileSize(item.file_size) : '--'}
+                      </p>
+                      <p className="mt-1 text-[11px] text-on-surface-variant">
                         {hasDocument ? toDisplayDate(item.updated_at || item.created_at) : '--'}
                       </p>
                     </div>
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-4">
-                    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-dashed border-outline-variant/20 bg-white px-4 py-3 text-sm font-semibold text-on-surface">
+                  <div className="mt-4 flex flex-col gap-2">
+                    <label className="flex min-w-0 max-w-[260px] cursor-pointer items-center justify-between gap-3 rounded-md border border-dashed border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-on-surface">
                       <span className="truncate">
                         {slot.selectedFile?.name || (hasDocument ? 'Choose new file to replace' : 'Choose file to upload')}
                       </span>
@@ -1123,62 +1177,31 @@ export default function DetailedEmployeeProfile({
                         onChange={(event) => handleDocumentFileChange(slot.key, event.target.files?.[0] || null)}
                       />
                     </label>
-
-                    <div className="mt-4 flex flex-wrap gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {hasDocument ? (
+                        <a
+                          href={item.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                          View
+                        </a>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => handleDocumentUpload(slot.key)}
                         disabled={isBusy || !slot.selectedFile}
-                        className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {isBusy ? 'Saving...' : hasDocument ? 'Replace' : 'Upload'}
+                        {isBusy ? 'Updating...' : hasDocument ? 'Update' : 'Upload'}
                       </button>
-                      {hasDocument ? (
-                        <button
-                          type="button"
-                          onClick={() => handleDocumentDelete(slot.key)}
-                          disabled={isBusy}
-                          className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Delete
-                        </button>
-                      ) : null}
                     </div>
                   </div>
                 </div>
               );
             })}
-          </div>
-
-          <div className="rounded-[1.75rem] border border-outline-variant/10 bg-white/85 p-6 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.3)] backdrop-blur">
-            <h3 className="text-lg font-bold text-on-surface">Quick Facts</h3>
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest px-4 py-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Created On</p>
-                <p className="mt-2 text-base font-semibold text-on-surface">{toDisplayDate(employee?.created_at)}</p>
-              </div>
-              <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest px-4 py-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Last Updated</p>
-                <p className="mt-2 text-base font-semibold text-on-surface">{toDisplayDate(employee?.updated_at)}</p>
-              </div>
-              <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest px-4 py-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Working Days</p>
-                <p className="mt-2 text-base font-semibold text-on-surface">
-                  {Array.isArray(employee?.working_days) && employee.working_days.length
-                    ? employee.working_days.join(', ')
-                    : '--'}
-                </p>
-              </div>
-              <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest px-4 py-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Document Count</p>
-                <p className="mt-2 text-base font-semibold text-on-surface">{documentSummary.totalDocuments}</p>
-              </div>
-              <div className="rounded-[1.5rem] border border-outline-variant/10 bg-surface-container-lowest px-4 py-4 sm:col-span-2">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Employee UUID</p>
-                <p className="mt-2 break-all text-sm font-medium text-on-surface">{employee?.id || '--'}</p>
-              </div>
-            </div>
-          </div>
         </div>
       </SectionShell>
     );
@@ -1187,18 +1210,24 @@ export default function DetailedEmployeeProfile({
   const sections = [
     { id: 'personal', label: 'Personal Details' },
     { id: 'professional', label: 'Professional Details' },
+    { id: 'education', label: 'Educational Details' },
     { id: 'identity', label: 'Identity & Finance' },
     { id: 'documents', label: 'Documents' },
   ];
+  const activeSectionIndex = Math.max(
+    sections.findIndex((section) => section.id === activeSection),
+    0
+  );
 
   let mainSection = renderPersonalSection();
   if (activeSection === 'professional') mainSection = renderProfessionalSection();
+  if (activeSection === 'education') mainSection = renderEducationSection();
   if (activeSection === 'identity') mainSection = renderIdentityFinanceSection();
   if (activeSection === 'documents') mainSection = renderDocumentsSection();
 
   if (loading) {
     return (
-      <div className="p-10 w-full">
+      <div className={`${embedded ? 'w-full' : 'p-10 w-full'}`}>
         <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest px-8 py-20 text-center text-on-surface-variant shadow-sm">
           Loading employee profile...
         </div>
@@ -1208,50 +1237,55 @@ export default function DetailedEmployeeProfile({
 
   if (!employeeId || !employee) {
     return (
-      <div className="p-10 w-full">
+      <div className={`${embedded ? 'w-full' : 'p-10 w-full'}`}>
         <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest px-8 py-20 text-center shadow-sm">
           <p className="text-2xl font-bold text-on-surface">Select an employee from the directory</p>
           <p className="mt-3 text-on-surface-variant">The detailed HR profile will open here for view, edit, status change, and record management.</p>
-          <button
-            type="button"
-            onClick={() => setCurrentTab?.('admin-employee-list')}
-            className="mt-8 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-on-primary"
-          >
-            Back to Employee Directory
-          </button>
+          {embedded ? null : (
+            <button
+              type="button"
+              onClick={() => setCurrentTab?.('admin-employee-list')}
+              className="mt-8 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-on-primary"
+            >
+              Back to Employee Directory
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-10 pb-14 w-full space-y-8">
-      <section className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest px-8 py-8 shadow-sm">
-        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-8">
-          <div className="flex flex-col lg:flex-row gap-6 lg:items-center">
-            <button type="button" onClick={() => setCurrentTab?.('admin-employee-list')} className="flex h-12 w-12 items-center justify-center rounded-2xl border border-outline-variant/10 bg-surface text-on-surface-variant transition hover:border-primary/20 hover:text-primary">
-              <span className="material-symbols-outlined">arrow_back</span>
-            </button>
-            <div className="flex flex-col md:flex-row md:items-center gap-5">
+    <div className={`${embedded ? 'w-full space-y-6' : 'p-10 pb-14 w-full space-y-8'}`}>
+      <section className="rounded-[1.6rem] border border-outline-variant/10 bg-surface-container-lowest px-7 py-6 shadow-sm">
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col md:flex-row md:items-center gap-5">
+            <div className="shrink-0">
               {employee.profile_picture_url ? (
-                <Image src={employee.profile_picture_url} alt={employee.name || 'Employee'} width={112} height={112} className="h-28 w-28 rounded-[2rem] object-cover border border-outline-variant/10 shadow-sm" unoptimized />
+                <Image src={employee.profile_picture_url} alt={employee.name || 'Employee'} width={156} height={156} className="h-[136px] w-[136px] rounded-[1.35rem] object-cover border border-slate-300 shadow-[0_10px_24px_rgba(15,23,42,0.08)]" unoptimized />
               ) : (
-                <div className="flex h-28 w-28 items-center justify-center rounded-[2rem] bg-primary text-3xl font-extrabold text-on-primary shadow-lg shadow-primary/15">
+                <div className="flex h-[136px] w-[136px] items-center justify-center rounded-[1.35rem] border border-slate-300 bg-primary text-4xl font-extrabold text-on-primary shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
                   {getInitials(employee.name)}
                 </div>
               )}
-              <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-4xl font-extrabold tracking-tight text-on-surface">{employee.employee_id || '--'} - {employee.name || 'Employee'}</h1>
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${statusTone(employee.resolved_employment_lifecycle_status || employee.employment_lifecycle_status)}`}>
-                    {formatStatus(employee.resolved_employment_lifecycle_status || employee.employment_lifecycle_status)}
-                  </span>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-3">
                   {(employee.resolved_current_stage || employee.current_stage) && (employee.resolved_current_stage || employee.current_stage) !== 'none' ? (
-                    <span className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${stageTone(employee.resolved_current_stage || employee.current_stage)}`}>
+                    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${stageTone(employee.resolved_current_stage || employee.current_stage)}`}>
                       {formatStatus(employee.resolved_current_stage || employee.current_stage)}
                     </span>
                   ) : null}
                 </div>
+                <h1 className="text-[1.75rem] font-extrabold tracking-tight text-on-surface md:text-[1.9rem]">
+                  {employee.name || 'Employee'}
+                  <span className="ml-3 inline-flex align-middle rounded-full bg-surface-container-low px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-on-surface-variant">
+                    {employee.employee_id || '--'}
+                  </span>
+                </h1>
+              </div>
+              <div className="space-y-2.5">
                 <p className="text-lg font-semibold text-primary">
                   {employee.resolved_designation_title || employee.designation?.title || 'Designation not set'}
                   <span className="mx-2 text-on-surface-variant/40">|</span>
@@ -1261,52 +1295,180 @@ export default function DetailedEmployeeProfile({
                   <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-base">call</span>{employee.resolved_phone_number || employee.phone || employee.mobile_phone || '--'}</span>
                   <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-base">mail</span>{employee.email || '--'}</span>
                   <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-base">account_tree</span>{formatReportingTarget(employee)}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-on-surface-variant">
                   <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-base">location_on</span>{[employee.city, employee.state].filter(Boolean).join(', ') || '--'}</span>
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${statusTone(employee.resolved_employment_lifecycle_status || employee.employment_lifecycle_status)}`}>
+                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                    {formatStatus(employee.resolved_employment_lifecycle_status || employee.employment_lifecycle_status)}
+                  </span>
                 </div>
                 <p className="text-sm text-on-surface-variant">Created by <span className="font-semibold text-on-surface">{employee.created_by_name || 'HR Admin'}</span><span className="mx-2">•</span>Last updated {toDisplayDate(employee.updated_at)}</p>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            {isEditing ? (
-              <>
-                <button type="button" onClick={() => {
-                  const nextForm = normalizeEmployeeToForm(employee);
-                  setForm(nextForm);
-                  setSameAsCurrentAddress(isPermanentAddressSameAsCurrent(nextForm));
-                  setIsEditing(false);
-                  setError('');
-                  setMessage('');
-                }} className="rounded-2xl border border-outline-variant/15 bg-white px-5 py-3 text-sm font-bold text-on-surface">
-                  Cancel
+          <div className="w-full xl:w-auto xl:ml-auto">
+            <div className="flex flex-col items-stretch gap-1.5 xl:min-w-[148px]">
+              {embedded ? (
+                <button type="button" onClick={() => onBack?.()} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
+                  <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+                  Back
                 </button>
-                <button type="button" onClick={handleSave} disabled={saving} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 disabled:cursor-not-allowed disabled:opacity-60">
-                  {saving ? 'Saving...' : 'Save Changes'}
+              ) : (
+                <button type="button" onClick={() => setCurrentTab?.('admin-employee-list')} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
+                  <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+                  Directory
                 </button>
-              </>
-            ) : (
-              <button type="button" onClick={() => setIsEditing(true)} className="rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20">
-                Edit Employee
+              )}
+              {isEditing ? (
+                <>
+                  <button type="button" onClick={() => {
+                    const nextForm = normalizeEmployeeToForm(employee);
+                    setForm(nextForm);
+                    setSameAsCurrentAddress(isPermanentAddressSameAsCurrent(nextForm));
+                    setIsEditing(false);
+                    setError('');
+                    setMessage('');
+                  }} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
+                    <span className="material-symbols-outlined text-[14px]">close</span>
+                    Cancel
+                  </button>
+                  <button type="button" onClick={handleSave} disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                    <span className="material-symbols-outlined text-[14px]">save</span>
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={() => setIsEditing(true)} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
+                  <span className="material-symbols-outlined text-[14px]">edit_square</span>
+                  Edit Employee
+                </button>
+              )}
+              <button type="button" onClick={() => handleStatusUpdate('inactive')} disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50 disabled:opacity-60">
+                <span className="material-symbols-outlined text-[14px]">pause_circle</span>
+                Mark Inactive
               </button>
-            )}
-            <button type="button" onClick={() => handleStatusUpdate('inactive')} disabled={saving} className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-bold text-amber-700 disabled:opacity-60">Mark Inactive</button>
-            <button type="button" onClick={() => handleStatusUpdate('terminated')} disabled={saving} className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-bold text-rose-700 disabled:opacity-60">Terminate</button>
-            <button type="button" onClick={handleDelete} disabled={saving} className="rounded-2xl border border-outline-variant/15 bg-white px-5 py-3 text-sm font-bold text-on-surface-variant disabled:opacity-60">Delete</button>
+              <button type="button" onClick={() => handleStatusUpdate('terminated')} disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50 disabled:opacity-60">
+                <span className="material-symbols-outlined text-[14px]">block</span>
+                Terminate
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="flex gap-3 overflow-x-auto rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest px-5 py-4 shadow-sm">
-        {sections.map((section) => (
-          <button key={section.id} type="button" onClick={() => setActiveSection(section.id)} className={`whitespace-nowrap rounded-2xl px-5 py-3 text-sm font-bold transition ${activeSection === section.id ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' : 'bg-surface text-on-surface-variant hover:text-on-surface'}`}>
-            {section.label}
-          </button>
-        ))}
+      <div className="overflow-x-auto">
+        <div
+          className="relative inline-grid min-w-[900px] rounded-full bg-surface-container-low/70 p-1"
+          style={{ gridTemplateColumns: `repeat(${sections.length}, minmax(0, 1fr))` }}
+        >
+          <div
+            className="absolute inset-y-1 rounded-full bg-white shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition-all duration-300 ease-out"
+            style={{
+              width: `calc(${100 / sections.length}% - 0.4rem)`,
+              transform: `translateX(calc(${activeSectionIndex * 100}% + ${activeSectionIndex * (0.4 / sections.length)}rem + 0.2rem))`,
+            }}
+          />
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => setActiveSection(section.id)}
+              className={`relative z-10 whitespace-nowrap rounded-full px-5 py-3 text-sm font-semibold transition ${
+                activeSection === section.id ? 'text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              {section.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {message && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-700">{message}</div>}
-      {error && <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">{error}</div>}
+      {pendingStatusAction ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-[1.75rem] border border-outline-variant/10 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+            <div className="flex items-start gap-4">
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+                pendingStatusAction === 'terminated' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+              }`}>
+                <span className="material-symbols-outlined text-[22px]">
+                  {pendingStatusAction === 'terminated' ? 'warning' : 'pause_circle'}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Confirm Status Change</p>
+                <h3 className="mt-2 text-xl font-bold text-on-surface">
+                  Mark this employee as {formatStatus(pendingStatusAction)}?
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+                  Please confirm again before we update the employee lifecycle status. This action will immediately change the employee record.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingStatusAction(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => applyStatusUpdate(pendingStatusAction)}
+                disabled={saving}
+                className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                  pendingStatusAction === 'terminated'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-amber-500 hover:bg-amber-600'
+                }`}
+              >
+                {saving ? 'Updating...' : `Yes, mark as ${formatStatus(pendingStatusAction)}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {feedbackModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20 px-4 backdrop-blur-[1px]">
+          <div className="w-full max-w-sm rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
+            <div className="flex items-start gap-4">
+              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                feedbackModal.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-rose-50 text-rose-700'
+              }`}>
+                <span className="material-symbols-outlined text-[20px]">
+                  {feedbackModal.type === 'success' ? 'check_circle' : 'error'}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-lg font-bold text-on-surface">
+                  {feedbackModal.type === 'success' ? 'Updated Successfully' : 'Update Failed'}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-on-surface-variant">{feedbackModal.text}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setFeedbackModal(null);
+                  setMessage('');
+                  setError('');
+                }}
+                className="rounded-md border border-black bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-8 items-start">
         <div>{mainSection}</div>

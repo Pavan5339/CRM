@@ -79,6 +79,7 @@ export default function Sidebar({ currentTab, setCurrentTab, employee, onLogout,
     { id: 'regularize-attendance', label: 'Regularization', icon: 'edit_calendar' },
     { id: 'tickets', label: 'Tickets', icon: 'support_agent' },
     { id: 'expenses', label: 'Expenses', icon: 'receipt_long' },
+    { id: 'organization-chart', label: 'Organization Chart', icon: 'account_tree' },
     { id: 'leave', label: 'Leave', icon: 'event_busy' },
     { id: 'salary', label: 'Salary', icon: 'payments' },
     { id: 'profile', label: 'Profile', icon: 'person' },
@@ -117,7 +118,7 @@ export default function Sidebar({ currentTab, setCurrentTab, employee, onLogout,
   };
 
   return (
-    <aside className="h-screen w-60 fixed left-0 top-0 overflow-hidden bg-surface-container-low flex flex-col py-5 pr-4 z-50">
+    <aside className="subtle-scrollbar fixed left-0 top-0 z-50 flex h-screen w-60 flex-col overflow-y-auto bg-surface-container-low py-5 pr-4">
       <div className="px-6 mb-6">
         <div className="flex flex-col items-center text-center">
           <Image

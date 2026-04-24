@@ -425,6 +425,7 @@ type AddEmployeeProps = {
   metaUrl?: string;
   submitUrl?: string;
   publicMode?: boolean;
+  embedded?: boolean;
 };
 
 export default function AddEmployee({
@@ -432,6 +433,7 @@ export default function AddEmployee({
   metaUrl = '/HRM/api/employees?includeMeta=1',
   submitUrl = '/HRM/api/employees',
   publicMode = false,
+  embedded = false,
 }: AddEmployeeProps) {
   const [form, setForm] = useState<FormState>(defaultFormState);
   const [sameAsCurrentAddress, setSameAsCurrentAddress] = useState(false);
@@ -1060,43 +1062,76 @@ export default function AddEmployee({
   };
 
   return (
-    <div className="p-10 pb-16">
+    <div className={embedded ? 'p-7 pb-10' : 'p-10 pb-16'}>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <section className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-on-surface-variant">
-              {publicMode ? 'Public Employee Intake' : 'Directory / Add New Employee'}
-            </p>
-            <h1 className="mt-3 text-5xl font-extrabold tracking-tight text-on-surface">
-              {publicMode ? 'Employee Information Form' : 'Add New Employee'}
-            </h1>
-            <p className="mt-3 max-w-3xl text-lg text-on-surface-variant">
-              {publicMode
-                ? 'Fill all employee details, upload documents, and submit your information directly into the employee database.'
-                : 'HR creates the employee, login credentials, master employee record, education, experience, and document access from one form.'}
-            </p>
-          </div>
+        {embedded ? (
+          <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
+                Employee Intake Form
+              </p>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
+                HR creates the employee, login credentials, master employee record, education, experience, and documents from one place.
+              </p>
+            </div>
 
-          <div className="flex gap-4">
-            {setCurrentTab ? (
+            <div className="flex gap-4">
+              {setCurrentTab ? (
+                <button
+                  type="button"
+                  onClick={() => setCurrentTab('admin-employee-list')}
+                  className="rounded-2xl border border-outline-variant/15 bg-surface px-6 py-3 text-sm font-bold text-on-surface"
+                >
+                  Cancel
+                </button>
+              ) : null}
               <button
-                type="button"
-                onClick={() => setCurrentTab('admin-employee-list')}
-                className="rounded-2xl border border-outline-variant/15 bg-surface px-6 py-3 text-sm font-bold text-on-surface"
+                type="submit"
+                form="add-employee-form"
+                disabled={submitting}
+                className="rounded-2xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Cancel
+                {submitting ? 'Saving Employee...' : 'Save Employee'}
               </button>
-            ) : null}
-            <button
-              type="submit"
-              form="add-employee-form"
-              disabled={submitting}
-              className="rounded-2xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {submitting ? 'Saving Employee...' : 'Save Employee'}
-            </button>
-          </div>
-        </section>
+            </div>
+          </section>
+        ) : (
+          <section className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.3em] text-on-surface-variant">
+                {publicMode ? 'Public Employee Intake' : 'Directory / Add New Employee'}
+              </p>
+              <h1 className="mt-3 text-5xl font-extrabold tracking-tight text-on-surface">
+                {publicMode ? 'Employee Information Form' : 'Add New Employee'}
+              </h1>
+              <p className="mt-3 max-w-3xl text-lg text-on-surface-variant">
+                {publicMode
+                  ? 'Fill all employee details, upload documents, and submit your information directly into the employee database.'
+                  : 'HR creates the employee, login credentials, master employee record, education, experience, and document access from one form.'}
+              </p>
+            </div>
+
+            <div className="flex gap-4">
+              {setCurrentTab ? (
+                <button
+                  type="button"
+                  onClick={() => setCurrentTab('admin-employee-list')}
+                  className="rounded-2xl border border-outline-variant/15 bg-surface px-6 py-3 text-sm font-bold text-on-surface"
+                >
+                  Cancel
+                </button>
+              ) : null}
+              <button
+                type="submit"
+                form="add-employee-form"
+                disabled={submitting}
+                className="rounded-2xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {submitting ? 'Saving Employee...' : 'Save Employee'}
+              </button>
+            </div>
+          </section>
+        )}
 
         {loadingMeta && (
           <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">

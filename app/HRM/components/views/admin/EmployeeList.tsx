@@ -55,9 +55,17 @@ function formatReportingTarget(employee: any) {
 export default function EmployeeList({
   setCurrentTab,
   setSelectedEmployeeId,
+  hideHeader = false,
+  onAddEmployee,
+  selectedEmployeeId,
+  onEmployeeSelect,
 }: {
   setCurrentTab?: (tab: string) => void;
   setSelectedEmployeeId?: (employeeId: string) => void;
+  hideHeader?: boolean;
+  onAddEmployee?: () => void;
+  selectedEmployeeId?: string | null;
+  onEmployeeSelect?: (employeeId: string) => void;
 }) {
   const [employees, setEmployees] = useState<any[]>([]);
   const [designations, setDesignations] = useState<any[]>([]);
@@ -186,36 +194,45 @@ export default function EmployeeList({
 
   return (
     <div className="w-full space-y-6 p-7 pb-10">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100/90 text-violet-700 shadow-sm">
-              <span className="material-symbols-outlined text-[22px]">groups</span>
+      {hideHeader ? null : (
+        <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100/90 text-violet-700 shadow-sm">
+                <span className="material-symbols-outlined text-[22px]">groups</span>
+              </div>
+              <h1 className="text-3xl font-headline font-bold text-on-background">Employee Directory</h1>
             </div>
-            <h1 className="text-3xl font-headline font-bold text-on-background">Employee Directory</h1>
+            <p className="pl-14 text-sm leading-6 text-on-surface-variant">
+              {filteredEmployees.length} of {employees.length} total employees
+            </p>
           </div>
-          <p className="pl-14 text-sm leading-6 text-on-surface-variant">
-            {filteredEmployees.length} of {employees.length} total employees
-          </p>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={loadEmployees}
-            className="rounded-2xl border border-outline-variant/15 bg-white px-4 py-2.5 text-sm font-bold text-on-surface-variant"
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={() => setCurrentTab?.('admin-add-employee')}
-            className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary shadow-lg shadow-primary/20"
-          >
-            Add New Employee
-          </button>
-        </div>
-      </section>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={loadEmployees}
+              className="rounded-2xl border border-outline-variant/15 bg-white px-4 py-2.5 text-sm font-bold text-on-surface-variant"
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (onAddEmployee) {
+                  onAddEmployee();
+                  return;
+                }
+
+                setCurrentTab?.('admin-add-employee');
+              }}
+              className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary shadow-lg shadow-primary/20"
+            >
+              Add New Employee
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="grid grid-cols-1 gap-3 xl:grid-cols-[1.7fr_1fr_1fr_0.85fr]">
         <input
@@ -288,9 +305,16 @@ export default function EmployeeList({
                 filteredEmployees.map((employee) => (
                   <tr
                     key={employee.id}
-                    className="cursor-pointer hover:bg-surface-container-low/20 transition-colors"
+                    className={`cursor-pointer transition-colors hover:bg-surface-container-low/20 ${
+                      selectedEmployeeId === employee.id ? 'bg-violet-50/70' : ''
+                    }`}
                     onClick={() => {
                       setSelectedEmployeeId?.(employee.id);
+                      if (onEmployeeSelect) {
+                        onEmployeeSelect(employee.id);
+                        return;
+                      }
+
                       setCurrentTab?.('admin-employee-profile');
                     }}
                   >

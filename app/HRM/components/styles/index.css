@@ -65,3 +65,25 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.subtle-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 96, 98, 0.18) transparent;
+}
+
+.subtle-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.subtle-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.subtle-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(90, 96, 98, 0.18);
+  border-radius: 999px;
+}
+
+.subtle-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 96, 98, 0.24);
+}

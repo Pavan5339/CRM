@@ -28,6 +28,7 @@ export default function AdminSidebar({
   const navItems = [
     { id: 'admin-dashboard', label: 'Admin Dashboard', icon: 'admin_panel_settings' },
     { id: 'admin-employee-list', label: 'Employee Directory', icon: 'groups' },
+    { id: 'admin-organization-chart', label: 'Organization Chart', icon: 'account_tree' },
     { id: 'admin-holidays', label: 'Holiday', icon: 'calendar_month' },
     { id: 'admin-leaves', label: 'Leave', icon: 'event_busy' },
     { id: 'admin-regularization', label: 'Regularization', icon: 'fact_check' },
@@ -38,7 +39,7 @@ export default function AdminSidebar({
   ];
 
   return (
-    <aside className="fixed left-0 top-0 z-50 flex h-screen w-60 flex-col overflow-y-auto border-r border-outline-variant/15 bg-[#EEF2F5] py-6 pr-4">
+    <aside className="subtle-scrollbar fixed left-0 top-0 z-50 flex h-screen w-60 flex-col overflow-y-auto border-r border-outline-variant/15 bg-[#EEF2F5] py-6 pr-4">
       <div className="mb-8 px-6 text-center">
         <h1 className="text-2xl font-extrabold tracking-tight text-on-background font-headline">HR Admin</h1>
       </div>
