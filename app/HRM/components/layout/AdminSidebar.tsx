@@ -31,6 +31,8 @@ export default function AdminSidebar({
     { id: 'admin-holidays', label: 'Holiday', icon: 'calendar_month' },
     { id: 'admin-leaves', label: 'Leave', icon: 'event_busy' },
     { id: 'admin-regularization', label: 'Regularization', icon: 'fact_check' },
+    { id: 'admin-tickets', label: 'Tickets', icon: 'support_agent' },
+    { id: 'admin-expenses', label: 'Expense Review', icon: 'receipt_long' },
     { id: 'admin-payouts', label: 'Payouts & Payroll', icon: 'account_balance_wallet' },
     { id: 'admin-analytics', label: 'Analytics', icon: 'insights' },
   ];

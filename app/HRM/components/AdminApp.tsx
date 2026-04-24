@@ -15,6 +15,8 @@ import EmployeeAnalytics from './views/admin/EmployeeAnalytics';
 import RegularizationInbox from './views/admin/RegularizationInbox';
 import HolidayManager from './views/admin/HolidayManager';
 import LeaveManagement from './views/admin/LeaveManagement';
+import Tickets from './views/Tickets';
+import Expenses from './views/Expenses';
 import { ShellSkeleton } from './ui/Skeleton';
 
 export default function AdminApp() {
@@ -96,6 +98,8 @@ export default function AdminApp() {
     'admin-payouts': <PayoutsPayroll />,
     'admin-analytics': <EmployeeAnalytics />,
     'admin-regularization': <RegularizationInbox />,
+    'admin-tickets': <Tickets variant="admin" />,
+    'admin-expenses': <Expenses variant="admin" />,
     'admin-leaves': <LeaveManagement />,
     'admin-holidays': <HolidayManager />,
     'admin-employee-profile': (

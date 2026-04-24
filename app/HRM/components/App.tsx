@@ -8,6 +8,8 @@ import Leave from './views/Leave';
 import Attendance from './views/Attendance';
 import RegularizeAttendance from './views/RegularizeAttendance';
 import Salary from './views/Salary';
+import Tickets from './views/Tickets';
+import Expenses from './views/Expenses';
 import { ShellSkeleton } from './ui/Skeleton';
 import { createClient } from '@/utils/supabase/client';
 
@@ -79,6 +81,8 @@ export default function App() {
     home: <Dashboard employee={employee} setCurrentTab={setCurrentTab} onLogout={handleLogout} isLoggingOut={isLoggingOut} />,
     attendance: <Attendance onOpenRegularizeAttendance={() => setCurrentTab('regularize-attendance')} />,
     'regularize-attendance': <RegularizeAttendance />,
+    tickets: <Tickets variant="employee" />,
+    expenses: <Expenses variant="employee" />,
     leave: <Leave />,
     salary: <Salary employee={employee} />,
     profile: <Profile employee={employee} />,
