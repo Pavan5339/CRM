@@ -962,6 +962,7 @@ CREATE TABLE IF NOT EXISTS "public"."tasks" (
     "rating" smallint,
     "frequency" "text",
     "last_cycle_reset" timestamp with time zone,
+    "created_by_employee_id" "uuid",
     CONSTRAINT "tasks_frequency_check" CHECK (("frequency" = ANY (ARRAY['weekly'::"text", 'monthly'::"text", 'yearly'::"text"]))),
     CONSTRAINT "tasks_priority_check" CHECK (("priority" = ANY (ARRAY['low'::"text", 'medium'::"text", 'high'::"text"]))),
     CONSTRAINT "tasks_progress_percentage_range" CHECK ((("progress_percentage" >= 0) AND ("progress_percentage" <= 100))),
@@ -1114,6 +1115,9 @@ CREATE INDEX "idx_task_assignments_employee_assigned_at" ON "public"."task_assig
 
 
 CREATE INDEX "idx_task_assignments_task_id" ON "public"."task_assignments" USING "btree" ("task_id");
+
+
+CREATE INDEX "idx_tasks_created_by_employee_id" ON "public"."tasks" USING "btree" ("created_by_employee_id");
 
 
 
@@ -1277,6 +1281,10 @@ ALTER TABLE ONLY "public"."task_subtasks"
 
 ALTER TABLE ONLY "public"."tasks"
     ADD CONSTRAINT "tasks_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "auth"."users"("id");
+
+
+ALTER TABLE ONLY "public"."tasks"
+    ADD CONSTRAINT "tasks_created_by_employee_id_fkey" FOREIGN KEY ("created_by_employee_id") REFERENCES "public"."employees"("id") ON DELETE SET NULL;
 
 
 
@@ -1898,8 +1906,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
-
-
 
 
 

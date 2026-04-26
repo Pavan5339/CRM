@@ -15,6 +15,7 @@ export default function CreateTask({ onCancel }) {
   const [priority, setPriority] = useState('medium');
   const [frequency, setFrequency] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [dueTime, setDueTime] = useState('');
   const [assignees, setAssignees] = useState([]);
 
   const [checklist, setChecklist] = useState([{ title: '', assignedEmployeeId: '' }]);
@@ -210,13 +211,8 @@ export default function CreateTask({ onCancel }) {
           month: 'short',
           year: 'numeric',
         }),
-        dueDate: dueDate
-          ? new Date(dueDate).toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })
-          : 'TBD',
+        dueDate,
+        dueTime,
         completedSubtasks: 0,
         totalSubtasks: cleanedChecklist.length,
         assignees,
@@ -370,7 +366,7 @@ export default function CreateTask({ onCancel }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Priority</label>
             <select
@@ -390,6 +386,16 @@ export default function CreateTask({ onCancel }) {
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Due Time</label>
+            <input
+              type="time"
+              value={dueTime}
+              onChange={(e) => setDueTime(e.target.value)}
+              disabled={!dueDate}
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-[#7F40EE] outline-none text-slate-700 disabled:bg-slate-50 disabled:text-slate-400"
             />
           </div>
           <div>
