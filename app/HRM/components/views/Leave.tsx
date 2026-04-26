@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
+import { useHrmFeedback } from '../ui/HrmFeedback';
 
 type LeaveType = {
   id: string;
@@ -88,10 +89,10 @@ function getStatusPill(status: string) {
 }
 
 export default function Leave() {
+  const { showFeedback } = useHrmFeedback();
   const [data, setData] = useState<LeaveResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [form, setForm] = useState({
     leaveTypeId: '',
     session: 'full_day',
@@ -108,7 +109,7 @@ export default function Leave() {
     return map;
   }, [data]);
 
-  async function loadLeaveData() {
+  const loadLeaveData = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch('/HRM/api/leaves', { method: 'GET' });
@@ -116,34 +117,32 @@ export default function Leave() {
 
       if (!response.ok) {
         setData(null);
-        setFeedback({ type: 'error', message: result.error || 'Failed to load leave data.' });
+        showFeedback({ type: 'error', title: 'Leave Data Not Loaded', message: result.error || 'Failed to load leave data.' });
         return;
       }
 
       setData(result);
-      setFeedback(null);
       setForm((current) => ({
         ...current,
         leaveTypeId: current.leaveTypeId || result.leaveTypes?.[0]?.id || '',
       }));
     } catch {
       setData(null);
-      setFeedback({ type: 'error', message: 'Failed to load leave data.' });
+      showFeedback({ type: 'error', title: 'Leave Data Not Loaded', message: 'Failed to load leave data.' });
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [showFeedback]);
 
   useEffect(() => {
     loadLeaveData();
-  }, []);
+  }, [loadLeaveData]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSubmitting) return;
 
     setIsSubmitting(true);
-    setFeedback(null);
 
     try {
       const response = await fetch('/HRM/api/leaves', {
@@ -154,11 +153,11 @@ export default function Leave() {
 
       const result = await response.json();
       if (!response.ok) {
-        setFeedback({ type: 'error', message: result.error || 'Failed to submit leave request.' });
+        showFeedback({ type: 'error', title: 'Leave Request Not Submitted', message: result.error || 'Failed to submit leave request.' });
         return;
       }
 
-      setFeedback({ type: 'success', message: result.message || 'Leave request submitted successfully.' });
+      showFeedback({ type: 'success', title: 'Leave Request Submitted', message: result.message || 'Leave request submitted successfully.' });
       setForm((current) => ({
         ...current,
         startDate: '',
@@ -167,7 +166,7 @@ export default function Leave() {
       }));
       await loadLeaveData();
     } catch {
-      setFeedback({ type: 'error', message: 'Failed to submit leave request.' });
+      showFeedback({ type: 'error', title: 'Leave Request Not Submitted', message: 'Failed to submit leave request.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -250,14 +249,6 @@ export default function Leave() {
               </p>
             </div>
           </div>
-
-          {feedback ? (
-            <div className={`mb-5 rounded-2xl px-4 py-3 text-sm ${
-              feedback.type === 'success' ? 'bg-secondary-container/60 text-on-secondary-container' : 'bg-error-container/60 text-on-error-container'
-            }`}>
-              {feedback.message}
-            </div>
-          ) : null}
 
           {data?.setupPending ? (
             <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">

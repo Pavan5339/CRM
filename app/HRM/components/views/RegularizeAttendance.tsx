@@ -13,6 +13,7 @@ import {
   type RegularizationStatusItem,
 } from './attendanceShared';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
+import { useHrmFeedback } from '../ui/HrmFeedback';
 
 type RegularizationTab = 'apply' | 'pending' | 'history';
 
@@ -144,6 +145,7 @@ function StatusTable({
 }
 
 export default function RegularizeAttendance() {
+  const { showFeedback } = useHrmFeedback();
   const [activeMonth, setActiveMonth] = useState(() => new Date());
   const [activeTab, setActiveTab] = useState<RegularizationTab>('apply');
   const [draftsByDate, setDraftsByDate] = useState<Record<string, DraftState>>({});
@@ -280,27 +282,27 @@ export default function RegularizeAttendance() {
 
   const submitRegularization = async () => {
     if (!selectedDay) {
-      window.alert('Select a date that is eligible for regularization.');
+      showFeedback({ type: 'warning', title: 'Select Eligible Date', message: 'Select a date that is eligible for regularization.' });
       return;
     }
 
     if (!draft.primaryHrApproverId) {
-      window.alert('Select one HR approver before submitting.');
+      showFeedback({ type: 'warning', title: 'Approver Required', message: 'Select one HR approver before submitting.' });
       return;
     }
 
     if (!draft.reason.trim()) {
-      window.alert('Reason for regularization is required.');
+      showFeedback({ type: 'warning', title: 'Reason Required', message: 'Reason for regularization is required.' });
       return;
     }
 
     if (!draft.requestType) {
-      window.alert('Select the request type you want to apply for.');
+      showFeedback({ type: 'warning', title: 'Request Type Required', message: 'Select the request type you want to apply for.' });
       return;
     }
 
     if (!draft.requestedCheckIn || !draft.requestedCheckOut) {
-      window.alert('Requested check-in and check-out time are required.');
+      showFeedback({ type: 'warning', title: 'Time Required', message: 'Requested check-in and check-out time are required.' });
       return;
     }
 
@@ -323,7 +325,7 @@ export default function RegularizeAttendance() {
 
       const result = await response.json();
       if (!response.ok) {
-        window.alert(result.error || 'Failed to submit regularization request.');
+        showFeedback({ type: 'error', title: 'Request Not Submitted', message: result.error || 'Failed to submit regularization request.' });
         return;
       }
 
@@ -334,8 +336,9 @@ export default function RegularizeAttendance() {
       });
       window.dispatchEvent(new CustomEvent(ATTENDANCE_SYNC_EVENT));
       setActiveTab('history');
+      showFeedback({ type: 'success', title: 'Request Submitted', message: 'Regularization request submitted successfully.' });
     } catch {
-      window.alert('Failed to submit regularization request.');
+      showFeedback({ type: 'error', title: 'Request Not Submitted', message: 'Failed to submit regularization request.' });
     } finally {
       setIsSubmitting(false);
     }

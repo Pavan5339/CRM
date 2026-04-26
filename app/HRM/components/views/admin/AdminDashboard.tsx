@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Download } from 'lucide-react';
+import { useHrmFeedback } from '../../ui/HrmFeedback';
 
 function getInitials(name = '') {
   return String(name)
@@ -125,6 +126,7 @@ function MetricCard({ title, value, subtitle, icon, tone }) {
 }
 
 export default function AdminDashboard({ admin, setCurrentTab }) {
+  const { showFeedback } = useHrmFeedback();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -240,7 +242,11 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
       link.remove();
       URL.revokeObjectURL(downloadUrl);
     } catch (downloadError) {
-      window.alert(downloadError?.message || 'Unable to download the birthday card right now.');
+      showFeedback({
+        type: 'error',
+        title: 'Download Failed',
+        message: downloadError?.message || 'Unable to download the birthday card right now.',
+      });
     } finally {
       setIsDownloadingBirthdayCard(false);
     }

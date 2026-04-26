@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useHrmFeedback } from '../../ui/HrmFeedback';
 
 type InboxTab = 'pending' | 'history';
 
@@ -31,6 +32,7 @@ function statusTone(status: AdminRegularizationItem['status']) {
 }
 
 export default function RegularizationInbox() {
+  const { showFeedback } = useHrmFeedback();
   const [activeTab, setActiveTab] = useState<InboxTab>('pending');
   const [pendingForMe, setPendingForMe] = useState<AdminRegularizationItem[]>([]);
   const [history, setHistory] = useState<AdminRegularizationItem[]>([]);
@@ -72,7 +74,7 @@ export default function RegularizationInbox() {
     approvalOutcome?: 'full_day' | 'half_day'
   ) => {
     if (!id) {
-      window.alert('This request is missing its id, so it cannot be reviewed yet.');
+      showFeedback({ type: 'warning', title: 'Request Missing', message: 'This request is missing its id, so it cannot be reviewed yet.' });
       return;
     }
 
@@ -93,8 +95,9 @@ export default function RegularizationInbox() {
 
       await loadInbox();
       window.dispatchEvent(new CustomEvent('hrm-attendance-updated'));
+      showFeedback({ type: 'success', title: 'Request Reviewed', message: 'Regularization request reviewed successfully.' });
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to review request');
+      showFeedback({ type: 'error', title: 'Review Failed', message: requestError instanceof Error ? requestError.message : 'Failed to review request' });
     } finally {
       setIsReviewingId('');
     }

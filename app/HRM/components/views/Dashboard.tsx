@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { AttendanceRecord, AttendanceResponse } from './attendanceShared';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
+import { useHrmFeedback } from '../ui/HrmFeedback';
 
 type HolidayItem = {
   id: string;
@@ -176,6 +177,7 @@ export default function Dashboard({
   onLogout?: () => Promise<void>;
   isLoggingOut?: boolean;
 }) {
+  const { showFeedback } = useHrmFeedback();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isSwipesModalOpen, setIsSwipesModalOpen] = useState(false);
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
@@ -556,7 +558,11 @@ export default function Dashboard({
       const result = await response.json();
 
       if (!response.ok) {
-        window.alert(result.error || 'Unable to update attendance right now.');
+        showFeedback({
+          type: 'warning',
+          title: 'Attendance Not Marked',
+          message: result.error || 'Unable to update attendance right now.',
+        });
         return;
       }
 
@@ -564,7 +570,11 @@ export default function Dashboard({
       setTodayAction(result.action === 'checked_in' ? 'check_out' : 'check_in');
       window.dispatchEvent(new CustomEvent('hrm-attendance-updated'));
     } catch {
-      window.alert('Unable to update attendance right now.');
+      showFeedback({
+        type: 'error',
+        title: 'Attendance Not Updated',
+        message: 'Unable to update attendance right now.',
+      });
     } finally {
       setIsAttendanceUpdating(false);
     }

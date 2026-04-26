@@ -17,6 +17,7 @@ import OrganizationChart from './views/admin/OrganizationChart';
 import Tickets from './views/Tickets';
 import Expenses from './views/Expenses';
 import { ShellSkeleton } from './ui/Skeleton';
+import { HrmFeedbackProvider } from './ui/HrmFeedback';
 
 export default function AdminApp() {
   const searchParams = useSearchParams();
@@ -127,7 +128,8 @@ export default function AdminApp() {
   }
 
   return (
-    <div className="flex min-h-screen bg-surface">
+    <HrmFeedbackProvider>
+      <div className="flex min-h-screen bg-surface">
       <AdminSidebar
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
@@ -156,6 +158,7 @@ export default function AdminApp() {
           ) : null}
         </main>
       </div>
-    </div>
+      </div>
+    </HrmFeedbackProvider>
   );
 }

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
+import { useHrmFeedback } from '../ui/HrmFeedback';
 
 interface SidebarProps {
   currentTab: string;
@@ -21,6 +22,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ currentTab, setCurrentTab, employee, onLogout, isLoggingOut = false }: SidebarProps) {
+  const { showFeedback } = useHrmFeedback();
   const [isTogglingAttendance, setIsTogglingAttendance] = useState(false);
   const [attendanceActionLabel, setAttendanceActionLabel] = useState<'Check In' | 'Check Out'>('Check In');
   const displayName = employee?.name || employee?.employee_id || 'Employee';
@@ -104,14 +106,22 @@ export default function Sidebar({ currentTab, setCurrentTab, employee, onLogout,
       const result = await response.json();
 
       if (!response.ok) {
-        window.alert(result.error || 'Unable to update attendance right now.');
+        showFeedback({
+          type: 'warning',
+          title: 'Attendance Not Marked',
+          message: result.error || 'Unable to update attendance right now.',
+        });
         return;
       }
 
       setAttendanceActionLabel(result.action === 'checked_in' ? 'Check Out' : 'Check In');
       window.dispatchEvent(new CustomEvent('hrm-attendance-updated'));
     } catch {
-      window.alert('Unable to update attendance right now.');
+      showFeedback({
+        type: 'error',
+        title: 'Attendance Not Updated',
+        message: 'Unable to update attendance right now.',
+      });
     } finally {
       setIsTogglingAttendance(false);
     }

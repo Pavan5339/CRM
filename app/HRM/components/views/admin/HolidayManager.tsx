@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useHrmFeedback } from '../../ui/HrmFeedback';
 
 type HolidayRow = {
   id: string;
@@ -28,20 +29,18 @@ function formatHolidayTypeLabel(type: string) {
 }
 
 export default function HolidayManager() {
+  const { showFeedback, confirmFeedback } = useHrmFeedback();
   const [holidays, setHolidays] = useState<HolidayRow[]>([]);
   const [form, setForm] = useState(defaultForm);
   const [editingId, setEditingId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
 
     async function loadHolidays() {
       setLoading(true);
-      setError('');
 
       try {
         const response = await fetch('/HRM/api/admin/holidays', { method: 'GET' });
@@ -56,7 +55,7 @@ export default function HolidayManager() {
         }
       } catch (requestError) {
         if (active) {
-          setError(requestError instanceof Error ? requestError.message : 'Failed to load holidays');
+          showFeedback({ type: 'error', title: 'Holidays Not Loaded', message: requestError instanceof Error ? requestError.message : 'Failed to load holidays' });
         }
       } finally {
         if (active) {
@@ -69,7 +68,7 @@ export default function HolidayManager() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [showFeedback]);
 
   const nextSerialRows = useMemo(
     () => holidays.map((holiday, index) => ({ ...holiday, serialNumber: index + 1 })),
@@ -84,8 +83,6 @@ export default function HolidayManager() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
-    setMessage('');
-    setError('');
 
     try {
       const endpoint = editingId ? `/HRM/api/admin/holidays/${editingId}` : '/HRM/api/admin/holidays';
@@ -112,10 +109,14 @@ export default function HolidayManager() {
 
         return [...current, nextHoliday].sort((left, right) => left.date.localeCompare(right.date));
       });
-      setMessage(editingId ? 'Holiday updated successfully.' : 'Holiday added successfully.');
+      showFeedback({
+        type: 'success',
+        title: editingId ? 'Holiday Updated' : 'Holiday Added',
+        message: editingId ? 'Holiday updated successfully.' : 'Holiday added successfully.',
+      });
       resetForm();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Failed to save holiday');
+      showFeedback({ type: 'error', title: 'Holiday Not Saved', message: requestError instanceof Error ? requestError.message : 'Failed to save holiday' });
     } finally {
       setSaving(false);
     }
@@ -128,13 +129,16 @@ export default function HolidayManager() {
       holidayName: holiday.name,
       holidayType: holiday.type || 'company',
     });
-    setMessage('');
-    setError('');
   };
 
   const handleDelete = async (holidayId: string) => {
-    setMessage('');
-    setError('');
+    const confirmed = await confirmFeedback({
+      type: 'warning',
+      title: 'Delete Holiday',
+      message: 'Delete this holiday from the calendar?',
+      confirmLabel: 'Delete Holiday',
+    });
+    if (!confirmed) return;
 
     try {
       const response = await fetch(`/HRM/api/admin/holidays/${holidayId}`, { method: 'DELETE' });
@@ -148,9 +152,9 @@ export default function HolidayManager() {
       if (editingId === holidayId) {
         resetForm();
       }
-      setMessage('Holiday deleted successfully.');
+      showFeedback({ type: 'success', title: 'Holiday Deleted', message: 'Holiday deleted successfully.' });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Failed to delete holiday');
+      showFeedback({ type: 'error', title: 'Holiday Not Deleted', message: requestError instanceof Error ? requestError.message : 'Failed to delete holiday' });
     }
   };
 
@@ -170,18 +174,6 @@ export default function HolidayManager() {
             </p>
           </div>
         </section>
-
-        {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-4 text-sm font-medium text-red-700">
-            {error}
-          </div>
-        )}
-
-        {message && (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-medium text-emerald-700">
-            {message}
-          </div>
-        )}
 
         <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">

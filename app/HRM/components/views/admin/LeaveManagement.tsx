@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useHrmFeedback } from '../../ui/HrmFeedback';
 
 type LeaveAdminItem = {
   id: string;
@@ -77,41 +78,39 @@ type BalanceSummaryRow = {
 };
 
 export default function LeaveManagement() {
+  const { showFeedback } = useHrmFeedback();
   const [data, setData] = useState<LeaveAdminResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [feedback, setFeedback] = useState<string>('');
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [activeActionId, setActiveActionId] = useState<string>('');
   const [activeSection, setActiveSection] = useState<'pending' | 'history' | 'balances'>('pending');
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch('/HRM/api/admin/leaves', { method: 'GET' });
       const result = await response.json();
       if (!response.ok) {
         setData(null);
-        setFeedback(result.error || 'Failed to load leave inbox.');
+        showFeedback({ type: 'error', title: 'Leave Inbox Not Loaded', message: result.error || 'Failed to load leave inbox.' });
         return;
       }
       setData(result);
-      setFeedback('');
     } catch {
       setData(null);
-      setFeedback('Failed to load leave inbox.');
+      showFeedback({ type: 'error', title: 'Leave Inbox Not Loaded', message: 'Failed to load leave inbox.' });
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [showFeedback]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   async function reviewRequest(id: string, action: 'approve' | 'reject') {
     try {
       setActiveActionId(id);
-      setFeedback('');
       const response = await fetch(`/HRM/api/admin/leaves/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -119,13 +118,13 @@ export default function LeaveManagement() {
       });
       const result = await response.json();
       if (!response.ok) {
-        setFeedback(result.error || 'Failed to review leave request.');
+        showFeedback({ type: 'error', title: 'Leave Review Failed', message: result.error || 'Failed to review leave request.' });
         return;
       }
-      setFeedback(result.message || 'Leave request updated.');
+      showFeedback({ type: 'success', title: 'Leave Request Updated', message: result.message || 'Leave request updated.' });
       await loadData();
     } catch {
-      setFeedback('Failed to review leave request.');
+      showFeedback({ type: 'error', title: 'Leave Review Failed', message: 'Failed to review leave request.' });
     } finally {
       setActiveActionId('');
     }
@@ -133,17 +132,16 @@ export default function LeaveManagement() {
 
   async function syncAccrual() {
     try {
-      setFeedback('');
       const response = await fetch('/HRM/api/admin/leaves/accrual', { method: 'POST' });
       const result = await response.json();
       if (!response.ok) {
-        setFeedback(result.error || 'Failed to sync leave accrual.');
+        showFeedback({ type: 'error', title: 'Leave Accrual Not Synced', message: result.error || 'Failed to sync leave accrual.' });
         return;
       }
-      setFeedback(result.message || 'Leave accrual synced.');
+      showFeedback({ type: 'success', title: 'Leave Accrual Synced', message: result.message || 'Leave accrual synced.' });
       await loadData();
     } catch {
-      setFeedback('Failed to sync leave accrual.');
+      showFeedback({ type: 'error', title: 'Leave Accrual Not Synced', message: 'Failed to sync leave accrual.' });
     }
   }
 
@@ -223,12 +221,6 @@ export default function LeaveManagement() {
           Sync Monthly Leave Credit
         </button>
       </div>
-
-      {feedback ? (
-        <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3 text-sm text-on-surface">
-          {feedback}
-        </div>
-      ) : null}
 
       {data?.setupPending ? (
         <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-4 py-3 text-sm text-on-surface">

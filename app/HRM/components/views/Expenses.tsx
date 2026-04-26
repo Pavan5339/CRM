@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import React, { useEffect, useMemo, useState } from 'react';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
+import { useHrmFeedback } from '../ui/HrmFeedback';
 import {
   type ExpenseClaimAttachment,
   type ExpenseClaimDetail,
@@ -325,6 +326,7 @@ function TimelineEntry({
 }
 
 export default function Expenses({ variant = 'employee' }: ExpensesProps) {
+  const { showFeedback } = useHrmFeedback();
   const isEmployeeView = variant === 'employee';
   const [listData, setListData] = useState<ExpenseListResponse | null>(null);
   const [reviewData, setReviewData] = useState<ExpenseReviewInboxResponse>(EMPTY_REVIEW_DATA);
@@ -539,17 +541,17 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
 
   const submitClaim = async () => {
     if (!listData?.actor?.canCreateClaims) {
-      window.alert('Only employees can submit expense claims.');
+      showFeedback({ type: 'warning', title: 'Cannot Submit Claim', message: 'Only employees can submit expense claims.' });
       return;
     }
 
     if (!draft.title.trim() || !draft.purpose.trim() || !draft.reviewerAuthUserId) {
-      window.alert('Complete the title, purpose, and reviewer before submitting.');
+      showFeedback({ type: 'warning', title: 'Claim Details Required', message: 'Complete the title, purpose, and reviewer before submitting.' });
       return;
     }
 
     if (!draft.items.length) {
-      window.alert('Add at least one expense item.');
+      showFeedback({ type: 'warning', title: 'Expense Item Required', message: 'Add at least one expense item.' });
       return;
     }
 
@@ -558,7 +560,7 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
     );
 
     if (invalidItem) {
-      window.alert('Each expense item needs a date, category, description, and amount.');
+      showFeedback({ type: 'warning', title: 'Expense Item Incomplete', message: 'Each expense item needs a date, category, description, and amount.' });
       return;
     }
 
@@ -604,11 +606,16 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
         throw new Error(result.error || 'Failed to submit expense claim.');
       }
 
+      const wasEditingClaim = Boolean(editingClaimId);
       resetDraft();
       setActiveSection('my-claims');
-      window.location.reload();
+      showFeedback({
+        type: 'success',
+        title: wasEditingClaim ? 'Expense Claim Updated' : 'Expense Claim Submitted',
+        message: wasEditingClaim ? 'Expense claim updated successfully.' : 'Expense claim submitted successfully.',
+      });
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to submit expense claim.');
+      showFeedback({ type: 'error', title: 'Expense Claim Not Submitted', message: requestError instanceof Error ? requestError.message : 'Failed to submit expense claim.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -618,7 +625,7 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
     if (!selectedClaimId) return;
 
     if ((action === 'rejected' || action === 'needs_changes') && !reviewNote.trim()) {
-      window.alert('Add a review note before sending this action.');
+      showFeedback({ type: 'warning', title: 'Review Note Required', message: 'Add a review note before sending this action.' });
       return;
     }
 
@@ -638,9 +645,9 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
       }
 
       resetDetail();
-      window.location.reload();
+      showFeedback({ type: 'success', title: 'Expense Claim Reviewed', message: 'Expense claim review submitted successfully.' });
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to review expense claim.');
+      showFeedback({ type: 'error', title: 'Expense Review Failed', message: requestError instanceof Error ? requestError.message : 'Failed to review expense claim.' });
     } finally {
       setIsReviewSubmitting(false);
     }

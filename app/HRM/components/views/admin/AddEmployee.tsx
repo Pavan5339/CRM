@@ -6,6 +6,7 @@ import {
   EMPLOYEE_TYPE_OPTIONS,
   EMPLOYMENT_LIFECYCLE_STATUS_OPTIONS,
 } from '@/utils/hrm-employment';
+import { useHrmFeedback } from '../../ui/HrmFeedback';
 
 type Option = {
   id: string;
@@ -435,6 +436,7 @@ export default function AddEmployee({
   publicMode = false,
   embedded = false,
 }: AddEmployeeProps) {
+  const { showFeedback } = useHrmFeedback();
   const [form, setForm] = useState<FormState>(defaultFormState);
   const [sameAsCurrentAddress, setSameAsCurrentAddress] = useState(false);
   const [workingDays, setWorkingDays] = useState<string[]>(WORKING_DAY_PRESETS[0].days);
@@ -454,22 +456,15 @@ export default function AddEmployee({
   const [superAdmins, setSuperAdmins] = useState<Option[]>([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
-  const [formError, setFormError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<ErrorMap>({});
   const [uploadErrors, setUploadErrors] = useState<ErrorMap>({});
   const [sectionErrors, setSectionErrors] = useState<SectionErrorMap>({});
-  const [submitErrorDetails, setSubmitErrorDetails] = useState<string[]>([]);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     async function loadMeta() {
       setLoadingMeta(true);
-      setFormError('');
-      setShowErrorModal(false);
 
       try {
         const response = await fetch(metaUrl);
@@ -505,9 +500,7 @@ export default function AddEmployee({
       } catch (requestError) {
         if (active) {
           const nextError = requestError instanceof Error ? requestError.message : 'Failed to load employee form data';
-          setFormError(nextError);
-          setSubmitErrorDetails([nextError]);
-          setShowErrorModal(true);
+          showFeedback({ type: 'error', title: 'Form Data Not Loaded', message: nextError });
         }
       } finally {
         if (active) {
@@ -520,7 +513,7 @@ export default function AddEmployee({
     return () => {
       active = false;
     };
-  }, [metaUrl]);
+  }, [metaUrl, showFeedback]);
 
   const filteredDesignations = useMemo(() => {
     const selectedDepartment = departments.find((department) => department.name === form.department);
@@ -558,13 +551,6 @@ export default function AddEmployee({
     });
   };
 
-  const clearSubmitState = () => {
-    setMessage('');
-    setFormError('');
-    setSubmitErrorDetails([]);
-    setShowErrorModal(false);
-  };
-
   const applyStructuredErrors = ({
     error,
     fieldErrors: nextFieldErrors = {},
@@ -578,12 +564,14 @@ export default function AddEmployee({
     sectionErrors?: SectionErrorMap;
     details?: string[];
   }) => {
-    setFormError(error);
     setFieldErrors(nextFieldErrors);
     setUploadErrors(nextUploadErrors);
     setSectionErrors(nextSectionErrors);
-    setSubmitErrorDetails(details.length ? details : [error]);
-    setShowErrorModal(true);
+    showFeedback({
+      type: 'error',
+      title: 'Save Error',
+      message: [error, ...(details.length ? details : [])].filter(Boolean).join('\n'),
+    });
   };
 
   const validateForm = () => {
@@ -778,7 +766,6 @@ export default function AddEmployee({
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, files } = event.target as HTMLInputElement;
-    clearSubmitState();
 
     if (name === 'profilePicture') {
       clearUploadError('profilePicture');
@@ -829,7 +816,6 @@ export default function AddEmployee({
   };
 
   const updateEducationEntry = (index: number, key: keyof EducationEntry, value: string | File | null) => {
-    clearSubmitState();
     if (key === 'file') {
       clearUploadError(`education_file_${index}`);
       clearSectionError('education');
@@ -851,7 +837,6 @@ export default function AddEmployee({
     key: keyof CertificationEntry,
     value: string | File | null
   ) => {
-    clearSubmitState();
     const targetIndex = certificationEntries.findIndex((entry) => entry.id === id);
     if (key === 'file' && targetIndex >= 0) {
       clearUploadError(`certification_file_${targetIndex}`);
@@ -887,7 +872,6 @@ export default function AddEmployee({
   };
 
   const handleDocumentChange = (type: string, file: File | null) => {
-    clearSubmitState();
     clearUploadError(`document_${type}`);
     clearSectionError('documents');
     setDocuments((current) => ({
@@ -923,23 +907,17 @@ export default function AddEmployee({
       experience_letter: null,
       salary_slip: null,
     });
-    setFormError('');
     setFieldErrors({});
     setUploadErrors({});
     setSectionErrors({});
-    setSubmitErrorDetails([]);
   };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitting(true);
-    setMessage('');
-    setFormError('');
     setFieldErrors({});
     setUploadErrors({});
     setSectionErrors({});
-    setSubmitErrorDetails([]);
-    setShowErrorModal(false);
 
     try {
       const validation = validateForm();
@@ -1047,8 +1025,13 @@ export default function AddEmployee({
         return;
       }
 
-      setMessage((typeof result?.message === 'string' && result.message) || 'Employee added successfully.');
-      setShowSuccessModal(true);
+      showFeedback({
+        type: 'success',
+        title: publicMode ? 'Form Submitted' : 'Employee Added',
+        message: publicMode
+          ? 'Your employee information has been submitted successfully.'
+          : ((typeof result?.message === 'string' && result.message) || 'Employee added successfully.'),
+      });
       resetForm();
     } catch (requestError) {
       const nextError = requestError instanceof Error ? requestError.message : 'We could not save the employee form right now. Please try again or contact HR.';
@@ -1136,12 +1119,6 @@ export default function AddEmployee({
         {loadingMeta && (
           <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">
             Loading employee form options...
-          </div>
-        )}
-
-        {formError && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-4 text-sm font-medium text-red-700">
-            {formError}
           </div>
         )}
 
@@ -1664,127 +1641,6 @@ export default function AddEmployee({
           </div>
         </form>
       </div>
-
-      {showSuccessModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-6 backdrop-blur-sm">
-          <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
-            <div className="flex flex-col items-center text-center">
-              <div className="relative mb-6 flex h-24 w-24 items-center justify-center">
-                <div className="absolute inset-1 rounded-full border-2 border-violet-500/20 animate-[pulseRing_1.8s_ease-out_infinite]" />
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-[3px] border-violet-600 bg-white shadow-[0_18px_40px_rgba(139,92,246,0.18)] animate-[modalIconIn_0.45s_ease-out]">
-                  <svg
-                    viewBox="0 0 52 52"
-                    className="h-11 w-11 text-violet-600"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M14 27.5L22.5 36L38.5 19"
-                      stroke="currentColor"
-                      strokeWidth="4.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="origin-center [stroke-dasharray:40] [stroke-dashoffset:40] animate-[dash_0.6s_ease-out_forwards_0.15s]"
-                    />
-                  </svg>
-                </div>
-              </div>
-
-              <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">
-                {publicMode ? 'Form Submitted' : 'Employee Added'}
-              </h2>
-              <p className="mt-3 text-base leading-7 text-slate-600 whitespace-nowrap">
-                {publicMode
-                  ? 'Your employee information has been submitted successfully.'
-                  : 'New employee has been added successfully.'}
-              </p>
-
-              <div className="mt-8 flex w-full flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => setShowSuccessModal(false)}
-                  className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-                >
-                  Add Another
-                </button>
-                {setCurrentTab ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSuccessModal(false);
-                      setCurrentTab('admin-employee-list');
-                    }}
-                    className="flex-1 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700"
-                  >
-                    View Employees
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowSuccessModal(false)}
-                    className="flex-1 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700"
-                  >
-                    Close
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showErrorModal && formError ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-6 backdrop-blur-sm">
-          <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-rose-200/80 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
-            <div className="flex flex-col items-center text-center">
-              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full border-[3px] border-rose-500 bg-rose-50 text-rose-600 shadow-[0_18px_40px_rgba(244,63,94,0.14)]">
-                <svg viewBox="0 0 24 24" className="h-10 w-10" fill="none" aria-hidden="true">
-                  <path
-                    d="M12 8v5"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="12" cy="16.5" r="1.2" fill="currentColor" />
-                  <path
-                    d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-
-              <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Save Error</h2>
-              <p className="mt-3 text-base leading-7 text-slate-600">
-                {formError}
-              </p>
-
-              {submitErrorDetails.length > 0 ? (
-                <div className="mt-6 w-full rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4 text-left">
-                  <p className="text-sm font-semibold text-rose-800">Please check these details:</p>
-                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-rose-700">
-                    {submitErrorDetails.map((detail, index) => (
-                      <li key={`${detail}-${index}`}>{detail}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              <div className="mt-8 flex w-full flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowErrorModal(false)}
-                  className="w-full rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition hover:bg-rose-700"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <style jsx>{`
         @keyframes dash {

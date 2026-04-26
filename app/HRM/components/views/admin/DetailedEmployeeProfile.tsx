@@ -9,6 +9,7 @@ import {
   formatEmploymentValue,
   getEmployeeTypeLabel,
 } from '@/utils/hrm-employment';
+import { useHrmFeedback } from '../../ui/HrmFeedback';
 
 const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENDER_OPTIONS = [
@@ -360,6 +361,7 @@ export default function DetailedEmployeeProfile({
   embedded?: boolean;
   onBack?: () => void;
 }) {
+  const { showFeedback, confirmFeedback } = useHrmFeedback();
   const [employee, setEmployee] = useState<any>(null);
   const [form, setForm] = useState(defaultForm);
   const [meta, setMeta] = useState<any>({ employees: [], departments: [], designations: [] });
@@ -372,8 +374,6 @@ export default function DetailedEmployeeProfile({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('personal');
-  const [pendingStatusAction, setPendingStatusAction] = useState<string | null>(null);
-  const [feedbackModal, setFeedbackModal] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -432,13 +432,13 @@ export default function DetailedEmployeeProfile({
 
   useEffect(() => {
     if (!message) return;
-    setFeedbackModal({ type: 'success', text: message });
-  }, [message]);
+    showFeedback({ type: 'success', title: 'Updated Successfully', message });
+  }, [message, showFeedback]);
 
   useEffect(() => {
     if (!error) return;
-    setFeedbackModal({ type: 'error', text: error });
-  }, [error]);
+    showFeedback({ type: 'error', title: 'Update Failed', message: error });
+  }, [error, showFeedback]);
 
   const reportingManagerOptions = useMemo(() => {
     return (meta.employees || []).filter((item: any) => item.id !== employee?.id);
@@ -604,18 +604,29 @@ export default function DetailedEmployeeProfile({
       setError(requestError?.message || 'Failed to update employee status');
     } finally {
       setSaving(false);
-      setPendingStatusAction(null);
     }
   }
 
-  function handleStatusUpdate(nextStatus: string) {
+  async function handleStatusUpdate(nextStatus: string) {
     if (!employee?.id || saving) return;
-    setPendingStatusAction(nextStatus);
+    const confirmed = await confirmFeedback({
+      type: nextStatus === 'terminated' ? 'warning' : 'info',
+      title: 'Confirm Status Change',
+      message: `Mark this employee as ${formatStatus(nextStatus)}? This action will immediately change the employee record.`,
+      confirmLabel: `Yes, mark as ${formatStatus(nextStatus)}`,
+    });
+    if (!confirmed) return;
+    await applyStatusUpdate(nextStatus);
   }
 
   async function handleDelete() {
     if (!employee?.id) return;
-    const confirmed = window.confirm('Delete this employee record permanently?');
+    const confirmed = await confirmFeedback({
+      type: 'warning',
+      title: 'Delete Employee Record',
+      message: 'Delete this employee record permanently?',
+      confirmLabel: 'Delete Employee',
+    });
     if (!confirmed) return;
 
     try {
@@ -694,7 +705,12 @@ export default function DetailedEmployeeProfile({
   async function handleDocumentDelete(documentType: string) {
     if (!employee?.id) return;
 
-    const confirmed = window.confirm('Delete this document? This will remove it from storage and the database.');
+    const confirmed = await confirmFeedback({
+      type: 'warning',
+      title: 'Delete Document',
+      message: 'Delete this document? This will remove it from storage and the database.',
+      confirmLabel: 'Delete Document',
+    });
     if (!confirmed) return;
 
     try {
@@ -1384,91 +1400,6 @@ export default function DetailedEmployeeProfile({
           ))}
         </div>
       </div>
-
-      {pendingStatusAction ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md rounded-[1.75rem] border border-outline-variant/10 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
-            <div className="flex items-start gap-4">
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
-                pendingStatusAction === 'terminated' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
-              }`}>
-                <span className="material-symbols-outlined text-[22px]">
-                  {pendingStatusAction === 'terminated' ? 'warning' : 'pause_circle'}
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Confirm Status Change</p>
-                <h3 className="mt-2 text-xl font-bold text-on-surface">
-                  Mark this employee as {formatStatus(pendingStatusAction)}?
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-                  Please confirm again before we update the employee lifecycle status. This action will immediately change the employee record.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setPendingStatusAction(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => applyStatusUpdate(pendingStatusAction)}
-                disabled={saving}
-                className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                  pendingStatusAction === 'terminated'
-                    ? 'bg-rose-600 hover:bg-rose-700'
-                    : 'bg-amber-500 hover:bg-amber-600'
-                }`}
-              >
-                {saving ? 'Updating...' : `Yes, mark as ${formatStatus(pendingStatusAction)}`}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {feedbackModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20 px-4 backdrop-blur-[1px]">
-          <div className="w-full max-w-sm rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
-            <div className="flex items-start gap-4">
-              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                feedbackModal.type === 'success'
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-rose-50 text-rose-700'
-              }`}>
-                <span className="material-symbols-outlined text-[20px]">
-                  {feedbackModal.type === 'success' ? 'check_circle' : 'error'}
-                </span>
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold text-on-surface">
-                  {feedbackModal.type === 'success' ? 'Updated Successfully' : 'Update Failed'}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-on-surface-variant">{feedbackModal.text}</p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setFeedbackModal(null);
-                  setMessage('');
-                  setError('');
-                }}
-                className="rounded-md border border-black bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-slate-50"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-8 items-start">
         <div>{mainSection}</div>

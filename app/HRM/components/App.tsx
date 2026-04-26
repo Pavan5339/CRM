@@ -12,6 +12,7 @@ import Tickets from './views/Tickets';
 import Expenses from './views/Expenses';
 import OrganizationChart from './views/admin/OrganizationChart';
 import { ShellSkeleton } from './ui/Skeleton';
+import { HrmFeedbackProvider } from './ui/HrmFeedback';
 import { createClient } from '@/utils/supabase/client';
 
 export default function App() {
@@ -95,7 +96,8 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-screen bg-surface">
+    <HrmFeedbackProvider>
+      <div className="flex min-h-screen bg-surface">
       <Sidebar
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
@@ -124,7 +126,8 @@ export default function App() {
           ) : null}
         </main>
       </div>
-    </div>
+      </div>
+    </HrmFeedbackProvider>
   );
 }
 

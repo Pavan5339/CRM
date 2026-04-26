@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
+import { useHrmFeedback } from '../ui/HrmFeedback';
 import type {
   TicketAttachment,
   TicketDetail,
@@ -361,6 +362,7 @@ function FileDropzone({
 }
 
 export default function Tickets({ variant = 'employee' }: { variant?: 'employee' | 'admin' }) {
+  const { showFeedback } = useHrmFeedback();
   const [activeSection, setActiveSection] = useState<TicketSection>('raise');
   const [data, setData] = useState<TicketListResponse | null>(null);
   const [selectedTicketId, setSelectedTicketId] = useState('');
@@ -426,7 +428,7 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
       if (!response.ok) throw new Error(result.error || 'Failed to load ticket detail.');
       setDetail(result.ticket || null);
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to load ticket detail.');
+      showFeedback({ type: 'error', title: 'Ticket Detail Not Loaded', message: requestError instanceof Error ? requestError.message : 'Failed to load ticket detail.' });
     }
   };
 
@@ -522,15 +524,15 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
 
   const handleCreateTicket = async () => {
     if (!subject.trim()) {
-      window.alert('Subject is required.');
+      showFeedback({ type: 'warning', title: 'Subject Required', message: 'Subject is required.' });
       return;
     }
     if (!description.trim()) {
-      window.alert('Description is required.');
+      showFeedback({ type: 'warning', title: 'Description Required', message: 'Description is required.' });
       return;
     }
     if (!ownerAuthUserId) {
-      window.alert('Select one owner.');
+      showFeedback({ type: 'warning', title: 'Owner Required', message: 'Select one owner.' });
       return;
     }
 
@@ -562,8 +564,9 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
       resetCreateForm();
       await loadTickets(false);
       setActiveSection('my');
+      showFeedback({ type: 'success', title: 'Ticket Created', message: 'Ticket created successfully.' });
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to create ticket.');
+      showFeedback({ type: 'error', title: 'Ticket Not Created', message: requestError instanceof Error ? requestError.message : 'Failed to create ticket.' });
     } finally {
       setIsSaving(false);
     }
@@ -587,8 +590,9 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
       if (!response.ok) throw new Error(result.error || 'Failed to update ticket.');
       await loadTickets(true);
       await loadTicketDetail(detail.id);
+      showFeedback({ type: 'success', title: 'Ticket Updated', message: 'Ticket status updated successfully.' });
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to update ticket.');
+      showFeedback({ type: 'error', title: 'Ticket Not Updated', message: requestError instanceof Error ? requestError.message : 'Failed to update ticket.' });
     } finally {
       setIsSaving(false);
     }
@@ -609,8 +613,9 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
       setShowCloseConfirm(false);
       await loadTickets(true);
       await loadTicketDetail(detail.id);
+      showFeedback({ type: 'success', title: 'Ticket Closed', message: 'Ticket closed successfully.' });
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to update ticket.');
+      showFeedback({ type: 'error', title: 'Ticket Not Updated', message: requestError instanceof Error ? requestError.message : 'Failed to update ticket.' });
     } finally {
       setIsSaving(false);
     }
@@ -630,8 +635,9 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
       if (!response.ok) throw new Error(result.error || 'Failed to update ticket.');
       await loadTickets(true);
       await loadTicketDetail(detail.id);
+      showFeedback({ type: 'success', title: 'Ticket Updated', message: 'Ticket details updated successfully.' });
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to update ticket.');
+      showFeedback({ type: 'error', title: 'Ticket Not Updated', message: requestError instanceof Error ? requestError.message : 'Failed to update ticket.' });
     } finally {
       setIsSaving(false);
     }
@@ -640,7 +646,7 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
   const handleAddComment = async () => {
     if (!detail?.id) return;
     if (!commentBody.trim() && commentFiles.length === 0) {
-      window.alert('Add a message or attach at least one file.');
+      showFeedback({ type: 'warning', title: 'Comment Required', message: 'Add a message or attach at least one file.' });
       return;
     }
 
@@ -662,8 +668,9 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
       setCommentFiles([]);
       await loadTickets(true);
       await loadTicketDetail(detail.id);
+      showFeedback({ type: 'success', title: 'Comment Added', message: 'Your ticket comment was added successfully.' });
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to add comment.');
+      showFeedback({ type: 'error', title: 'Comment Not Added', message: requestError instanceof Error ? requestError.message : 'Failed to add comment.' });
     } finally {
       setIsSaving(false);
     }
@@ -679,8 +686,9 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
       await loadTickets(true);
       await loadTicketDetail(detail.id);
       setActiveSection('assigned');
+      showFeedback({ type: 'success', title: 'Ticket Reopened', message: 'Ticket reopened successfully.' });
     } catch (requestError) {
-      window.alert(requestError instanceof Error ? requestError.message : 'Failed to reopen ticket.');
+      showFeedback({ type: 'error', title: 'Ticket Not Reopened', message: requestError instanceof Error ? requestError.message : 'Failed to reopen ticket.' });
     } finally {
       setIsSaving(false);
     }

@@ -12,6 +12,7 @@ import {
   listActiveLeaveTypes,
   syncEmployeeLeaveBalances,
 } from '@/utils/leave';
+import { syncPayrollLopEntriesForLeaveApproval } from '@/utils/payroll';
 
 async function requireHrAdminAccess() {
   const supabase = await createClient();
@@ -175,6 +176,16 @@ export async function PATCH(request, context) {
         note: `Loss of pay generated for request ${leaveRequest.id}.`,
       });
     }
+
+    await syncPayrollLopEntriesForLeaveApproval({
+      employeeId: employee.id,
+      leaveRequestId: leaveRequest.id,
+      workingDates: calculation.workingDates,
+      session: leaveRequest.applied_session || leaveRequest.session || 'full_day',
+      paidDays,
+      lopDays,
+      source: 'leave_request',
+    });
 
     await applyApprovedLeaveToAttendance({
       employeeId: employee.id,
