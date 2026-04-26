@@ -338,7 +338,10 @@ export function DataProvider({ children, initialUser = null, mode = 'employee', 
   };
 
   const addTask = async (newTask) => {
-    const dueDateISO = newTask?.dueDate ? new Date(newTask.dueDate).toISOString() : null;
+    const parsedDueDate = newTask?.dueDate ? new Date(newTask.dueDate) : null;
+    const dueDateISO = parsedDueDate && !Number.isNaN(parsedDueDate.getTime())
+      ? parsedDueDate.toISOString()
+      : null;
 
     const response = await fetch('/Taskmanager/api/tasks', {
       method: 'POST',
