@@ -1,10 +1,15 @@
 #!/bin/bash
 # Upload storage backup files to new Supabase project via REST API
-# Uses service role key for authentication
+# Requires a service role key via SUPABASE_SERVICE_ROLE_KEY.
 
 SUPABASE_URL="https://llfoaqnljjbneouiedbg.supabase.co"
-SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsZm9hcW5sampibmVvdWllZGJnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQwMjQ4MSwiZXhwIjoyMDkwOTc4NDgxfQ.lEC14skWd0bxtuGVPEX7PZaC5DsKTQx5f7dooh3VDTg"
+SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
 BACKUP_DIR="supabase/storage-backup"
+
+if [ -z "$SERVICE_ROLE_KEY" ]; then
+  echo "Error: set SUPABASE_SERVICE_ROLE_KEY before running this script." >&2
+  exit 1
+fi
 
 upload_file() {
   local local_path="$1"
