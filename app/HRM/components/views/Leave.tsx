@@ -2,7 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
+import HrmEmptyState from '../ui/HrmEmptyState';
 import { useHrmFeedback } from '../ui/HrmFeedback';
+import { MetricCardSkeleton, Skeleton, TableRowsSkeleton } from '../ui/Skeleton';
 
 type LeaveType = {
   id: string;
@@ -39,8 +41,18 @@ type LeaveHistoryItem = {
   lopDays: number;
   reviewNote: string;
   rejectionReason: string;
+  reviewedByRole?: string;
+  reviewedByName?: string;
+  reportingManagerId?: string;
+  reportingManagerName?: string;
   createdAt: string;
   reviewedAt: string;
+};
+
+type TeamLeaveItem = LeaveHistoryItem & {
+  employeeId: string;
+  employeeCode: string;
+  employeeName: string;
 };
 
 type LeaveResponse = {
@@ -53,6 +65,11 @@ type LeaveResponse = {
     sickAvailable: number;
   };
   history: LeaveHistoryItem[];
+  teamInbox?: {
+    isReportingManager: boolean;
+    pending: TeamLeaveItem[];
+    history: TeamLeaveItem[];
+  };
   year: number;
   setupPending?: boolean;
   error?: string;
@@ -93,6 +110,9 @@ export default function Leave() {
   const [data, setData] = useState<LeaveResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeMode, setActiveMode] = useState<'my_leave_manage' | 'team_leave_review'>('my_leave_manage');
+  const [teamReviewNotes, setTeamReviewNotes] = useState<Record<string, string>>({});
+  const [activeTeamActionId, setActiveTeamActionId] = useState('');
   const [form, setForm] = useState({
     leaveTypeId: '',
     session: 'full_day',
@@ -108,6 +128,12 @@ export default function Leave() {
     });
     return map;
   }, [data]);
+
+  const canManageTeamLeaves = Boolean(
+    data?.teamInbox?.isReportingManager ||
+    (data?.teamInbox?.pending || []).length ||
+    (data?.teamInbox?.history || []).length
+  );
 
   const loadLeaveData = useCallback(async () => {
     try {
@@ -172,6 +198,53 @@ export default function Leave() {
     }
   }
 
+  async function handleTeamReview(id: string, action: 'approve' | 'reject') {
+    if (activeTeamActionId) return;
+
+    setActiveTeamActionId(id);
+    try {
+      const response = await fetch(`/HRM/api/leaves/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          reviewNote: teamReviewNotes[id] || '',
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        showFeedback({
+          type: 'error',
+          title: 'Team Leave Review Failed',
+          message: result.error || 'Failed to review team leave request.',
+        });
+        return;
+      }
+
+      showFeedback({
+        type: 'success',
+        title: 'Team Leave Updated',
+        message: result.message || 'Team leave request updated successfully.',
+      });
+
+      setTeamReviewNotes((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      await loadLeaveData();
+    } catch {
+      showFeedback({
+        type: 'error',
+        title: 'Team Leave Review Failed',
+        message: 'Failed to review team leave request.',
+      });
+    } finally {
+      setActiveTeamActionId('');
+    }
+  }
+
   const kpiItems = [
     {
       label: 'Casual Leave',
@@ -204,6 +277,42 @@ export default function Leave() {
         description="Apply for leave, monitor monthly balances, and review approvals in a cleaner employee workflow."
       />
 
+      <section className="overflow-x-auto">
+        <div
+          className="relative inline-grid min-w-full grid-cols-2 items-center overflow-hidden rounded-[1.35rem] bg-[#F1F4F5] p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.05)] md:min-w-[520px]"
+        >
+          <div
+            className="absolute inset-y-1.5 left-1.5 rounded-[1rem] bg-[linear-gradient(180deg,#eadcff_0%,#cfbdfd_100%)] shadow-[0_8px_18px_rgba(167,139,250,0.20)] transition-transform duration-300 ease-out"
+            style={{
+              width: 'calc((100% - 0.75rem) / 2)',
+              transform: activeMode === 'team_leave_review' ? 'translateX(100%)' : 'translateX(0%)',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setActiveMode('my_leave_manage')}
+            className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
+              activeMode === 'my_leave_manage' ? 'text-violet-950' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+            <span className="whitespace-nowrap">My Leave Manage</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMode('team_leave_review')}
+            className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-semibold transition-colors ${
+              activeMode === 'team_leave_review' ? 'text-violet-950' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">groups</span>
+            <span className="whitespace-nowrap">Team Leave Review</span>
+          </button>
+        </div>
+      </section>
+
+      {activeMode === 'my_leave_manage' ? (
+        <>
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         <div className="rounded-3xl border border-white/70 bg-violet-50 px-5 py-5 shadow-[0_18px_38px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]">
           <div className="flex items-center gap-3">
@@ -211,29 +320,44 @@ export default function Leave() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Available Days</p>
           </div>
           <div className="mt-5 text-center">
-            <p className="text-3xl font-headline font-bold text-on-background">
-              {isLoading ? '--' : formatLeaveDays(data?.summary?.totalAvailable || 0)}
-            </p>
-            <p className="mt-3 text-[11px] leading-5 text-on-surface-variant">
-              Total currently available across your balances
-            </p>
+            {isLoading ? (
+              <div className="space-y-3">
+                <div className="flex justify-center">
+                  <Skeleton className="h-9 w-20" />
+                </div>
+                <div className="flex justify-center">
+                  <Skeleton className="h-3 w-40" />
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-3xl font-headline font-bold text-on-background">
+                  {formatLeaveDays(data?.summary?.totalAvailable || 0)}
+                </p>
+                <p className="mt-3 text-[11px] leading-5 text-on-surface-variant">
+                  Total currently available across your balances
+                </p>
+              </>
+            )}
           </div>
         </div>
 
-        {kpiItems.map((item) => (
-          <div key={item.label} className={`rounded-3xl border border-white/70 ${item.shell} px-5 py-5 shadow-[0_18px_38px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]`}>
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[25px] text-black">{item.icon}</span>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">{item.label}</span>
+        {isLoading ? (
+          <MetricCardSkeleton count={3} />
+        ) : (
+          kpiItems.map((item) => (
+            <div key={item.label} className={`rounded-3xl border border-white/70 ${item.shell} px-5 py-5 shadow-[0_18px_38px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]`}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[25px] text-black">{item.icon}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">{item.label}</span>
+              </div>
+              <div className="mt-5 text-center">
+                <p className="text-3xl font-headline font-bold text-on-background">{formatLeaveDays(item.value)}</p>
+                <p className="mt-3 text-[11px] leading-5 text-on-surface-variant">{item.helper}</p>
+              </div>
             </div>
-            <div className="mt-5 text-center">
-              <p className="text-3xl font-headline font-bold text-on-background">
-                {isLoading ? '--' : formatLeaveDays(item.value)}
-              </p>
-              <p className="mt-3 text-[11px] leading-5 text-on-surface-variant">{item.helper}</p>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </section>
 
       <section className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
@@ -250,7 +374,27 @@ export default function Leave() {
             </div>
           </div>
 
-          {data?.setupPending ? (
+          {isLoading ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+                <div className="space-y-6 rounded-2xl bg-surface-container-low px-5 py-5">
+                  <Skeleton className="h-12 rounded-xl" />
+                  <Skeleton className="h-12 rounded-xl" />
+                  <Skeleton className="h-40 rounded-2xl" />
+                </div>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Skeleton className="h-12 rounded-xl" />
+                    <Skeleton className="h-12 rounded-xl" />
+                  </div>
+                  <Skeleton className="h-40 rounded-xl" />
+                  <div className="flex justify-end">
+                    <Skeleton className="h-12 w-40 rounded-2xl" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : data?.setupPending ? (
             <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">
               Leave schema update is pending. Please apply the latest migration first.
             </div>
@@ -361,14 +505,20 @@ export default function Leave() {
           </div>
 
           <div className="relative z-10 mt-14 space-y-3">
-            {(data?.leaveTypes || []).map((leaveType) => (
-              <div key={leaveType.id} className="rounded-2xl bg-on-tertiary-container/10 px-4 py-3">
-                <p className="text-sm font-semibold text-on-tertiary-container">{leaveType.name}</p>
-                <p className="text-xs text-on-tertiary-container/80">
-                  Monthly credit: {formatLeaveDays(leaveType.monthlyCreditDays)} day(s){leaveType.isPaid ? ' - Paid Leave' : ' - Unpaid'}
-                </p>
-              </div>
-            ))}
+            {isLoading ? (
+              Array.from({ length: 3 }, (_, index) => (
+                <Skeleton key={index} className="h-16 rounded-2xl bg-white/35" />
+              ))
+            ) : (
+              (data?.leaveTypes || []).map((leaveType) => (
+                <div key={leaveType.id} className="rounded-2xl bg-on-tertiary-container/10 px-4 py-3">
+                  <p className="text-sm font-semibold text-on-tertiary-container">{leaveType.name}</p>
+                  <p className="text-xs text-on-tertiary-container/80">
+                    Monthly credit: {formatLeaveDays(leaveType.monthlyCreditDays)} day(s){leaveType.isPaid ? ' - Paid Leave' : ' - Unpaid'}
+                  </p>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="absolute top-0 right-0 opacity-10">
@@ -398,7 +548,13 @@ export default function Leave() {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container/50">
-              {!isLoading && (data?.history || []).length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-0 py-0">
+                    <TableRowsSkeleton rows={5} columns={6} />
+                  </td>
+                </tr>
+              ) : !isLoading && (data?.history || []).length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-5 py-10 text-center text-sm text-on-surface-variant">
                     No leave requests have been submitted yet.
@@ -435,6 +591,169 @@ export default function Leave() {
           </table>
         </div>
       </section>
+        </>
+      ) : (
+        <div className="space-y-10">
+          {!canManageTeamLeaves ? (
+            <section>
+              <h2 className="text-xl font-bold font-headline text-on-background">Team Leave Review</h2>
+              <div className="mt-5">
+                <HrmEmptyState
+                  compact
+                  icon="groups"
+                  title="No reporting team assigned yet"
+                  message="This review space will start showing team leave requests once employees are mapped under your reporting profile."
+                />
+              </div>
+            </section>
+          ) : null}
+
+          <section>
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold font-headline text-on-background">Team Leave Requests</h2>
+              </div>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                {(data?.teamInbox?.pending || []).length} pending
+              </span>
+            </div>
+
+            {(data?.teamInbox?.pending || []).length === 0 ? (
+              <div className="mt-5">
+                <HrmEmptyState
+                  compact
+                  icon="hourglass_disabled"
+                  title="No pending team leave requests"
+                  message="New leave applications from your direct team will appear here for review."
+                />
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-outline-variant/10">
+                <table className="min-w-full text-left">
+                  <thead>
+                    <tr>
+                      <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Employee</th>
+                      <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Type</th>
+                      <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Dates</th>
+                      <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Duration</th>
+                      <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Reason</th>
+                      <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Review Note</th>
+                      <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/10">
+                    {(data?.teamInbox?.pending || []).map((item) => (
+                      <tr key={item.id}>
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-semibold text-on-background">{item.employeeName}</p>
+                          <p className="text-xs text-on-surface-variant">{item.employeeCode || 'No employee ID'}</p>
+                        </td>
+                        <td className="px-5 py-4 text-sm text-on-surface">{item.leaveTypeName}</td>
+                        <td className="px-5 py-4 text-sm text-on-surface-variant">{formatDateRange(item.startDate, item.endDate)}</td>
+                        <td className="px-5 py-4 text-sm text-on-surface">{formatLeaveDays(item.totalDays)} day(s) - {item.sessionLabel}</td>
+                        <td className="max-w-[260px] px-5 py-4 text-sm text-on-surface-variant">{item.reason || '--'}</td>
+                        <td className="px-5 py-4">
+                          <textarea
+                            rows={2}
+                            value={teamReviewNotes[item.id] || ''}
+                            onChange={(event) =>
+                              setTeamReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))
+                            }
+                            className="w-full min-w-[190px] resize-none rounded-2xl border border-outline-variant/10 bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
+                            placeholder="Optional note..."
+                          />
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleTeamReview(item.id, 'approve')}
+                              disabled={activeTeamActionId === item.id}
+                              className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-on-primary disabled:opacity-70"
+                            >
+                              {activeTeamActionId === item.id ? 'Approving...' : 'Approve'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleTeamReview(item.id, 'reject')}
+                              disabled={activeTeamActionId === item.id}
+                              className="rounded-full bg-error-container px-4 py-2 text-xs font-semibold text-on-error-container disabled:opacity-70"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section>
+            <div className="mb-5">
+              <h2 className="text-xl font-bold font-headline text-on-background">Team Leave History</h2>
+            </div>
+
+            {(data?.teamInbox?.history || []).length === 0 ? (
+              <div className="mt-5">
+                <HrmEmptyState
+                  compact
+                  icon="history"
+                  title="No team leave history yet"
+                  message="Approved and rejected leave actions for your team will be listed here once reviews begin."
+                />
+              </div>
+            ) : (
+            <div className="overflow-x-auto rounded-2xl border border-outline-variant/10">
+              <table className="min-w-full text-left">
+                <thead>
+                  <tr>
+                    <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Employee</th>
+                    <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Type</th>
+                    <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Dates</th>
+                    <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Status</th>
+                    <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Paid / LOP</th>
+                    <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Reviewed By</th>
+                    <th className="px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Note</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {(data?.teamInbox?.history || []).map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-semibold text-on-background">{item.employeeName}</p>
+                        <p className="text-xs text-on-surface-variant">{item.employeeCode || 'No employee ID'}</p>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-on-surface">{item.leaveTypeName}</td>
+                      <td className="px-5 py-4 text-sm text-on-surface-variant">{formatDateRange(item.startDate, item.endDate)}</td>
+                      <td className="px-5 py-4">
+                        <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${getStatusPill(item.status)}`}>{item.status}</span>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-on-surface-variant">
+                        {formatLeaveDays(item.paidDays)} paid / {formatLeaveDays(item.lopDays)} LOP
+                      </td>
+                      <td className="px-5 py-4 text-sm text-on-surface">
+                        {item.reviewedByName || '--'}
+                        {item.reviewedByRole ? (
+                          <p className="text-xs text-on-surface-variant">
+                            {item.reviewedByRole === 'reporting_manager' ? 'Reporting Manager' : 'HR Admin'}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="max-w-[280px] px-5 py-4 text-sm text-on-surface-variant">
+                        {item.reviewNote || item.rejectionReason || '--'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

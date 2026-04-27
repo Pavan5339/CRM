@@ -37,7 +37,7 @@ const PAYROLL_EMPLOYEE_SELECT = `
   employment_lifecycle_status,
   current_stage,
   employee_status,
-  terminated_at
+  separated_at
 `;
 
 function toNumber(value, fallback = 0) {
@@ -130,13 +130,13 @@ export function getActivePeriodForMonth(employee, year, month) {
   const monthStart = dateFromDateOnly(startDate);
   const monthEnd = dateFromDateOnly(endDate);
   const joinDate = dateFromDateOnly(toDateOnly(employee?.date_of_joining)) || monthStart;
-  const terminationDate = dateFromDateOnly(toDateOnly(employee?.terminated_at));
+  const separationDate = dateFromDateOnly(toDateOnly(employee?.separated_at));
 
   let activeStart = joinDate > monthStart ? joinDate : monthStart;
   let activeEnd = monthEnd;
 
-  if (terminationDate && terminationDate < activeEnd) {
-    activeEnd = terminationDate;
+  if (separationDate && separationDate < activeEnd) {
+    activeEnd = separationDate;
   }
 
   if (activeEnd < activeStart) {
@@ -791,7 +791,7 @@ function isEmployeeEligibleForPayroll(employee, year, month) {
     return true;
   }
 
-  return lifecycle === 'terminated';
+  return lifecycle === 'separated';
 }
 
 export function calculateEmployeePayroll({

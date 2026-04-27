@@ -7,11 +7,12 @@ import { adminClient } from '@/utils/supabase/admin';
 import { resolveAuthenticatedUserContext } from '@/utils/auth/context';
 import {
   deriveEmploymentFields,
-  normalizeCurrentStage,
   normalizeEmployeeType,
-  normalizeEmploymentLifecycleStatus,
-  toLegacyEmployeeStatus,
 } from '@/utils/hrm-employment';
+import {
+  buildLifecycleColumns,
+  DEFAULT_PROBATION_PERIOD_DAYS,
+} from '@/utils/employee-lifecycle';
 
 const EMAIL_NOTIFICATIONS_ENABLED = process.env.EMAIL_NOTIFICATIONS_ENABLED === 'true';
 const EMPLOYEE_FILES_BUCKET = 'employee-files';
@@ -178,8 +179,13 @@ async function getSupportedEmploymentColumns() {
     'employee_type',
     'employment_lifecycle_status',
     'current_stage',
-    'terminated_at',
-    'termination_reason',
+    'probation_started_at',
+    'probation_ends_at',
+    'notice_started_at',
+    'notice_ends_at',
+    'separated_at',
+    'separation_reason',
+    'separation_reason_code',
     'access_disabled_at',
   ].map(async (columnName) => [columnName, await supportsHrmEmployeeColumn(columnName)]));
 
@@ -218,6 +224,33 @@ function cleanEmail(value) {
 
 function parseDate(value) {
   return cleanText(value);
+}
+
+function toDateOnly(value) {
+  const normalized = cleanText(value);
+  return normalized ? normalized.slice(0, 10) : null;
+}
+
+function formatFriendlyDate(value) {
+  const dateOnly = toDateOnly(value);
+  if (!dateOnly) return value || '--';
+  const date = new Date(`${dateOnly}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return dateOnly;
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
+function addDaysToDateOnly(value, daysToAdd) {
+  const dateOnly = toDateOnly(value);
+  if (!dateOnly) return null;
+  const date = new Date(`${dateOnly}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setUTCDate(date.getUTCDate() + daysToAdd);
+  return date.toISOString().slice(0, 10);
 }
 
 function parseTime(value) {
@@ -271,39 +304,12 @@ function getEmploymentInputValues(source = {}) {
       source.employee_status ??
       null,
     currentStage: source.currentStage ?? source.current_stage ?? null,
-    terminationReason: source.terminationReason ?? source.termination_reason ?? null,
-  };
-}
-
-function buildEmploymentColumns(source, existingEmployee = {}) {
-  const input = getEmploymentInputValues(source);
-  const current = deriveEmploymentFields(existingEmployee);
-  const lifecycleStatus = normalizeEmploymentLifecycleStatus(
-    input.lifecycleStatus,
-    current.employmentLifecycleStatus
-  );
-  const currentStage =
-    lifecycleStatus === 'terminated'
-      ? 'none'
-      : normalizeCurrentStage(input.currentStage, current.currentStage);
-  const employeeType = normalizeEmployeeType(input.employeeType, current.employeeType);
-  const legacyEmployeeStatus = toLegacyEmployeeStatus({
-    employmentLifecycleStatus: lifecycleStatus,
-    currentStage,
-  });
-  const isTerminated = lifecycleStatus === 'terminated';
-  const now = new Date().toISOString();
-
-  return {
-    employee_type: employeeType,
-    employment_lifecycle_status: lifecycleStatus,
-    current_stage: currentStage,
-    employee_status: legacyEmployeeStatus,
-    terminated_at: isTerminated ? existingEmployee.terminated_at || now : null,
-    termination_reason: isTerminated
-      ? cleanText(input.terminationReason) || existingEmployee.termination_reason || null
-      : null,
-    access_disabled_at: isTerminated ? existingEmployee.access_disabled_at || now : null,
+    separationReason:
+      source.separationReason ??
+      source.separation_reason ??
+      source.terminationReason ??
+      source.termination_reason ??
+      null,
   };
 }
 
@@ -1465,15 +1471,23 @@ export async function POST(request) {
 
     validateEmployeeIdentityFields({ aadhaarNumber, panNumber });
     const employmentColumns = filterPayloadByAllowedColumns(
-      buildEmploymentColumns(
+      {
+        employee_type: normalizeEmployeeType(formData.get('employeeType')),
+        ...buildLifecycleColumns(
         {
           employeeType: formData.get('employeeType'),
           lifecycleStatus: formData.get('lifecycleStatus') || formData.get('status'),
           currentStage: formData.get('currentStage'),
-          terminationReason: formData.get('terminationReason'),
+          noticePeriodDays: formData.get('noticePeriodDays'),
+          separationReason: formData.get('separationReason') || formData.get('terminationReason'),
+          separationReasonCode: formData.get('separationReasonCode') || formData.get('terminationReasonCode'),
+          separatedAt: formData.get('separatedAt') || formData.get('terminatedAt'),
+          accessDisabledAt: formData.get('accessDisabledAt'),
+          joinedOn: formData.get('joinedOn'),
         },
         {}
       ),
+      },
       new Set(['employee_status', ...supportedEmploymentColumns])
     );
 
@@ -1512,7 +1526,7 @@ export async function POST(request) {
       date_of_joining: parseDate(formData.get('joinedOn')),
       confirmation_date: parseDate(formData.get('confirmationDate')),
       employee_status: employmentColumns.employee_status,
-      probation_period_days: parseIntegerValue(formData.get('probationPeriodDays')),
+      probation_period_days: DEFAULT_PROBATION_PERIOD_DAYS,
       notice_period_days: parseIntegerValue(formData.get('noticePeriodDays')),
       current_company_experience: cleanText(formData.get('currentCompanyExperience')),
       previous_experience: cleanText(formData.get('previousExperience')),
@@ -1734,11 +1748,15 @@ export async function PATCH(request) {
     }
 
     const { authContext } = auth;
+    const { searchParams } = new URL(request.url);
     const contentType = request.headers.get('content-type') || '';
     const isMultipart = contentType.includes('multipart/form-data');
     const body = isMultipart ? null : await request.json();
     const formData = isMultipart ? await request.formData() : null;
-    const id = cleanText(isMultipart ? formData?.get('id') : body?.id);
+    const id = cleanText(
+      (isMultipart ? formData?.get('id') : body?.id) ||
+      searchParams.get('id')
+    );
 
     if (!id) {
       return NextResponse.json({ error: 'Employee id is required' }, { status: 400 });
@@ -1895,7 +1913,14 @@ export async function PATCH(request) {
       ['joinedOn', 'date_of_joining', parseDate],
       ['confirmationDate', 'confirmation_date', parseDate],
       ['probationPeriodDays', 'probation_period_days', parseIntegerValue],
+      ['probationStartedAt', 'probation_started_at', cleanText],
+      ['probationEndsAt', 'probation_ends_at', parseDate],
       ['noticePeriodDays', 'notice_period_days', parseIntegerValue],
+      ['noticeStartedAt', 'notice_started_at', cleanText],
+      ['noticeEndsAt', 'notice_ends_at', parseDate],
+      ['separatedAt', 'separated_at', cleanText],
+      ['separationReasonCode', 'separation_reason_code', cleanText],
+      ['accessDisabledAt', 'access_disabled_at', cleanText],
       ['referredBy', 'referred_by', cleanText],
       ['currentCompanyExperience', 'current_company_experience', cleanText],
       ['previousExperience', 'previous_experience', cleanText],
@@ -1924,17 +1949,66 @@ export async function PATCH(request) {
       payload.working_days = normalizeWorkingDaysInput(body.workingDays);
     }
 
+    if (existingEmployee.probation_period_days !== DEFAULT_PROBATION_PERIOD_DAYS || body?.probationPeriodDays !== undefined) {
+      payload.probation_period_days = DEFAULT_PROBATION_PERIOD_DAYS;
+    }
+
     const employmentInputs = getEmploymentInputValues(body);
+    const requestedCurrentStage = employmentInputs.currentStage !== null
+      ? String(employmentInputs.currentStage || '').trim().toLowerCase()
+      : null;
+    const existingCurrentStage = String(existingEmployee.current_stage || '').trim().toLowerCase();
+    const probationEndDate =
+      toDateOnly(existingEmployee.probation_ends_at) ||
+      addDaysToDateOnly(
+        payload.date_of_joining !== undefined ? payload.date_of_joining : existingEmployee.date_of_joining,
+        DEFAULT_PROBATION_PERIOD_DAYS
+      );
+    const todayDate = new Date().toISOString().slice(0, 10);
+
+    if (existingCurrentStage === 'probation' && requestedCurrentStage === 'none' && probationEndDate && todayDate < probationEndDate) {
+      return NextResponse.json(
+        {
+          error: `You can remove this employee from probation after ${formatFriendlyDate(probationEndDate)}.`,
+        },
+        { status: 400 }
+      );
+    }
+
     if (
       employmentInputs.employeeType !== null ||
       employmentInputs.lifecycleStatus !== null ||
       employmentInputs.currentStage !== null ||
-      employmentInputs.terminationReason !== null
+      employmentInputs.separationReason !== null ||
+      body?.probationStartedAt !== undefined ||
+      body?.probationEndsAt !== undefined ||
+      body?.noticeStartedAt !== undefined ||
+      body?.noticeEndsAt !== undefined ||
+      body?.separatedAt !== undefined ||
+      body?.terminationReason !== undefined ||
+      body?.separationReason !== undefined ||
+      body?.terminationReasonCode !== undefined ||
+      body?.separationReasonCode !== undefined ||
+      body?.accessDisabledAt !== undefined
     ) {
       Object.assign(
         payload,
         filterPayloadByAllowedColumns(
-          buildEmploymentColumns(body, existingEmployee),
+          {
+            employee_type:
+              employmentInputs.employeeType !== null
+                ? normalizeEmployeeType(employmentInputs.employeeType, existingEmployee.employee_type)
+                : existingEmployee.employee_type,
+            ...buildLifecycleColumns(body, {
+              ...existingEmployee,
+              date_of_joining:
+                payload.date_of_joining !== undefined ? payload.date_of_joining : existingEmployee.date_of_joining,
+              probation_period_days:
+                payload.probation_period_days !== undefined ? payload.probation_period_days : existingEmployee.probation_period_days,
+              notice_period_days:
+                payload.notice_period_days !== undefined ? payload.notice_period_days : existingEmployee.notice_period_days,
+            }),
+          },
           new Set(['employee_status', ...supportedEmploymentColumns])
         )
       );

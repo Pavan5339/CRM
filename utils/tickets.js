@@ -139,16 +139,27 @@ export function groupByKey(rows = [], keyName) {
 
 export async function requireTicketActor() {
   const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  const [
+    {
+      data: { user },
+      error: userError,
+    },
+    {
+      data: { session },
+      error: sessionError,
+    },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.auth.getSession(),
+  ]);
 
-  if (userError || !user) {
+  const resolvedUser = user || session?.user || null;
+
+  if ((!resolvedUser && userError) || (!resolvedUser && sessionError) || !resolvedUser) {
     return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 
-  const authContext = await resolveAuthenticatedUserContext(supabase, user);
+  const authContext = await resolveAuthenticatedUserContext(supabase, resolvedUser);
   if (!authContext?.userId) {
     return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }

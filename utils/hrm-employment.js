@@ -10,7 +10,7 @@ export const EMPLOYEE_TYPE_OPTIONS = [
 export const EMPLOYMENT_LIFECYCLE_STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
-  { value: 'terminated', label: 'Terminated' },
+  { value: 'separated', label: 'Separated' },
 ];
 
 export const CURRENT_STAGE_OPTIONS = [
@@ -40,6 +40,9 @@ export function normalizeEmployeeType(value, fallback = 'full_time_employee') {
 
 export function normalizeEmploymentLifecycleStatus(value, fallback = 'active') {
   const normalized = normalizeText(value);
+  if (normalized === 'terminated') {
+    return 'separated';
+  }
   if (normalized && LIFECYCLE_STATUS_SET.has(normalized)) {
     return normalized;
   }
@@ -61,7 +64,7 @@ export function deriveEmploymentFields(row = {}) {
 
   let lifecycle = normalizeEmploymentLifecycleStatus(
     row.employment_lifecycle_status,
-    legacyStatus === 'terminated' ? 'terminated' : legacyStatus === 'inactive' ? 'inactive' : 'active'
+    (legacyStatus === 'terminated' || legacyStatus === 'separated') ? 'separated' : legacyStatus === 'inactive' ? 'inactive' : 'active'
   );
 
   let currentStage = normalizeCurrentStage(
@@ -71,7 +74,7 @@ export function deriveEmploymentFields(row = {}) {
 
   const employeeType = normalizeEmployeeType(row.employee_type);
 
-  if (lifecycle === 'terminated') {
+  if (lifecycle === 'separated') {
     currentStage = 'none';
   }
 
@@ -90,14 +93,33 @@ export function toLegacyEmployeeStatus({ employmentLifecycleStatus, currentStage
   const lifecycle = normalizeEmploymentLifecycleStatus(employmentLifecycleStatus);
   const stage = normalizeCurrentStage(currentStage);
 
-  if (lifecycle === 'terminated') return 'terminated';
+  if (lifecycle === 'separated') return 'separated';
   if (lifecycle === 'inactive') return 'inactive';
   if (stage !== 'none') return stage;
   return 'active';
 }
 
 export function isEmployeeLoginBlocked(row = {}) {
-  return deriveEmploymentFields(row).employmentLifecycleStatus === 'terminated';
+  const lifecycle = deriveEmploymentFields(row).employmentLifecycleStatus;
+  return lifecycle === 'separated' || lifecycle === 'inactive';
+}
+
+export function isEmployeeAccessDisabledNow(row = {}, now = new Date()) {
+  if (isEmployeeLoginBlocked(row)) {
+    return true;
+  }
+
+  const disabledAt = String(row?.access_disabled_at || '').trim();
+  if (!disabledAt) {
+    return false;
+  }
+
+  const disabledAtDate = new Date(disabledAt);
+  if (Number.isNaN(disabledAtDate.getTime())) {
+    return false;
+  }
+
+  return disabledAtDate.getTime() <= now.getTime();
 }
 
 export function formatEmploymentValue(value) {

@@ -1,9 +1,11 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { formatEmploymentValue, getEmployeeTypeLabel } from '@/utils/hrm-employment';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
+import { useHrmFeedback } from '../ui/HrmFeedback';
+import HrmEmptyState from '../ui/HrmEmptyState';
 
 function InfoRow({
   label,
@@ -87,8 +89,19 @@ function getDocumentIcon(documentType?: string | null, fileName?: string | null)
   return 'folder_open';
 }
 
-export default function Profile({ employee }: { employee?: any }) {
+export default function Profile({
+  employee,
+  onEmployeeChange,
+  onRefreshEmployee,
+}: {
+  employee?: any;
+  onEmployeeChange?: (employee: any) => void;
+  onRefreshEmployee?: () => Promise<any>;
+}) {
+  const { showFeedback } = useHrmFeedback();
   const [activeSection, setActiveSection] = useState('personal');
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const name = employee?.name || 'Employee';
   const employeeId = employee?.employee_id || 'Not assigned';
@@ -99,6 +112,8 @@ export default function Profile({ employee }: { employee?: any }) {
 
   const lifecycleStatus = formatStatus(employee?.employment_lifecycle_status || employee?.employee_status);
   const currentStage = formatStatus(employee?.current_stage);
+  const separationDate = formatDate(employee?.separated_at);
+  const accessDisabledAt = formatDate(employee?.access_disabled_at);
   const employeeType = getEmployeeTypeLabel(employee?.resolved_employee_type || employee?.employee_type);
   const reportingManager = formatReportingTarget(employee);
   const workPhone = pickFirstText(employee?.phone, employee?.mobile_phone, employee?.alternate_phone, 'Not available');
@@ -124,6 +139,59 @@ export default function Profile({ employee }: { employee?: any }) {
     { id: 'performance', label: 'Performance' },
     { id: 'skills', label: 'Skills & Certs' },
   ];
+
+  async function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return;
+
+    try {
+      setAvatarUploading(true);
+      const formData = new FormData();
+      formData.set('avatar', file);
+
+      const response = await fetch('/HRM/api/employee/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update profile picture');
+      }
+
+      let nextEmployee = employee ? { ...employee, profile_picture_url: result.avatarUrl } : employee;
+      if (onEmployeeChange) {
+        onEmployeeChange(nextEmployee);
+      }
+
+      if (onRefreshEmployee) {
+        try {
+          const refreshedEmployee = await onRefreshEmployee();
+          if (refreshedEmployee) {
+            nextEmployee = refreshedEmployee;
+          }
+        } catch {
+          // Keep the optimistic avatar update if the refresh request fails.
+        }
+      }
+
+      showFeedback({
+        type: 'success',
+        title: 'Profile picture updated',
+        message: 'Your previous profile picture was replaced successfully.',
+      });
+    } catch (error: any) {
+      showFeedback({
+        type: 'error',
+        title: 'Profile picture not updated',
+        message: error?.message || 'Please try again.',
+      });
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
 
   function renderPersonalSection() {
     return {
@@ -186,6 +254,8 @@ export default function Profile({ employee }: { employee?: any }) {
               <InfoRow label="Lifecycle Status" value={lifecycleStatus} />
               <InfoRow label="Employee Type" value={employeeType} />
               <InfoRow label="Current Stage" value={currentStage} />
+              <InfoRow label="Separated At" value={employee?.separated_at ? separationDate : 'Not separated'} />
+              <InfoRow label="Access Disabled At" value={employee?.access_disabled_at ? accessDisabledAt : 'Active access'} />
               <InfoRow label="Department" value={department} />
               <InfoRow label="Designation" value={designation} />
               <InfoRow label="Reporting To" value={reportingManager} />
@@ -219,6 +289,9 @@ export default function Profile({ employee }: { employee?: any }) {
             <InfoRow label="Employee Type" value={employeeType} />
             <InfoRow label="Current Stage" value={currentStage} />
             <InfoRow label="Date of Joining" value={formatDate(employee?.date_of_joining)} />
+            <InfoRow label="Separated At" value={employee?.separated_at ? separationDate : 'Not separated'} />
+            <InfoRow label="Separation Reason" value={employee?.separation_reason || 'Not applicable'} />
+            <InfoRow label="Access Disabled At" value={employee?.access_disabled_at ? accessDisabledAt : 'Active access'} />
             <InfoRow label="Confirmation Date" value={formatDate(employee?.confirmation_date)} />
             <InfoRow label="Salary" value={formatSalary(employee?.salary)} />
             <InfoRow label="Current Company Experience" value={employee?.current_company_experience} />
@@ -263,9 +336,12 @@ export default function Profile({ employee }: { employee?: any }) {
           </h2>
           <div className="space-y-4">
             {documents.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-outline-variant/20 bg-surface-container-low px-4 py-8 text-sm text-on-surface-variant">
-                Documents uploaded by HR will appear here once they are available.
-              </div>
+              <HrmEmptyState
+                compact
+                icon="folder_open"
+                title="No documents available yet"
+                message="Documents uploaded by HR will appear here once they are assigned to your profile."
+              />
             ) : (
               documents.map((item: any) => (
                 <a
@@ -320,15 +396,12 @@ export default function Profile({ employee }: { employee?: any }) {
             Performance
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-2xl bg-surface-container-low p-5">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Current Status</p>
-              <p className="mt-3 text-lg font-bold text-on-surface">No active review cycle</p>
-              <p className="mt-2 text-sm text-on-surface-variant">Performance reviews assigned by HR or managers will appear here.</p>
-            </div>
-            <div className="rounded-2xl bg-surface-container-low p-5">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Manager Feedback</p>
-              <p className="mt-3 text-lg font-bold text-on-surface">Awaiting updates</p>
-              <p className="mt-2 text-sm text-on-surface-variant">You will be able to view published feedback once it is shared internally.</p>
+            <div className="md:col-span-2">
+              <HrmEmptyState
+                icon="monitoring"
+                title="No active review cycle"
+                message="Performance reviews, appraisal notes, and manager feedback will appear here once they are published internally."
+              />
             </div>
           </div>
         </div>
@@ -357,18 +430,24 @@ export default function Profile({ employee }: { employee?: any }) {
               <span className="material-symbols-outlined text-primary text-xl">workspace_premium</span>
               Skills
             </h2>
-            <div className="text-sm text-on-surface-variant">
-              Skills are not linked yet.
-            </div>
+            <HrmEmptyState
+              compact
+              icon="workspace_premium"
+              title="No skills linked yet"
+              message="Skill records will appear here once HR or your manager starts mapping your profile."
+            />
           </div>
           <div className="bg-surface-container-lowest p-6 rounded-3xl editorial-shadow">
             <h2 className="text-lg font-bold font-headline mb-5 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-xl">military_tech</span>
               Certifications
             </h2>
-            <div className="text-sm text-on-surface-variant">
-              Certifications will appear here after they are uploaded from HR.
-            </div>
+            <HrmEmptyState
+              compact
+              icon="military_tech"
+              title="No certifications uploaded"
+              message="Certification records will appear here after they are uploaded or linked from HR."
+            />
           </div>
         </div>
       ),
@@ -384,9 +463,12 @@ export default function Profile({ employee }: { employee?: any }) {
           </div>
           <div className="bg-surface-container-lowest p-6 rounded-3xl editorial-shadow">
             <h3 className="text-base font-bold font-headline mb-5">Team Members</h3>
-            <div className="space-y-3 text-sm text-on-surface-variant">
-              <p>Team details will appear here once reporting structure is configured.</p>
-            </div>
+            <HrmEmptyState
+              compact
+              icon="groups"
+              title="No team details yet"
+              message="Team members will appear here once the reporting structure is configured in HRM."
+            />
             <button className="w-full mt-6 py-2 border border-outline-variant/20 text-[10px] font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition-colors">
               View Org Chart
             </button>
@@ -415,28 +497,60 @@ export default function Profile({ employee }: { employee?: any }) {
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary-container/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
 
           <div className="relative z-10">
-            <Image
-              className="w-32 h-32 rounded-2xl object-cover shadow-xl shadow-on-surface/5 border-4 border-surface-container-lowest"
-              alt={`${name} profile avatar`}
-              src={avatar}
-              width={128}
-              height={128}
-              unoptimized={!employee?.profile_picture_url}
-            />
-            <div className="absolute -bottom-2 -right-2 bg-primary text-on-primary p-2 rounded-lg shadow-lg">
-              <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>
-                verified
-              </span>
+            <div className="group relative">
+              <Image
+                className="w-32 h-32 rounded-2xl object-cover shadow-xl shadow-on-surface/5 border-4 border-surface-container-lowest"
+                alt={`${name} profile avatar`}
+                src={avatar}
+                width={128}
+                height={128}
+                unoptimized={!employee?.profile_picture_url}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarUploading}
+                className="absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-950/35 text-white opacity-0 transition-opacity group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className="rounded-full bg-white/20 px-3 py-2 text-xs font-bold">
+                  {avatarUploading ? 'Uploading...' : 'Update'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarUploading}
+                className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-on-primary shadow-lg transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Update profile picture"
+              >
+                <span className="material-symbols-outlined text-[18px]">photo_camera</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarChange}
+                disabled={avatarUploading}
+              />
             </div>
           </div>
 
           <div className="flex-1 space-y-3 text-center md:text-left z-10">
-            <div>
-              <h1 className="text-3xl font-extrabold font-headline text-on-surface tracking-tight">{name}</h1>
-              <p className="text-primary font-semibold text-sm mt-1">
-                {designation} <span className="text-on-surface-variant font-medium mx-1">|</span>
-                <span className="text-on-surface-variant font-medium">{department}</span>
-              </p>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h1 className="text-3xl font-extrabold font-headline text-on-surface tracking-tight">{name}</h1>
+                <p className="text-primary font-semibold text-sm mt-1">
+                  {designation} <span className="text-on-surface-variant font-medium mx-1">|</span>
+                  <span className="text-on-surface-variant font-medium">{department}</span>
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-2 self-center rounded-full bg-emerald-50 px-3 py-2 text-emerald-700 md:self-start">
+                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  verified
+                </span>
+                <span className="text-xs font-bold uppercase tracking-[0.18em]">Verified</span>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-3 items-center justify-center md:justify-start">

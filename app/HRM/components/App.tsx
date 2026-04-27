@@ -53,6 +53,18 @@ export default function App() {
     };
   }, []);
 
+  const refreshEmployee = async () => {
+    const response = await fetch('/HRM/api/employee/me', { method: 'GET' });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to refresh employee profile');
+    }
+
+    setEmployee(result.employee || null);
+    return result.employee || null;
+  };
+
   useEffect(() => {
     setVisitedTabs((current) => (current[currentTab] ? current : { ...current, [currentTab]: true }));
   }, [currentTab]);
@@ -88,7 +100,7 @@ export default function App() {
     'organization-chart': <OrganizationChart apiPath="/HRM/api/employee/organization-chart" />,
     leave: <Leave />,
     salary: <Salary employee={employee} />,
-    profile: <Profile employee={employee} />,
+    profile: <Profile employee={employee} onEmployeeChange={setEmployee} onRefreshEmployee={refreshEmployee} />,
   };
 
   if (isBootstrapping) {
@@ -107,7 +119,13 @@ export default function App() {
       />
       
       <div className="flex-1 flex min-w-0 flex-col ml-64">
-        <main className="flex-1 relative px-5 pt-6 pb-8 pr-8 lg:px-6 lg:pr-10 lg:pt-6">
+        <main
+          className={`flex-1 relative ${
+            currentTab === 'organization-chart'
+              ? ''
+              : 'px-5 pt-6 pb-8 pr-8 lg:px-6 lg:pr-10 lg:pt-6'
+          }`}
+        >
           {Object.entries(tabViews).map(([tabId, view]) => {
             if (!visitedTabs[tabId]) {
               return null;

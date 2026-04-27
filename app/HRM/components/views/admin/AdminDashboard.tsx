@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Download } from 'lucide-react';
 import { useHrmFeedback } from '../../ui/HrmFeedback';
+import HrmEmptyState from '../../ui/HrmEmptyState';
+import { LoadingPanel } from '../../ui/Skeleton';
 
 function getInitials(name = '') {
   return String(name)
@@ -125,12 +127,13 @@ function MetricCard({ title, value, subtitle, icon, tone }) {
   );
 }
 
-export default function AdminDashboard({ admin, setCurrentTab }) {
+export default function AdminDashboard({ admin, setCurrentTab, setSelectedEmployeeId }) {
   const { showFeedback } = useHrmFeedback();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isDownloadingBirthdayCard, setIsDownloadingBirthdayCard] = useState(false);
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
 
   useEffect(() => {
     let active = true;
@@ -167,7 +170,24 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
     };
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   const greetingName = admin?.name || dashboard?.admin?.name || 'HR Admin';
+  const liveDateTimeLabel = currentDateTime.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
   const helperText = useMemo(() => {
     const department = dashboard?.admin?.department || admin?.department || 'HR';
     const designation = dashboard?.admin?.designation || admin?.designation || 'Administrator';
@@ -251,6 +271,7 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
       setIsDownloadingBirthdayCard(false);
     }
   };
+  const lifecycleReminders = dashboard?.lifecycleReminders || [];
 
   return (
     <div className="mx-auto max-w-7xl p-7">
@@ -262,7 +283,9 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
               Welcome, {greetingName}
             </h2>
           </div>
-          <p className="mt-2 pl-12 text-sm font-medium text-on-surface-variant lg:pl-14">{helperText}</p>
+          <p className="mt-2 pl-12 text-sm font-medium text-on-surface-variant lg:pl-14">
+            {liveDateTimeLabel}
+          </p>
         </div>
         <button
           type="button"
@@ -274,9 +297,10 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
       </section>
 
       {loading && (
-        <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">
-          Loading HR dashboard...
-        </div>
+        <LoadingPanel
+          title="Loading HR dashboard"
+          message="We are pulling the latest HR metrics, recent employees, and birthday highlights."
+        />
       )}
 
       {error && (
@@ -295,78 +319,143 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
           </section>
 
           <section className="grid grid-cols-1 items-start gap-7 xl:grid-cols-[minmax(0,1.7fr)_300px]">
-            <div className="self-start rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-headline text-xl font-bold text-on-surface">Recent Employees</h3>
-                  <p className="mt-1 text-sm text-on-surface-variant">Latest employee records created in the HRM system.</p>
+            <div className="space-y-4 self-start">
+              <div className="rounded-[1.75rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-headline text-xl font-bold text-on-surface">Recent Employees</h3>
+                    <p className="mt-1 text-sm text-on-surface-variant">Latest employee records created in the HRM system.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentTab?.('admin-employee-list')}
+                    className="rounded-full border border-outline-variant/20 bg-surface px-4 py-2 text-xs font-bold text-on-surface-variant"
+                  >
+                    View Directory
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setCurrentTab?.('admin-employee-list')}
-                  className="rounded-full border border-outline-variant/20 bg-surface px-4 py-2 text-xs font-bold text-on-surface-variant"
-                >
-                  View Directory
-                </button>
-              </div>
-              <div className="overflow-hidden rounded-[1.25rem] border border-outline-variant/10">
-                {(dashboard.recentEmployees || []).length === 0 ? (
-                  <p className="px-4 py-7 text-sm text-on-surface-variant">No employee records are available yet.</p>
-                ) : (
-                  <div className="divide-y divide-outline-variant/10">
-                    <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_120px_110px] gap-4 border-b border-outline-variant/10 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/70">
-                      <p>Employee</p>
-                      <p>Designation</p>
-                      <p>ID</p>
-                      <p>Created</p>
+                <div className="overflow-hidden rounded-[1.25rem] border border-outline-variant/10">
+                  {(dashboard.recentEmployees || []).length === 0 ? (
+                    <div className="p-4">
+                      <HrmEmptyState
+                        compact
+                        icon="badge"
+                        title="No employee records yet"
+                        message="Newly added employees will start appearing here as soon as the HR directory is populated."
+                      />
                     </div>
-                    {(dashboard.recentEmployees || []).map((employee) => (
-                      <div
-                        key={employee.id}
-                        className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_120px_110px] gap-4 px-4 py-3 transition-colors hover:bg-surface-container-low/20"
+                  ) : (
+                    <div className="divide-y divide-outline-variant/10">
+                      <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_120px_110px] gap-4 border-b border-outline-variant/10 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant/70">
+                        <p>Employee</p>
+                        <p>Designation</p>
+                        <p>ID</p>
+                        <p>Created</p>
+                      </div>
+                      {(dashboard.recentEmployees || []).map((employee) => (
+                        <div
+                          key={employee.id}
+                          className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_120px_110px] gap-4 px-4 py-3 transition-colors hover:bg-surface-container-low/20"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            {employee.profile_picture_url ? (
+                              <Image
+                                src={employee.profile_picture_url}
+                                alt={employee.name || 'Employee'}
+                                width={38}
+                                height={38}
+                                className="h-[38px] w-[38px] rounded-full object-cover border border-outline-variant/10"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                                {getInitials(employee.name)}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-on-surface">{employee.name || 'Employee'}</p>
+                              <p className="truncate text-xs text-on-surface-variant">{employee.email || 'No email added'}</p>
+                            </div>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-on-surface">
+                              {employee.designation?.title || 'Designation not set'}
+                            </p>
+                            <p className="truncate text-xs text-on-surface-variant">
+                              {employee.department?.name || 'Department not set'}
+                            </p>
+                          </div>
+
+                          <div className="text-xs font-semibold text-on-surface-variant">
+                            {employee.employee_id || 'No ID'}
+                          </div>
+
+                          <div className="text-xs font-semibold text-on-surface">
+                            {formatDate(employee.created_at?.slice?.(0, 10) || employee.created_at)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {lifecycleReminders.length ? (
+                <div className="rounded-[1.35rem] border border-outline-variant/10 bg-surface-container-low p-4 shadow-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="font-headline text-base font-bold text-on-surface">Lifecycle reminders</h3>
+                      <p className="mt-1 text-xs text-on-surface-variant">
+                        Pending HR action after probation or notice completion.
+                      </p>
+                    </div>
+                    <span className="inline-flex w-fit rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-primary">
+                      {lifecycleReminders.length} pending
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {lifecycleReminders.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedEmployeeId?.(item.id);
+                          setCurrentTab?.('admin-employee-profile');
+                        }}
+                        className="flex w-full items-center justify-between gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest px-3 py-2.5 text-left transition hover:bg-white"
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          {employee.profile_picture_url ? (
+                          {item.profile_picture_url ? (
                             <Image
-                              src={employee.profile_picture_url}
-                              alt={employee.name || 'Employee'}
-                              width={38}
-                              height={38}
-                              className="h-[38px] w-[38px] rounded-full object-cover border border-outline-variant/10"
+                              src={item.profile_picture_url}
+                              alt={item.name || 'Employee'}
+                              width={36}
+                              height={36}
+                              className="h-9 w-9 rounded-full border border-outline-variant/10 object-cover"
                               unoptimized
                             />
                           ) : (
-                            <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                              {getInitials(employee.name)}
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                              {getInitials(item.name)}
                             </div>
                           )}
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-on-surface">{employee.name || 'Employee'}</p>
-                            <p className="truncate text-xs text-on-surface-variant">{employee.email || 'No email added'}</p>
+                            <p className="truncate text-sm font-semibold text-on-surface">{item.name || 'Employee'}</p>
+                            <p className="truncate text-xs text-on-surface-variant">
+                              {item.stage === 'probation' ? 'Remove probation' : 'Review notice'} · {item.employee_id || 'No employee ID'}
+                            </p>
                           </div>
                         </div>
-
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-on-surface">
-                            {employee.designation?.title || 'Designation not set'}
-                          </p>
-                          <p className="truncate text-xs text-on-surface-variant">
-                            {employee.department?.name || 'Department not set'}
-                          </p>
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs font-semibold text-on-surface">{formatDate(item.dueDate)}</p>
+                          <p className="mt-0.5 text-[11px] text-on-surface-variant">{item.title}</p>
                         </div>
-
-                        <div className="text-xs font-semibold text-on-surface-variant">
-                          {employee.employee_id || 'No ID'}
-                        </div>
-
-                        <div className="text-xs font-semibold text-on-surface">
-                          {formatDate(employee.created_at?.slice?.(0, 10) || employee.created_at)}
-                        </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="relative self-start xl:max-w-[300px]">
@@ -400,8 +489,14 @@ export default function AdminDashboard({ admin, setCurrentTab }) {
                   </div>
 
                   {(dashboard.upcomingBirthdays || []).length === 0 ? (
-                    <div className="mt-6 rounded-[1.5rem] bg-white/45 px-5 py-7 text-sm text-[#7C5A49] backdrop-blur-sm">
-                      No employee birthdays are available yet.
+                    <div className="mt-6">
+                      <HrmEmptyState
+                        compact
+                        icon="cake"
+                        title="No birthdays available yet"
+                        message="Add employee birth dates in the HR records to start showing upcoming birthday reminders here."
+                        className="border-white/70 bg-white/45"
+                      />
                     </div>
                   ) : (
                     <div className="mt-6 flex flex-col items-center px-1 pb-1 text-center">

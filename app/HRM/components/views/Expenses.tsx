@@ -4,6 +4,8 @@ import Image from 'next/image';
 import React, { useEffect, useMemo, useState } from 'react';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
 import { useHrmFeedback } from '../ui/HrmFeedback';
+import HrmEmptyState from '../ui/HrmEmptyState';
+import { DetailPanelSkeleton, LoadingPanel } from '../ui/Skeleton';
 import {
   type ExpenseClaimAttachment,
   type ExpenseClaimDetail,
@@ -259,6 +261,8 @@ function ClaimsSection({
   subtitle,
   claims,
   emptyMessage,
+  emptyTitle = 'Nothing to show here',
+  emptyIcon = 'receipt_long',
   onOpen,
   hideHeader = false,
 }: {
@@ -266,6 +270,8 @@ function ClaimsSection({
   subtitle: string;
   claims: ExpenseClaimSummary[];
   emptyMessage: string;
+  emptyTitle?: string;
+  emptyIcon?: string;
   onOpen: (claimId: string) => void;
   hideHeader?: boolean;
 }) {
@@ -284,8 +290,12 @@ function ClaimsSection({
           ))}
         </div>
       ) : (
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest px-6 py-12 text-center text-sm text-on-surface-variant">
-          {emptyMessage}
+        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-5">
+          <HrmEmptyState
+            icon={emptyIcon}
+            title={emptyTitle}
+            message={emptyMessage}
+          />
         </div>
       )}
     </div>
@@ -656,8 +666,8 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
   const renderClaimDetail = () => {
     if (isDetailLoading) {
       return (
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest px-6 py-16 text-center text-sm text-on-surface-variant">
-          Loading claim detail...
+        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+          <DetailPanelSkeleton />
         </div>
       );
     }
@@ -1159,6 +1169,8 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
           title="Pending And Needs Changes"
           subtitle="Track the expense claims you have submitted and the ones returned for correction."
           claims={pendingClaims}
+          emptyTitle="No active claims in your queue"
+          emptyIcon="inventory_2"
           emptyMessage="No active expense claims are waiting in your queue."
           onOpen={openClaim}
         />
@@ -1171,6 +1183,8 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
           title="Pending Review"
           subtitle="These expense claims are assigned to you for action right now."
           claims={pendingReviewClaims}
+          emptyTitle="No claims pending review"
+          emptyIcon="fact_check"
           emptyMessage="No expense claims are pending your review right now."
           onOpen={openClaim}
         />
@@ -1211,6 +1225,8 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
               title="My Expense History"
               subtitle="Approved and rejected claims that you submitted as an employee."
               claims={myHistoryClaims}
+              emptyTitle="No expense history yet"
+              emptyIcon="history"
               emptyMessage="You have no completed expense claim history yet."
               onOpen={openClaim}
               hideHeader
@@ -1220,6 +1236,8 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
               title="Reviewed By Me"
               subtitle="Claims where you were the reviewer and already completed a decision."
               claims={reviewedByMeClaims}
+              emptyTitle="No reviewed claims yet"
+              emptyIcon="task_alt"
               emptyMessage="You have not reviewed any expense claims yet."
               onOpen={openClaim}
               hideHeader
@@ -1234,6 +1252,8 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
         title="Reviewed History"
         subtitle="Completed review decisions with the latest outcome and full detail access."
         claims={reviewedByMeClaims}
+        emptyTitle="No reviewed expense claims yet"
+        emptyIcon="history"
         emptyMessage="No reviewed expense claims are available in this section yet."
         onOpen={openClaim}
       />
@@ -1275,9 +1295,10 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
       </section>
 
       {isLoading ? (
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest px-6 py-16 text-center text-sm text-on-surface-variant">
-          Loading expense claims...
-        </div>
+        <LoadingPanel
+          title="Loading expense claims"
+          message="We are preparing your claims, review inbox, and detailed reimbursement data."
+        />
       ) : error ? (
         <div className="rounded-[2rem] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">
           {error}

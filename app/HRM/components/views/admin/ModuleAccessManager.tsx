@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import EmployeePageHeader from '../../ui/EmployeePageHeader';
 import { useHrmFeedback } from '../../ui/HrmFeedback';
+import HrmEmptyState from '../../ui/HrmEmptyState';
+import { TableRowsSkeleton } from '../../ui/Skeleton';
 
 type ModuleKey = 'task_manager' | 'hrm_admin' | 'auditing' | 'crm';
 
 type ModuleConfig = {
   key: ModuleKey;
   label: string;
-  accentClass: string;
 };
 
 type EmployeeRow = {
@@ -18,6 +19,11 @@ type EmployeeRow = {
   employee_id?: string;
   name?: string;
   email?: string;
+  employment_lifecycle_status?: string | null;
+  resolved_employment_lifecycle_status?: string | null;
+  current_stage?: string | null;
+  resolved_current_stage?: string | null;
+  access_disabled_at?: string | null;
   profile_picture_url?: string | null;
   designation?: { title?: string | null } | null;
   department?: { name?: string | null } | null;
@@ -30,22 +36,18 @@ const MODULES: ModuleConfig[] = [
   {
     key: 'task_manager',
     label: 'Task Manager',
-    accentClass: 'bg-sky-50 text-sky-700 ring-sky-200/70',
   },
   {
     key: 'hrm_admin',
     label: 'HRM',
-    accentClass: 'bg-violet-50 text-violet-700 ring-violet-200/70',
   },
   {
     key: 'auditing',
     label: 'Auditing',
-    accentClass: 'bg-amber-50 text-amber-700 ring-amber-200/70',
   },
   {
     key: 'crm',
     label: 'CRM',
-    accentClass: 'bg-emerald-50 text-emerald-700 ring-emerald-200/70',
   },
 ];
 
@@ -71,6 +73,26 @@ function getEmployeeDesignation(employee: EmployeeRow) {
 
 function getEmployeeDepartment(employee: EmployeeRow) {
   return employee?.department?.name || employee?.resolved_department_name || '--';
+}
+
+function getEmployeeRecordId(employee: EmployeeRow) {
+  return String(employee?.id || '').trim();
+}
+
+function formatLabel(value?: string | null, fallback = 'None') {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized || normalized === 'none') return fallback;
+  return normalized
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getLifecycleTone(status?: string | null) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'separated') return 'bg-rose-50 text-rose-700 ring-rose-200/80';
+  if (normalized === 'inactive') return 'bg-slate-100 text-slate-700 ring-slate-200/80';
+  return 'bg-emerald-50 text-emerald-700 ring-emerald-200/80';
 }
 
 function buildPatchBody(moduleKey: ModuleKey, nextValue: boolean) {
@@ -101,7 +123,7 @@ export default function ModuleAccessManager() {
     nextValue: boolean;
   } | null>(null);
 
-  async function loadEmployees() {
+  const loadEmployees = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/HRM/api/employees?includeMeta=1', { method: 'GET' });
@@ -122,11 +144,11 @@ export default function ModuleAccessManager() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [showFeedback]);
 
   useEffect(() => {
     loadEmployees();
-  }, []);
+  }, [loadEmployees]);
 
   const filteredEmployees = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -149,14 +171,28 @@ export default function ModuleAccessManager() {
   async function handleAccessUpdate() {
     if (!selectedAction) return;
 
+    const employeeRecordId = getEmployeeRecordId(selectedAction.employee);
+
+    if (!employeeRecordId) {
+      showFeedback({
+        type: 'error',
+        title: 'Update failed',
+        message: 'Employee id is required',
+      });
+      return;
+    }
+
     try {
       setSaving(true);
-      const response = await fetch(`/HRM/api/employees?id=${selectedAction.employee.id}`, {
+      const response = await fetch(`/HRM/api/employees?id=${encodeURIComponent(employeeRecordId)}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(buildPatchBody(selectedAction.module.key, selectedAction.nextValue)),
+        body: JSON.stringify({
+          id: employeeRecordId,
+          ...buildPatchBody(selectedAction.module.key, selectedAction.nextValue),
+        }),
       });
 
       const result = await response.json();
@@ -244,22 +280,30 @@ export default function ModuleAccessManager() {
               <tbody className="divide-y divide-outline-variant/10 bg-white">
                 {loading ? (
                   <tr>
-                    <td colSpan={2 + MODULES.length} className="px-4 py-12 text-center text-sm text-on-surface-variant">
-                      Loading employee access table...
+                    <td colSpan={2 + MODULES.length} className="px-0 py-0">
+                      <TableRowsSkeleton rows={6} columns={2 + MODULES.length} />
                     </td>
                   </tr>
                 ) : filteredEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan={2 + MODULES.length} className="px-4 py-12 text-center text-sm text-on-surface-variant">
-                      No employees match the current search.
+                    <td colSpan={2 + MODULES.length} className="px-4 py-6">
+                      <HrmEmptyState
+                        compact
+                        icon="manage_accounts"
+                        title="No employees match this search"
+                        message="Try a different name, email, employee ID, or designation to update module access."
+                      />
                     </td>
                   </tr>
                 ) : (
                   filteredEmployees.map((employee) => {
                     const access = getModuleAccessRecord(employee) as Record<string, boolean> | null;
+                    const employeeRecordId = getEmployeeRecordId(employee);
+                    const lifecycleStatus = employee.resolved_employment_lifecycle_status || employee.employment_lifecycle_status || 'active';
+                    const currentStage = employee.resolved_current_stage || employee.current_stage || 'none';
 
                     return (
-                      <tr key={employee.id} className="hover:bg-surface-container-low/20">
+                      <tr key={employeeRecordId || employee.employee_id || employee.email || employee.name} className="hover:bg-surface-container-low/20">
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-3">
                             {employee.profile_picture_url ? (
@@ -282,6 +326,21 @@ export default function ModuleAccessManager() {
                               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/70">
                                 {employee.employee_id || '--'}
                               </p>
+                              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${getLifecycleTone(lifecycleStatus)}`}>
+                                  {formatLabel(lifecycleStatus, 'Active')}
+                                </span>
+                                {currentStage !== 'none' ? (
+                                  <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700 ring-1 ring-violet-200/80">
+                                    {formatLabel(currentStage)}
+                                  </span>
+                                ) : null}
+                                {employee.access_disabled_at ? (
+                                  <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 ring-1 ring-amber-200/80">
+                                    Access Disabled
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -305,9 +364,10 @@ export default function ModuleAccessManager() {
                                 }
                                 className={`inline-flex min-w-[110px] items-center justify-center rounded-full px-3 py-2 text-xs font-bold ring-1 transition hover:-translate-y-0.5 ${
                                   enabled
-                                    ? `${module.accentClass}`
-                                    : 'bg-slate-100 text-slate-600 ring-slate-200/80'
+                                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/80'
+                                    : 'bg-rose-50 text-rose-700 ring-rose-200/80'
                                 }`}
+                                disabled={!employeeRecordId}
                               >
                                 {enabled ? 'Access On' : 'Access Off'}
                               </button>
@@ -328,7 +388,13 @@ export default function ModuleAccessManager() {
         <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/20 px-4 py-6 backdrop-blur-[2px]">
           <div className="w-full max-w-md rounded-[1.75rem] border border-white/80 bg-[linear-gradient(165deg,#ffffff_0%,#faf7ff_52%,#f2ecff_100%)] p-6 shadow-[0_30px_70px_rgba(76,29,149,0.22)]">
             <div className="flex items-start gap-4">
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ${selectedAction.module.accentClass}`}>
+              <div
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ${
+                  selectedAction.nextValue
+                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/80'
+                    : 'bg-rose-50 text-rose-700 ring-rose-200/80'
+                }`}
+              >
                 <span className="material-symbols-outlined text-[24px]">verified_user</span>
               </div>
               <div>
@@ -346,6 +412,10 @@ export default function ModuleAccessManager() {
               <p className="mt-1 text-xs text-on-surface-variant">{selectedAction.employee.email || 'No email'}</p>
               <p className="mt-1 text-xs text-on-surface-variant">
                 {selectedAction.employee.employee_id || '--'} | {getEmployeeDesignation(selectedAction.employee)} | {getEmployeeDepartment(selectedAction.employee)}
+              </p>
+              <p className="mt-1 text-xs text-on-surface-variant">
+                Status: {formatLabel(selectedAction.employee.resolved_employment_lifecycle_status || selectedAction.employee.employment_lifecycle_status, 'Active')}
+                {selectedAction.employee.access_disabled_at ? ' | Access Disabled' : ''}
               </p>
             </div>
 

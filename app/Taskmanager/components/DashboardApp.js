@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { DataProvider, useData } from './DataContext';
+import { ModuleAccessGate } from '@/app/components-homepage/ModuleAccessGate';
 import Login from './Login';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
@@ -80,8 +81,10 @@ export default function DashboardApp({ startLoggedIn = false, initialView = 'das
     : null;
 
   return (
-    <DataProvider initialUser={initialUser} mode={mode}>
-      <AppContent initialView={initialView} mode={mode} />
-    </DataProvider>
+    <ModuleAccessGate moduleKey="taskManager" moduleLabel="Task Manager">
+      <DataProvider initialUser={initialUser} mode={mode}>
+        <AppContent initialView={initialView} mode={mode} />
+      </DataProvider>
+    </ModuleAccessGate>
   );
 }

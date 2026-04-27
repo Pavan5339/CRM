@@ -86,6 +86,8 @@ export async function GET() {
         employeeId: row.employee_id,
         employeeCode: employee?.employee_id || '',
         employeeName: employee?.name || 'Employee',
+        reportingManagerId: row.reporting_manager_id || '',
+        reportingManagerName: row.reporting_manager_name_snapshot || employee?.reporting_manager_name || '',
         leaveTypeName: leaveType?.name || 'Leave',
         startDate: row.start_date,
         endDate: row.end_date,
@@ -99,7 +101,8 @@ export async function GET() {
         reviewNote: row.review_note || '',
         rejectionReason: row.rejection_reason || '',
         reviewedAt: row.reviewed_at,
-        reviewedByName: row.reviewed_at ? hrName : '',
+        reviewedByName: row.reviewed_by_name || (row.reviewed_at ? hrName : ''),
+        reviewedByRole: row.reviewed_by_role || '',
       };
     });
 

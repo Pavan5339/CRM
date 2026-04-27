@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHrmFeedback } from '../../ui/HrmFeedback';
+import { DetailPanelSkeleton, LoadingPanel, TableRowsSkeleton } from '../../ui/Skeleton';
 
 const SECTIONS = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -50,7 +51,7 @@ function statusTone(status?: string | null) {
 function lifecycleTone(status?: string | null) {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'active') return 'bg-emerald-50 text-emerald-700';
-  if (normalized === 'terminated') return 'bg-rose-50 text-rose-700';
+  if (normalized === 'separated') return 'bg-rose-50 text-rose-700';
   return 'bg-violet-50 text-violet-700';
 }
 
@@ -852,8 +853,8 @@ export default function PayoutsPayroll() {
                 <tbody className="divide-y divide-slate-200/70">
                   {directoryLoading ? (
                     <tr>
-                      <td className="px-5 py-12 text-center text-sm text-slate-500" colSpan={11}>
-                        Loading payroll directory...
+                      <td className="px-0 py-0" colSpan={11}>
+                        <TableRowsSkeleton rows={6} columns={11} />
                       </td>
                     </tr>
                   ) : directory.length === 0 ? (
@@ -1453,9 +1454,10 @@ export default function PayoutsPayroll() {
 
             <div className="space-y-6 p-6">
               {runsLoading ? (
-                <div className="rounded-2xl border border-dashed border-outline-variant/25 px-5 py-12 text-center text-sm text-on-surface-variant">
-                  Loading payroll ledger...
-                </div>
+                <LoadingPanel
+                  title="Loading payroll ledger"
+                  message="Payroll runs, item totals, and payment status are being prepared."
+                />
               ) : runs.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-outline-variant/25 px-5 py-12 text-center text-sm text-on-surface-variant">
                   No payroll run is available yet.
@@ -1576,11 +1578,13 @@ export default function PayoutsPayroll() {
               </div>
 
               <div className="mt-6 grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-                <div className="rounded-[1.5rem] border border-outline-variant/10 bg-white p-5">
-                  <h4 className="text-base font-bold text-on-surface">Breakdown</h4>
-                  {itemLoading ? (
-                    <div className="mt-4 text-sm text-on-surface-variant">Loading...</div>
-                  ) : (
+                  <div className="rounded-[1.5rem] border border-outline-variant/10 bg-white p-5">
+                    <h4 className="text-base font-bold text-on-surface">Breakdown</h4>
+                    {itemLoading ? (
+                    <div className="mt-4">
+                      <DetailPanelSkeleton />
+                    </div>
+                    ) : (
                     <div className="mt-4">
                       <LabelValue label="Salary Snapshot" value={formatCurrency(itemDetail.item.salary_snapshot)} />
                       <LabelValue label="Prorated Salary" value={formatCurrency(itemDetail.item.prorated_salary)} />
@@ -1597,13 +1601,17 @@ export default function PayoutsPayroll() {
                   )}
                 </div>
 
-                <div className="rounded-[1.5rem] border border-outline-variant/10 bg-white p-4">
-                  <h4 className="text-base font-bold text-on-surface">Payslip Preview</h4>
-                  {itemLoading ? (
-                    <div className="mt-4 rounded-2xl border border-dashed border-outline-variant/25 px-5 py-10 text-center text-sm text-on-surface-variant">
-                      Loading payslip...
+                  <div className="rounded-[1.5rem] border border-outline-variant/10 bg-white p-4">
+                    <h4 className="text-base font-bold text-on-surface">Payslip Preview</h4>
+                    {itemLoading ? (
+                    <div className="mt-4">
+                      <LoadingPanel
+                        title="Loading payslip"
+                        message="The selected payroll item snapshot is being prepared for preview."
+                        className="px-5 py-10"
+                      />
                     </div>
-                  ) : itemDetail.payslip?.html_snapshot ? (
+                    ) : itemDetail.payslip?.html_snapshot ? (
                     <iframe
                       title="Payslip Preview"
                       className="mt-4 h-[720px] w-full rounded-2xl border border-outline-variant/10 bg-white"

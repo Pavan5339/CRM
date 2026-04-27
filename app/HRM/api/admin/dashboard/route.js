@@ -31,6 +31,47 @@ function getUpcomingBirthdays(employees = []) {
     .slice(0, 5);
 }
 
+function toDateOnly(value) {
+  return value ? String(value).slice(0, 10) : null;
+}
+
+function buildLifecycleReminders(employees = []) {
+  const todayDate = new Date().toISOString().slice(0, 10);
+
+  return employees
+    .filter((employee) => {
+      const employment = deriveEmploymentFields(employee);
+      if (employment.currentStage === 'probation' && toDateOnly(employee.probation_ends_at)) {
+        return toDateOnly(employee.probation_ends_at) < todayDate;
+      }
+
+      if (employment.currentStage === 'notice_period' && toDateOnly(employee.notice_ends_at)) {
+        return toDateOnly(employee.notice_ends_at) < todayDate;
+      }
+
+      return false;
+    })
+    .map((employee) => {
+      const employment = deriveEmploymentFields(employee);
+      const isProbation = employment.currentStage === 'probation';
+      const dueDate = isProbation ? toDateOnly(employee.probation_ends_at) : toDateOnly(employee.notice_ends_at);
+
+      return {
+        id: employee.id,
+        employee_id: employee.employee_id,
+        name: employee.name,
+        profile_picture_url: employee.profile_picture_url || '',
+        stage: employment.currentStage,
+        dueDate,
+        title: isProbation ? 'Probation completed' : 'Notice period completed',
+        message: isProbation
+          ? 'Remove probation manually when HR confirms the employee has completed probation.'
+          : 'Review the employee notice period and update their stage manually.',
+      };
+    })
+    .sort((left, right) => String(left.dueDate || '').localeCompare(String(right.dueDate || '')));
+}
+
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -69,6 +110,7 @@ export async function GET() {
       recentEmployees,
       recentHrAdmins: hrAdmins.slice(0, 5),
       upcomingBirthdays: getUpcomingBirthdays(employees),
+      lifecycleReminders: buildLifecycleReminders(employees),
     });
   } catch (error) {
     console.error('Error fetching HR admin dashboard:', error);

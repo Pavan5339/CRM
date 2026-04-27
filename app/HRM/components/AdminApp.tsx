@@ -28,6 +28,7 @@ export default function AdminApp() {
   const [admin, setAdmin] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({
     [requestedTab || 'admin-dashboard']: true,
   });
@@ -89,7 +90,7 @@ export default function AdminApp() {
   };
 
   const tabViews: Record<string, React.ReactNode> = {
-    'admin-dashboard': <AdminDashboard admin={admin} setCurrentTab={setCurrentTab} />,
+    'admin-dashboard': <AdminDashboard admin={admin} setCurrentTab={setCurrentTab} setSelectedEmployeeId={setSelectedEmployeeId} />,
     'admin-employee-list': (
       <EmployeeDirectoryWorkspace
         currentTab={currentTab}
@@ -138,9 +139,11 @@ export default function AdminApp() {
         admin={admin}
         onLogout={handleLogout}
         isLoggingOut={isLoggingOut}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
       />
       
-      <div className="flex-1 flex flex-col ml-60 min-w-0">
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'ml-24' : 'ml-64'}`}>
         <main className="flex-1 relative">
           {Object.entries(tabViews).map(([tabId, view]) => {
             if (!visitedTabs[tabId]) {

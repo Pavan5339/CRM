@@ -4,6 +4,8 @@ import Image from 'next/image';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
 import { useHrmFeedback } from '../ui/HrmFeedback';
+import HrmEmptyState from '../ui/HrmEmptyState';
+import { LoadingPanel } from '../ui/Skeleton';
 import type {
   TicketAttachment,
   TicketDetail,
@@ -397,7 +399,11 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
     setError('');
 
     try {
-      const response = await fetch('/HRM/api/tickets', { method: 'GET', credentials: 'include' });
+      const response = await fetch('/HRM/api/tickets', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to load tickets.');
 
@@ -416,15 +422,23 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
     }
   };
 
-  const loadTicketDetail = async (ticketId: string) => {
+  const loadTicketDetail = async (ticketId: string, allowRetry = true) => {
     if (!ticketId) {
       setDetail(null);
       return;
     }
 
     try {
-      const response = await fetch(`/HRM/api/tickets/${ticketId}`, { method: 'GET', credentials: 'include' });
+      const response = await fetch(`/HRM/api/tickets/${ticketId}`, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      });
       const result = await response.json();
+      if (response.status === 401 && allowRetry) {
+        await loadTicketDetail(ticketId, false);
+        return;
+      }
       if (!response.ok) throw new Error(result.error || 'Failed to load ticket detail.');
       setDetail(result.ticket || null);
     } catch (requestError) {
@@ -733,9 +747,10 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
       </section>
 
       {isLoading ? (
-        <div className="rounded-3xl bg-surface-container-low px-6 py-16 text-center text-sm text-on-surface-variant">
-          Loading tickets...
-        </div>
+        <LoadingPanel
+          title="Loading tickets"
+          message="We are preparing the latest ticket queues, filters, and conversation history."
+        />
       ) : error ? (
         <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">{error}</div>
       ) : data?.setupPending ? (
@@ -875,8 +890,13 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
                     })}
                   </div>
                   {ccOptions.length === 0 ? (
-                    <div className="rounded-2xl bg-white/70 px-4 py-3 text-sm text-on-surface-variant">
-                      No people matched your CC search.
+                    <div className="rounded-2xl bg-white/70 p-3">
+                      <HrmEmptyState
+                        compact
+                        icon="person_search"
+                        title="No matching people"
+                        message="No people matched your CC search."
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -1098,8 +1118,13 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
                     {detail.attachments.length ? (
                       <AttachmentList attachments={detail.attachments} />
                     ) : (
-                      <div className="rounded-2xl bg-surface-container-low px-4 py-4 text-sm text-on-surface-variant">
-                        No files were attached to the ticket header.
+                      <div className="rounded-2xl bg-surface-container-low p-3">
+                        <HrmEmptyState
+                          compact
+                          icon="attach_file"
+                          title="No ticket files attached"
+                          message="No files were attached to the ticket header."
+                        />
                       </div>
                     )}
                   </div>
@@ -1139,7 +1164,14 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
                         ))}
                       </div>
                     ) : (
-                      <div className="rounded-2xl bg-surface-container-low px-4 py-4 text-sm text-on-surface-variant">No comments yet.</div>
+                      <div className="rounded-2xl bg-surface-container-low p-3">
+                        <HrmEmptyState
+                          compact
+                          icon="forum"
+                          title="No comments yet"
+                          message="The conversation thread will appear here once someone replies to this ticket."
+                        />
+                      </div>
                     )}
                   </div>
 
@@ -1211,8 +1243,24 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
               </div>
 
               {visibleTickets.length === 0 ? (
-                <div className="rounded-3xl border border-outline-variant/10 bg-surface-container-lowest px-6 py-16 text-center text-sm text-on-surface-variant editorial-shadow">
-                  No tickets found in this section.
+                <div className="rounded-3xl border border-outline-variant/10 bg-surface-container-lowest p-5 editorial-shadow">
+                  <HrmEmptyState
+                    icon={
+                      activeSection === 'my'
+                        ? 'confirmation_number'
+                        : activeSection === 'assigned'
+                          ? 'assignment_ind'
+                          : 'inventory_2'
+                    }
+                    title={
+                      activeSection === 'my'
+                        ? 'No tickets in your queue'
+                        : activeSection === 'assigned'
+                          ? 'No assigned tickets right now'
+                          : 'No resolved tickets yet'
+                    }
+                    message="No tickets found in this section."
+                  />
                 </div>
               ) : (
                 visibleTickets.map((ticket) => (

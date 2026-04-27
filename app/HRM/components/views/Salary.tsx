@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
 import { useHrmFeedback } from '../ui/HrmFeedback';
+import HrmEmptyState from '../ui/HrmEmptyState';
+import { DetailPanelSkeleton, MetricCardSkeleton, TableRowsSkeleton } from '../ui/Skeleton';
 
 function formatCurrency(value: any) {
   const numeric = Number(value || 0);
@@ -29,6 +31,15 @@ function formatMonth(year: number, month: number) {
     month: 'long',
     year: 'numeric',
   }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+function getPayrollNotes(item: any) {
+  return (
+    item?.calculation_snapshot?.notes ||
+    item?.calculation_snapshot?.policy?.notes ||
+    item?.calculation_snapshot?.effectiveRevision?.notes ||
+    '--'
+  );
 }
 
 async function downloadSnapshotPdf(snapshot: any, fileName: string) {
@@ -126,24 +137,30 @@ export default function Salary({ employee }: { employee?: any }) {
       />
 
       <section className="grid gap-6 lg:grid-cols-3">
-        <SummaryCard
-          label="Current Salary"
-          value={formatCurrency(employee?.salary)}
-          helper={`Current salary master for ${employeeName}. Final paid amount can differ by month due to LOP, deductions, and releases.`}
-        />
-        <SummaryCard
-          label="Latest Increment"
-          value={latestRevision ? formatCurrency(latestRevision.new_salary) : 'No revision yet'}
-          helper={latestRevision ? `Effective from ${formatDate(latestRevision.effective_from)}` : 'Your latest approved increment will appear here after payroll is processed.'}
-        />
-        <SummaryCard
-          label="Latest Paid Month"
-          value={items[0] ? formatMonth(items[0].payroll_run.year, items[0].payroll_run.month) : 'No payroll yet'}
-          helper={items[0] ? `Net salary ${formatCurrency(items[0].net_salary)}` : 'This section becomes visible after HR marks a payroll month as paid.'}
-        />
+        {loading ? (
+          <MetricCardSkeleton count={3} />
+        ) : (
+          <>
+            <SummaryCard
+              label="Current Salary"
+              value={formatCurrency(employee?.salary)}
+              helper={`Current salary master for ${employeeName}. Final paid amount can differ by month due to LOP, deductions, and releases.`}
+            />
+            <SummaryCard
+              label="Latest Increment"
+              value={latestRevision ? formatCurrency(latestRevision.new_salary) : 'No revision yet'}
+              helper={latestRevision ? `Effective from ${formatDate(latestRevision.effective_from)}` : 'Your latest approved increment will appear here after payroll is processed.'}
+            />
+            <SummaryCard
+              label="Latest Paid Month"
+              value={items[0] ? formatMonth(items[0].payroll_run.year, items[0].payroll_run.month) : 'No payroll yet'}
+              helper={items[0] ? `Net salary ${formatCurrency(items[0].net_salary)}` : 'This section becomes visible after HR marks a payroll month as paid.'}
+            />
+          </>
+        )}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+      <section className="grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
         <div className="overflow-hidden rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
           <div className="border-b border-outline-variant/10 px-6 py-5">
             <h2 className="text-xl font-headline font-bold text-on-background">Paid Salary History</h2>
@@ -151,21 +168,35 @@ export default function Salary({ employee }: { employee?: any }) {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px]">
+            <table className="w-full min-w-[700px] table-fixed">
               <thead className="border-b border-outline-variant/10 bg-surface-container-low/40">
                 <tr>
-                  {['Month', 'Gross', 'Deductions', 'Net', 'Payslip'].map((label) => (
-                    <th key={label} className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">
-                      {label}
-                    </th>
-                  ))}
+                  <th className="w-[22%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Month</th>
+                  <th className="w-[13%] px-3 py-4 text-left text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Gross</th>
+                  <th className="w-[14%] px-3 py-4 text-left text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Deductions</th>
+                  <th className="w-[13%] px-3 py-4 text-left text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Net</th>
+                  <th className="w-[22%] px-3 py-4 text-left text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Notes</th>
+                  <th className="w-[16%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Payslip</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
                 {loading ? (
-                  <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-on-surface-variant">Loading salary history...</td></tr>
+                  <tr>
+                    <td colSpan={6} className="px-0 py-0">
+                      <TableRowsSkeleton rows={5} columns={6} />
+                    </td>
+                  </tr>
                 ) : items.length === 0 ? (
-                  <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-on-surface-variant">No paid payroll is available yet.</td></tr>
+                  <tr>
+                    <td colSpan={6} className="px-5 py-6">
+                      <HrmEmptyState
+                        compact
+                        icon="payments"
+                        title="No paid salary history yet"
+                        message="Paid payroll months will appear here once HR completes payroll and marks a month as paid."
+                      />
+                    </td>
+                  </tr>
                 ) : (
                   items.map((item) => (
                     <tr
@@ -175,14 +206,19 @@ export default function Salary({ employee }: { employee?: any }) {
                         selectedMonth?.id === item.id ? 'bg-emerald-50/70' : ''
                       }`}
                     >
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-4">
                         <p className="font-semibold text-on-surface">{formatMonth(item.payroll_run.year, item.payroll_run.month)}</p>
                         <p className="text-xs text-on-surface-variant">Paid {formatDate(item.paid_at)}</p>
                       </td>
-                      <td className="px-5 py-4 text-sm text-on-surface">{formatCurrency(item.prorated_salary)}</td>
-                      <td className="px-5 py-4 text-sm text-on-surface">{formatCurrency(item.total_deductions)}</td>
-                      <td className="px-5 py-4 text-sm font-bold text-emerald-700">{formatCurrency(item.net_salary)}</td>
-                      <td className="px-5 py-4 text-sm text-on-surface">
+                      <td className="px-3 py-4 text-sm text-on-surface">{formatCurrency(item.prorated_salary)}</td>
+                      <td className="px-3 py-4 text-sm text-on-surface">{formatCurrency(item.total_deductions)}</td>
+                      <td className="px-3 py-4 text-sm font-bold text-emerald-700">{formatCurrency(item.net_salary)}</td>
+                      <td className="px-3 py-4 text-sm text-on-surface">
+                        <div className="max-w-[220px] overflow-x-auto whitespace-nowrap scrollbar-thin">
+                          {getPayrollNotes(item)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-on-surface">
                         {item.payslip ? item.payslip.payslip_number : 'Generated'}
                       </td>
                     </tr>
@@ -193,7 +229,7 @@ export default function Salary({ employee }: { employee?: any }) {
           </div>
         </div>
 
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
+        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="text-xl font-headline font-bold text-on-background">Month Breakdown</h2>
@@ -216,8 +252,8 @@ export default function Salary({ employee }: { employee?: any }) {
           </div>
 
           {detailLoading ? (
-            <div className="mt-6 rounded-2xl border border-dashed border-outline-variant/25 px-5 py-12 text-center text-sm text-on-surface-variant">
-              Loading month details...
+            <div className="mt-6">
+              <DetailPanelSkeleton />
             </div>
           ) : selectedMonth ? (
             <div className="mt-6 space-y-6">
@@ -226,7 +262,7 @@ export default function Salary({ employee }: { employee?: any }) {
                 <SummaryCard label="Net Salary" value={formatCurrency(selectedMonth.net_salary)} helper="Final released amount after deductions and releases." />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 2xl:grid-cols-2">
                 <div className="rounded-2xl border border-outline-variant/10 bg-white px-5 py-4">
                   <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Breakdown</p>
                   <div className="mt-4 space-y-3 text-sm">
@@ -252,6 +288,12 @@ export default function Salary({ employee }: { employee?: any }) {
                     <div className="flex items-center justify-between gap-4"><span>Paid At</span><span className="font-semibold">{formatDate(selectedMonth.paid_at)}</span></div>
                     <div className="flex items-center justify-between gap-4"><span>Payslip No.</span><span className="font-semibold">{selectedMonth.payslip?.payslip_number || '--'}</span></div>
                     <div className="flex items-center justify-between gap-4"><span>Generated At</span><span className="font-semibold">{formatDate(selectedMonth.payslip?.generated_at)}</span></div>
+                    <div className="border-t border-outline-variant/10 pt-3">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Notes</p>
+                      <div className="mt-2 overflow-x-auto whitespace-nowrap text-sm text-on-surface scrollbar-thin">
+                        {getPayrollNotes(selectedMonth)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -266,14 +308,20 @@ export default function Salary({ employee }: { employee?: any }) {
                   />
                 </div>
               ) : (
-                <div className="rounded-[1.75rem] border border-dashed border-outline-variant/25 px-5 py-10 text-center text-sm text-on-surface-variant">
-                  Payslip will appear here once it has been generated for the paid month.
-                </div>
+                <HrmEmptyState
+                  icon="description"
+                  title="Payslip preview not ready yet"
+                  message="The payslip preview will appear here once a generated snapshot is available for the selected paid month."
+                />
               )}
             </div>
           ) : (
-            <div className="mt-6 rounded-2xl border border-dashed border-outline-variant/25 px-5 py-12 text-center text-sm text-on-surface-variant">
-              Select a paid month to review salary details and the frozen payslip snapshot.
+            <div className="mt-6">
+              <HrmEmptyState
+                icon="calendar_month"
+                title="Select a paid month"
+                message="Choose a paid salary month from the history table to review the detailed breakdown and frozen payslip snapshot."
+              />
             </div>
           )}
         </div>

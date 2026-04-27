@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useHrmFeedback } from '../../ui/HrmFeedback';
+import HrmEmptyState from '../../ui/HrmEmptyState';
+import { LoadingPanel } from '../../ui/Skeleton';
 
 type InboxTab = 'pending' | 'history';
 
@@ -163,9 +165,10 @@ export default function RegularizationInbox() {
 
       <section className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
         {isLoading ? (
-          <div className="rounded-2xl bg-surface-container-low px-5 py-12 text-center text-sm text-on-surface-variant">
-            Loading regularization inbox...
-          </div>
+          <LoadingPanel
+            title="Loading regularization inbox"
+            message="Pending approvals and review history are being prepared for this queue."
+          />
         ) : error ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">
             {error}
@@ -175,9 +178,15 @@ export default function RegularizationInbox() {
             Regularization database setup is pending. Apply the latest migration so the recipient table exists in Supabase.
           </div>
         ) : list.length === 0 ? (
-          <div className="rounded-2xl bg-surface-container-low px-5 py-12 text-center text-sm text-on-surface-variant">
-            No requests in this section yet.
-          </div>
+          <HrmEmptyState
+            icon={activeTab === 'pending' ? 'hourglass_disabled' : 'history'}
+            title={activeTab === 'pending' ? 'No pending requests' : 'No history records yet'}
+            message={
+              activeTab === 'pending'
+                ? 'Fresh regularization requests will appear here once employees send them for approval.'
+                : 'Reviewed regularization records will begin showing here after the first approval cycle.'
+            }
+          />
         ) : activeTab === 'pending' ? (
           <>
             <div className="mb-5 flex items-center justify-between gap-4">

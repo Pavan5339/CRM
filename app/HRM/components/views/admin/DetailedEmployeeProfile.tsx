@@ -3,13 +3,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import {
-  CURRENT_STAGE_OPTIONS,
   EMPLOYEE_TYPE_OPTIONS,
-  EMPLOYMENT_LIFECYCLE_STATUS_OPTIONS,
   formatEmploymentValue,
   getEmployeeTypeLabel,
 } from '@/utils/hrm-employment';
+import { DEFAULT_PROBATION_PERIOD_DAYS, SEPARATION_REASON_OPTIONS } from '@/utils/employee-lifecycle';
 import { useHrmFeedback } from '../../ui/HrmFeedback';
+import { LoadingPanel, Skeleton } from '../../ui/Skeleton';
 
 const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENDER_OPTIONS = [
@@ -19,7 +19,6 @@ const GENDER_OPTIONS = [
 ];
 const RELIGION_OPTIONS = ['Hindu', 'Muslim', 'Sikh', 'Christian', 'Buddhist', 'Jain', 'Parsi', 'Other'];
 const YES_NO_OPTIONS = ['Yes', 'No'];
-const PROBATION_PERIOD_OPTIONS = ['90', '180'];
 const NOTICE_PERIOD_OPTIONS = ['30', '60', '90'];
 const DEPARTMENT_DESIGNATION_SUGGESTIONS: Record<string, string[]> = {
   'Human Resource': ['Manager', 'HR Manager', 'HR Executive', 'HR Recruiter', 'Talent Acquisition Executive'],
@@ -74,8 +73,16 @@ const defaultForm = {
   employeeType: 'full_time_employee',
   lifecycleStatus: 'active',
   currentStage: 'none',
-  probationPeriodDays: '',
+  probationPeriodDays: String(DEFAULT_PROBATION_PERIOD_DAYS),
+  probationStartedAt: '',
+  probationEndsAt: '',
   noticePeriodDays: '',
+  noticeStartedAt: '',
+  noticeEndsAt: '',
+  separatedAt: '',
+  separationReasonCode: '',
+  separationReason: '',
+  accessDisabledAt: '',
   referredBy: '',
   currentCompanyExperience: '',
   salary: '',
@@ -135,6 +142,26 @@ function toInputDate(value?: string | null) {
   return String(value).slice(0, 10);
 }
 
+function addDaysToDateOnly(value: string, daysToAdd: number) {
+  const [year, month, day] = String(value || '').split('-').map((part) => Number(part));
+  if (!year || !month || !day) return '';
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + daysToAdd);
+  return date.toISOString().slice(0, 10);
+}
+
+function deriveProbationStartDate(stage?: string | null, joinedOn?: string | null, probationStartedAt?: string | null) {
+  if (stage === 'probation' && joinedOn) return joinedOn;
+  return probationStartedAt || '';
+}
+
+function deriveProbationEndDate(stage?: string | null, probationStartDate?: string | null, probationEndsAt?: string | null) {
+  if (stage === 'probation' && probationStartDate) {
+    return addDaysToDateOnly(probationStartDate, DEFAULT_PROBATION_PERIOD_DAYS);
+  }
+  return probationEndsAt || '';
+}
+
 function toDisplayDate(value?: string | null) {
   if (!value) return '--';
   const date = new Date(value);
@@ -172,7 +199,7 @@ function statusTone(status?: string | null) {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'active') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
   if (normalized === 'inactive') return 'bg-slate-100 text-slate-700 border-slate-200';
-  if (normalized === 'terminated') return 'bg-rose-50 text-rose-700 border-rose-200';
+  if (normalized === 'separated') return 'bg-rose-50 text-rose-700 border-rose-200';
   return 'bg-surface-container-low text-on-surface-variant border-outline-variant/10';
 }
 
@@ -258,6 +285,11 @@ function formatEducationLevelLabel(value?: string | null) {
 
 function normalizeEmployeeToForm(employee: any) {
   const access = Array.isArray(employee?.module_access) ? employee.module_access[0] : employee?.module_access;
+  const lifecycleStatus = employee?.resolved_employment_lifecycle_status || employee?.employment_lifecycle_status || 'active';
+  const currentStage = employee?.resolved_current_stage || employee?.current_stage || 'none';
+  const joinedOn = toInputDate(employee?.date_of_joining);
+  const probationStartedAt = deriveProbationStartDate(currentStage, joinedOn, toInputDate(employee?.probation_started_at));
+  const probationEndsAt = deriveProbationEndDate(currentStage, probationStartedAt, toInputDate(employee?.probation_ends_at));
 
   return {
     employeeId: employee?.employee_id || '',
@@ -290,13 +322,21 @@ function normalizeEmployeeToForm(employee: any) {
     mobile: employee?.mobile_phone || '',
     emergencyContactName: employee?.emergency_contact_name || '',
     emergencyContactNumber: employee?.emergency_contact_number || '',
-    joinedOn: toInputDate(employee?.date_of_joining),
+    joinedOn,
     confirmationDate: toInputDate(employee?.confirmation_date),
     employeeType: employee?.resolved_employee_type || employee?.employee_type || 'full_time_employee',
-    lifecycleStatus: employee?.resolved_employment_lifecycle_status || employee?.employment_lifecycle_status || 'active',
-    currentStage: employee?.resolved_current_stage || employee?.current_stage || 'none',
-    probationPeriodDays: employee?.probation_period_days ? String(employee.probation_period_days) : '',
+    lifecycleStatus,
+    currentStage,
+    probationPeriodDays: String(DEFAULT_PROBATION_PERIOD_DAYS),
+    probationStartedAt,
+    probationEndsAt,
     noticePeriodDays: employee?.notice_period_days ? String(employee.notice_period_days) : '',
+    noticeStartedAt: toInputDate(employee?.notice_started_at),
+    noticeEndsAt: toInputDate(employee?.notice_ends_at),
+    separatedAt: toInputDate(employee?.separated_at || employee?.terminated_at),
+    separationReasonCode: employee?.separation_reason_code || employee?.termination_reason_code || '',
+    separationReason: employee?.separation_reason || employee?.termination_reason || '',
+    accessDisabledAt: toInputDate(employee?.access_disabled_at),
     referredBy: employee?.referred_by || '',
     currentCompanyExperience: employee?.current_company_experience || '',
     salary: employee?.salary !== undefined && employee?.salary !== null ? String(employee.salary) : '',
@@ -393,6 +433,13 @@ export default function DetailedEmployeeProfile({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('personal');
+  const [lifecycleDialog, setLifecycleDialog] = useState<null | {
+    type: 'remove_probation' | 'start_notice' | 'mark_separation';
+    effectiveDate: string;
+    noticePeriodDays: string;
+    separationReasonCode: string;
+    separationReason: string;
+  }>(null);
 
   useEffect(() => {
     let active = true;
@@ -513,10 +560,14 @@ export default function DetailedEmployeeProfile({
   }, [documentFiles, documentList]);
 
   const summaryItems = useMemo(
-    () => [
+    () => {
+      const summaryLifecycleStatus = employee?.resolved_employment_lifecycle_status || employee?.employment_lifecycle_status;
+      const summaryCurrentStage = employee?.resolved_current_stage || employee?.current_stage || 'none';
+
+      return [
       { label: 'Employee Type', value: getEmployeeTypeLabel(employee?.resolved_employee_type || employee?.employee_type) },
-      { label: 'Lifecycle Status', value: formatStatus(employee?.resolved_employment_lifecycle_status || employee?.employment_lifecycle_status) },
-      { label: 'Current Stage', value: formatStatus(employee?.resolved_current_stage || employee?.current_stage) },
+      { label: 'Lifecycle Status', value: formatStatus(summaryLifecycleStatus) },
+      { label: 'Current Stage', value: formatStatus(summaryCurrentStage) },
       { label: 'Department', value: employee?.resolved_department_name || employee?.department?.name || '--' },
       { label: 'Designation', value: employee?.resolved_designation_title || employee?.designation?.title || '--' },
       { label: 'Reporting To', value: formatReportingTarget(employee) },
@@ -524,7 +575,8 @@ export default function DetailedEmployeeProfile({
       { label: 'Date Of Joining', value: toDisplayDate(employee?.date_of_joining) },
       { label: 'Salary', value: employee?.salary !== null && employee?.salary !== undefined ? `INR ${employee.salary}` : '--' },
       { label: 'Task Manager', value: form.taskManagerAccess === 'Yes' ? 'Enabled' : 'Disabled' },
-    ],
+    ];
+    },
     [employee, form.taskManagerAccess]
   );
 
@@ -532,14 +584,27 @@ export default function DetailedEmployeeProfile({
     event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) {
     const { name, value } = event.target;
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-      ...(sameAsCurrentAddress && CURRENT_TO_PERMANENT_FIELD_MAP[name]
-        ? { [CURRENT_TO_PERMANENT_FIELD_MAP[name]]: value }
-        : {}),
-      ...(name === 'lifecycleStatus' && value === 'terminated' ? { currentStage: 'none' } : {}),
-    }));
+    setForm((current) => {
+      const next = {
+        ...current,
+        [name]: value,
+        ...(sameAsCurrentAddress && CURRENT_TO_PERMANENT_FIELD_MAP[name]
+          ? { [CURRENT_TO_PERMANENT_FIELD_MAP[name]]: value }
+          : {}),
+        ...(name === 'lifecycleStatus' && value === 'separated' ? { currentStage: 'none' } : {}),
+      };
+
+      const nextStage = name === 'currentStage' ? value : next.currentStage;
+      const nextJoinedOn = name === 'joinedOn' ? value : next.joinedOn;
+      const nextProbationStart = deriveProbationStartDate(nextStage, nextJoinedOn, next.probationStartedAt);
+
+      return {
+        ...next,
+        probationPeriodDays: String(DEFAULT_PROBATION_PERIOD_DAYS),
+        probationStartedAt: nextProbationStart,
+        probationEndsAt: deriveProbationEndDate(nextStage, nextProbationStart, next.probationEndsAt),
+      };
+    });
     setMessage('');
     setError('');
   }
@@ -616,7 +681,7 @@ export default function DetailedEmployeeProfile({
       setForm((current) => ({
         ...current,
         lifecycleStatus: nextStatus,
-        ...(nextStatus === 'terminated' ? { currentStage: 'none' } : {}),
+        ...(nextStatus === 'separated' ? { currentStage: 'none' } : {}),
       }));
       setMessage(`Employee marked as ${formatStatus(nextStatus)}.`);
     } catch (requestError: any) {
@@ -629,13 +694,90 @@ export default function DetailedEmployeeProfile({
   async function handleStatusUpdate(nextStatus: string) {
     if (!employee?.id || saving) return;
     const confirmed = await confirmFeedback({
-      type: nextStatus === 'terminated' ? 'warning' : 'info',
+      type: nextStatus === 'separated' ? 'warning' : 'info',
       title: 'Confirm Status Change',
       message: `Mark this employee as ${formatStatus(nextStatus)}? This action will immediately change the employee record.`,
       confirmLabel: `Yes, mark as ${formatStatus(nextStatus)}`,
     });
     if (!confirmed) return;
     await applyStatusUpdate(nextStatus);
+  }
+
+  function openLifecycleDialog(type: 'remove_probation' | 'start_notice' | 'mark_separation') {
+    setLifecycleDialog({
+      type,
+      effectiveDate:
+        type === 'remove_probation'
+          ? (form.probationEndsAt || toInputDate(new Date().toISOString()))
+          : type === 'start_notice'
+            ? (form.noticeStartedAt || toInputDate(new Date().toISOString()))
+            : (form.separatedAt || toInputDate(new Date().toISOString())),
+      noticePeriodDays: form.noticePeriodDays || '30',
+      separationReasonCode: form.separationReasonCode || '',
+      separationReason: form.separationReason || '',
+    });
+  }
+
+  async function submitLifecycleDialog() {
+    if (!employee?.id || !lifecycleDialog) return;
+
+    const payload: Record<string, any> = { id: employee.id };
+
+    if (lifecycleDialog.type === 'remove_probation') {
+      payload.lifecycleStatus = form.lifecycleStatus === 'inactive' ? 'inactive' : 'active';
+      payload.currentStage = 'none';
+      payload.probationEndsAt = lifecycleDialog.effectiveDate;
+    }
+
+    if (lifecycleDialog.type === 'start_notice') {
+      payload.lifecycleStatus = form.lifecycleStatus === 'inactive' ? 'inactive' : 'active';
+      payload.currentStage = 'notice_period';
+      payload.noticeStartedAt = lifecycleDialog.effectiveDate;
+      payload.noticePeriodDays = lifecycleDialog.noticePeriodDays || '30';
+    }
+
+    if (lifecycleDialog.type === 'mark_separation') {
+      payload.lifecycleStatus = 'separated';
+      payload.currentStage = 'none';
+      payload.separatedAt = lifecycleDialog.effectiveDate;
+      payload.separationReasonCode = lifecycleDialog.separationReasonCode;
+      payload.separationReason = lifecycleDialog.separationReason;
+    }
+
+    try {
+      setSaving(true);
+      setError('');
+      setMessage('');
+
+      const response = await fetch('/HRM/api/employees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update employee lifecycle');
+      }
+
+      const nextEmployee = result.employee || employee;
+      const nextForm = normalizeEmployeeToForm(nextEmployee);
+      setEmployee(nextEmployee);
+      setForm(nextForm);
+      setSameAsCurrentAddress(isPermanentAddressSameAsCurrent(nextForm));
+      setLifecycleDialog(null);
+      setMessage(
+        lifecycleDialog.type === 'remove_probation'
+          ? 'Employee removed from probation.'
+          : lifecycleDialog.type === 'start_notice'
+            ? 'Notice period started successfully.'
+            : 'Employee marked as separated.'
+      );
+    } catch (requestError: any) {
+      setError(requestError?.message || 'Failed to update employee lifecycle');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete() {
@@ -934,41 +1076,11 @@ export default function DetailedEmployeeProfile({
               ))}
             </select>
           </Field>
-          <Field label="Lifecycle Status">
-            <select name="lifecycleStatus" value={form.lifecycleStatus} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
-              {EMPLOYMENT_LIFECYCLE_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Current Stage">
-            <select name="currentStage" value={form.currentStage} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
-              {CURRENT_STAGE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </Field>
           <Field label="Date Of Joining">
             <input type="date" name="joinedOn" value={form.joinedOn} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
           </Field>
           <Field label="Confirmation Date">
             <input type="date" name="confirmationDate" value={form.confirmationDate} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
-          </Field>
-          <Field label="Probation Period (days)">
-            <select name="probationPeriodDays" value={form.probationPeriodDays} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
-              <option value="">Select probation period</option>
-              {PROBATION_PERIOD_OPTIONS.map((option) => (
-                <option key={option} value={option}>{option} days</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Notice Period (days)">
-            <select name="noticePeriodDays" value={form.noticePeriodDays} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
-              <option value="">Select notice period</option>
-              {NOTICE_PERIOD_OPTIONS.map((option) => (
-                <option key={option} value={option}>{option} days</option>
-              ))}
-            </select>
           </Field>
           <Field label="Department">
             <select name="department" value={form.department} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
@@ -1015,7 +1127,7 @@ export default function DetailedEmployeeProfile({
               />
               {isEditing ? (
                 <p className="text-xs text-on-surface-variant">
-                  Select from dropdown, or choose "Other" and type a new designation.
+                  Select from dropdown, or choose &quot;Other&quot; and type a new designation.
                 </p>
               ) : null}
               <datalist id="employee-profile-designation-options">
@@ -1278,12 +1390,60 @@ export default function DetailedEmployeeProfile({
     );
   }
 
+  function renderLifecycleSection() {
+    return (
+      <SectionShell
+        title="Lifecycle Summary"
+        subtitle="Current lifecycle state, timeline dates, and access view for this employee."
+      >
+        <div className="space-y-5">
+          <div className="flex flex-wrap gap-2">
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${statusTone(form.lifecycleStatus)}`}>
+              <span className="material-symbols-outlined text-[14px]">check_circle</span>
+              {formatStatus(form.lifecycleStatus)}
+            </span>
+            {form.currentStage && form.currentStage !== 'none' ? (
+              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${stageTone(form.currentStage)}`}>
+                <span className="material-symbols-outlined text-[14px]">schedule</span>
+                {formatStatus(form.currentStage)}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Probation</p>
+              <p className="mt-2 text-sm font-semibold text-on-surface">{DEFAULT_PROBATION_PERIOD_DAYS} days</p>
+              <p className="mt-1 text-xs text-on-surface-variant">Ends {toDisplayDate(form.probationEndsAt)}</p>
+            </div>
+            <div className="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Notice</p>
+              <p className="mt-2 text-sm font-semibold text-on-surface">{form.noticePeriodDays ? `${form.noticePeriodDays} days` : 'Not started'}</p>
+              <p className="mt-1 text-xs text-on-surface-variant">Starts {toDisplayDate(form.noticeStartedAt)}</p>
+            </div>
+            <div className="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Separation</p>
+              <p className="mt-2 text-sm font-semibold text-on-surface">{form.separatedAt ? toDisplayDate(form.separatedAt) : 'Not separated'}</p>
+              <p className="mt-1 truncate text-xs text-on-surface-variant">{form.separationReason || 'No separation reason'}</p>
+            </div>
+            <div className="rounded-2xl border border-outline-variant/10 bg-surface px-4 py-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Access</p>
+              <p className="mt-2 text-sm font-semibold text-on-surface">{form.accessDisabledAt ? 'Disabled' : 'Active'}</p>
+              <p className="mt-1 text-xs text-on-surface-variant">{toDisplayDate(form.accessDisabledAt)}</p>
+            </div>
+          </div>
+        </div>
+      </SectionShell>
+    );
+  }
+
   const sections = [
     { id: 'personal', label: 'Personal Details' },
     { id: 'professional', label: 'Professional Details' },
     { id: 'education', label: 'Educational Details' },
     { id: 'identity', label: 'Identity & Finance' },
     { id: 'documents', label: 'Documents' },
+    { id: 'lifecycle', label: 'Lifecycle Summary' },
   ];
   const activeSectionIndex = Math.max(
     sections.findIndex((section) => section.id === activeSection),
@@ -1292,6 +1452,7 @@ export default function DetailedEmployeeProfile({
 
   let mainSection = renderPersonalSection();
   if (activeSection === 'professional') mainSection = renderProfessionalSection();
+  if (activeSection === 'lifecycle') mainSection = renderLifecycleSection();
   if (activeSection === 'education') mainSection = renderEducationSection();
   if (activeSection === 'identity') mainSection = renderIdentityFinanceSection();
   if (activeSection === 'documents') mainSection = renderDocumentsSection();
@@ -1299,8 +1460,20 @@ export default function DetailedEmployeeProfile({
   if (loading) {
     return (
       <div className={`${embedded ? 'w-full' : 'p-10 w-full'}`}>
-        <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest px-8 py-20 text-center text-on-surface-variant shadow-sm">
-          Loading employee profile...
+        <div className="space-y-6 rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
+          <LoadingPanel
+            title="Loading employee profile"
+            message="Personal details, documents, and professional records are being prepared."
+            className="border-none bg-transparent px-0 py-0 shadow-none"
+          />
+          <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+            <Skeleton className="h-72 rounded-[1.6rem]" />
+            <div className="space-y-4">
+              <Skeleton className="h-12 rounded-2xl" />
+              <Skeleton className="h-56 rounded-[1.6rem]" />
+              <Skeleton className="h-56 rounded-[1.6rem]" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -1326,6 +1499,13 @@ export default function DetailedEmployeeProfile({
     );
   }
 
+  const lifecycleStatus = employee.resolved_employment_lifecycle_status || employee.employment_lifecycle_status;
+  const currentStage = employee.resolved_current_stage || employee.current_stage || 'none';
+  const probationStartDate = deriveProbationStartDate(currentStage, toInputDate(employee.date_of_joining), toInputDate(employee.probation_started_at));
+  const probationEndDate = deriveProbationEndDate(currentStage, probationStartDate, toInputDate(employee.probation_ends_at));
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const isProbationCompleted = currentStage === 'probation' && Boolean(probationEndDate) && probationEndDate < todayDate;
+
   return (
     <div className={`${embedded ? 'w-full space-y-6' : 'p-10 pb-14 w-full space-y-8'}`}>
       <section className="rounded-[1.6rem] border border-outline-variant/10 bg-surface-container-lowest px-7 py-6 shadow-sm">
@@ -1342,13 +1522,6 @@ export default function DetailedEmployeeProfile({
             </div>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <div className="flex flex-wrap items-center gap-3">
-                  {(employee.resolved_current_stage || employee.current_stage) && (employee.resolved_current_stage || employee.current_stage) !== 'none' ? (
-                    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${stageTone(employee.resolved_current_stage || employee.current_stage)}`}>
-                      {formatStatus(employee.resolved_current_stage || employee.current_stage)}
-                    </span>
-                  ) : null}
-                </div>
                 <h1 className="text-[1.75rem] font-extrabold tracking-tight text-on-surface md:text-[1.9rem]">
                   {employee.name || 'Employee'}
                   <span className="ml-3 inline-flex align-middle rounded-full bg-surface-container-low px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-on-surface-variant">
@@ -1369,61 +1542,110 @@ export default function DetailedEmployeeProfile({
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-on-surface-variant">
                   <span className="flex items-center gap-1.5"><span className="material-symbols-outlined text-base">location_on</span>{[employee.city, employee.state].filter(Boolean).join(', ') || '--'}</span>
-                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${statusTone(employee.resolved_employment_lifecycle_status || employee.employment_lifecycle_status)}`}>
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${statusTone(lifecycleStatus)}`}>
                     <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                    {formatStatus(employee.resolved_employment_lifecycle_status || employee.employment_lifecycle_status)}
+                    {formatStatus(lifecycleStatus)}
                   </span>
+                  {currentStage === 'probation' ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                      <span className="material-symbols-outlined text-[14px]">schedule</span>
+                      {isProbationCompleted ? 'Probation Completed' : 'On Probation'}
+                    </span>
+                  ) : null}
+                  {currentStage === 'notice_period' ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                      <span className="material-symbols-outlined text-[14px]">event_upcoming</span>
+                      On Notice
+                    </span>
+                  ) : null}
                 </div>
+                {currentStage === 'probation' ? (
+                  <p className="text-xs font-medium text-violet-700">
+                    Probation period end date: {toDisplayDate(probationEndDate)}
+                  </p>
+                ) : null}
                 <p className="text-sm text-on-surface-variant">Created by <span className="font-semibold text-on-surface">{employee.created_by_name || 'HR Admin'}</span><span className="mx-2">•</span>Last updated {toDisplayDate(employee.updated_at)}</p>
               </div>
             </div>
           </div>
 
           <div className="w-full xl:w-auto xl:ml-auto">
-            <div className="flex flex-col items-stretch gap-1.5 xl:min-w-[148px]">
-              {embedded ? (
-                <button type="button" onClick={() => onBack?.()} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
-                  <span className="material-symbols-outlined text-[15px]">arrow_back</span>
-                  Back
-                </button>
-              ) : (
-                <button type="button" onClick={() => setCurrentTab?.('admin-employee-list')} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
-                  <span className="material-symbols-outlined text-[15px]">arrow_back</span>
-                  Directory
-                </button>
-              )}
-              {isEditing ? (
-                <>
-                  <button type="button" onClick={() => {
-                    const nextForm = normalizeEmployeeToForm(employee);
-                    setForm(nextForm);
-                    setSameAsCurrentAddress(isPermanentAddressSameAsCurrent(nextForm));
-                    setIsEditing(false);
-                    setError('');
-                    setMessage('');
-                  }} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
-                    <span className="material-symbols-outlined text-[14px]">close</span>
-                    Cancel
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row xl:items-start">
+              {!isEditing ? (
+                <div className="flex flex-col items-stretch gap-1.5 xl:min-w-[148px]">
+                  {currentStage === 'probation' ? (
+                    <button
+                      type="button"
+                      onClick={() => openLifecycleDialog('remove_probation')}
+                      disabled={saving || lifecycleStatus === 'separated' || !isProbationCompleted}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      title={!isProbationCompleted ? `Available after ${toDisplayDate(probationEndDate)}` : 'Remove probation'}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">assignment_turned_in</span>
+                      Remove Probation
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => openLifecycleDialog('start_notice')}
+                    disabled={saving || lifecycleStatus === 'separated'}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">notification_important</span>
+                    Start Notice Period
                   </button>
-                  <button type="button" onClick={handleSave} disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-                    <span className="material-symbols-outlined text-[14px]">save</span>
-                    {saving ? 'Saving...' : 'Save Changes'}
+                  <button
+                    type="button"
+                    onClick={() => openLifecycleDialog('mark_separation')}
+                    disabled={saving || lifecycleStatus === 'separated'}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">person_off</span>
+                    Mark Separation
                   </button>
-                </>
-              ) : (
-                <button type="button" onClick={() => setIsEditing(true)} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
-                  <span className="material-symbols-outlined text-[14px]">edit_square</span>
-                  Edit Employee
+                </div>
+              ) : null}
+              <div className="flex flex-col items-stretch gap-1.5 xl:min-w-[148px]">
+                {embedded ? (
+                  <button type="button" onClick={() => onBack?.()} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
+                    <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+                    Back
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setCurrentTab?.('admin-employee-list')} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
+                    <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+                    Directory
+                  </button>
+                )}
+                {isEditing ? (
+                  <>
+                    <button type="button" onClick={() => {
+                      const nextForm = normalizeEmployeeToForm(employee);
+                      setForm(nextForm);
+                      setSameAsCurrentAddress(isPermanentAddressSameAsCurrent(nextForm));
+                      setIsEditing(false);
+                      setError('');
+                      setMessage('');
+                    }} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                      Cancel
+                    </button>
+                    <button type="button" onClick={handleSave} disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                      <span className="material-symbols-outlined text-[14px]">save</span>
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => setIsEditing(true)} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50">
+                    <span className="material-symbols-outlined text-[14px]">edit_square</span>
+                    Edit Employee
+                  </button>
+                )}
+                <button type="button" onClick={() => handleStatusUpdate('inactive')} disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50 disabled:opacity-60">
+                  <span className="material-symbols-outlined text-[14px]">pause_circle</span>
+                  Mark Inactive
                 </button>
-              )}
-              <button type="button" onClick={() => handleStatusUpdate('inactive')} disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50 disabled:opacity-60">
-                <span className="material-symbols-outlined text-[14px]">pause_circle</span>
-                Mark Inactive
-              </button>
-              <button type="button" onClick={() => handleStatusUpdate('terminated')} disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-black bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-slate-50 disabled:opacity-60">
-                <span className="material-symbols-outlined text-[14px]">block</span>
-                Terminate
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1470,6 +1692,105 @@ export default function DetailedEmployeeProfile({
           </div>
         </aside>
       </div>
+
+      {lifecycleDialog ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-[1.8rem] border border-outline-variant/10 bg-white p-7 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-on-surface">
+                  {lifecycleDialog.type === 'remove_probation'
+                    ? 'Remove Probation'
+                    : lifecycleDialog.type === 'start_notice'
+                      ? 'Start Notice Period'
+                      : 'Mark Separation'}
+                </h3>
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  {lifecycleDialog.type === 'remove_probation'
+                    ? 'Choose the effective date when probation was completed or removed.'
+                    : lifecycleDialog.type === 'start_notice'
+                      ? 'Save the agreed notice start date and notice period days.'
+                      : 'Save the employee separation date and reason.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLifecycleDialog(null)}
+                className="rounded-full border border-outline-variant/15 bg-white p-2 text-on-surface-variant transition hover:bg-surface-container-low"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              <Field label="Effective Date">
+                <input
+                  type="date"
+                  value={lifecycleDialog.effectiveDate}
+                  onChange={(event) => setLifecycleDialog((current) => current ? { ...current, effectiveDate: event.target.value } : current)}
+                  className={inputClassName(false)}
+                />
+              </Field>
+
+              {lifecycleDialog.type === 'start_notice' ? (
+                <Field label="Notice Period (days)">
+                  <select
+                    value={lifecycleDialog.noticePeriodDays}
+                    onChange={(event) => setLifecycleDialog((current) => current ? { ...current, noticePeriodDays: event.target.value } : current)}
+                    className={inputClassName(false)}
+                  >
+                    {NOTICE_PERIOD_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option} days</option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
+              {lifecycleDialog.type === 'mark_separation' ? (
+                <>
+                  <Field label="Separation Reason Code">
+                    <select
+                      value={lifecycleDialog.separationReasonCode}
+                      onChange={(event) => setLifecycleDialog((current) => current ? { ...current, separationReasonCode: event.target.value } : current)}
+                      className={inputClassName(false)}
+                    >
+                      <option value="">Select reason</option>
+                      {SEPARATION_REASON_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Separation Reason">
+                    <textarea
+                      value={lifecycleDialog.separationReason}
+                      onChange={(event) => setLifecycleDialog((current) => current ? { ...current, separationReason: event.target.value } : current)}
+                      className={inputClassName(false, true)}
+                    />
+                  </Field>
+                </>
+              ) : null}
+            </div>
+
+            <div className="mt-7 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setLifecycleDialog(null)}
+                className="rounded-2xl border border-outline-variant/15 bg-white px-4 py-2.5 text-sm font-semibold text-on-surface-variant"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitLifecycleDialog}
+                disabled={saving || !lifecycleDialog.effectiveDate}
+                className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? 'Saving...' : 'Save Lifecycle Action'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

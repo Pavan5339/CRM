@@ -10,6 +10,14 @@ function getFileExtension(fileName = '') {
   return parts.length > 1 ? parts.pop().toLowerCase() : 'jpg';
 }
 
+function sanitizePathSegment(value = '') {
+  return String(value)
+    .trim()
+    .replace(/[^A-Za-z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 function getStoragePathFromPublicUrl(url) {
   if (!url) return null;
   const marker = `/${AVATAR_BUCKET}/`;
@@ -31,7 +39,7 @@ async function getActorEmployee(request) {
 
   const { data: employee, error: employeeError } = await adminClient
     .from('hrm_employees')
-    .select('id, profile_picture_url')
+    .select('id, employee_id, profile_picture_url')
     .eq('id', actor.employeeId)
     .single();
 
@@ -67,7 +75,8 @@ export async function POST(request) {
     }
 
     const ext = getFileExtension(avatar.name);
-    const filePath = `${employee.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const employeeCode = sanitizePathSegment(employee.employee_id || employee.id || 'employee');
+    const filePath = `${employeeCode}/${employeeCode}-${Date.now()}-${crypto.randomUUID()}.${ext}`;
     const bytes = await avatar.arrayBuffer();
 
     const { error: uploadError } = await adminClient.storage

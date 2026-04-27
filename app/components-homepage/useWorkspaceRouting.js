@@ -6,7 +6,15 @@ import { createClient } from '@/utils/supabase/client';
 const DEFAULT_WORKSPACE_STATE = {
   isAuthenticated: false,
   accountType: null,
+  workspaceHref: '/login',
   taskManagerHref: '/login',
+  user: null,
+  modules: {
+    taskManager: { enabled: false, href: null },
+    hrm: { enabled: false, href: null },
+    auditing: { enabled: false, href: null },
+    crm: { enabled: false, href: null },
+  },
 };
 
 export function useWorkspaceRouting() {
@@ -44,7 +52,10 @@ export function useWorkspaceRouting() {
           setWorkspaceState({
             isAuthenticated: true,
             accountType: null,
+            workspaceHref: '/login',
             taskManagerHref: '/login',
+            user: null,
+            modules: DEFAULT_WORKSPACE_STATE.modules,
           });
           return;
         }
@@ -54,14 +65,20 @@ export function useWorkspaceRouting() {
         setWorkspaceState({
           isAuthenticated: Boolean(result?.authenticated),
           accountType: result?.accountType || null,
+          workspaceHref: result?.workspaceHref || result?.destination || '/login',
           taskManagerHref: result?.taskManagerHref || '/login',
+          user: result?.user || null,
+          modules: result?.modules || DEFAULT_WORKSPACE_STATE.modules,
         });
       } catch {
         if (isMounted) {
           setWorkspaceState({
             isAuthenticated: true,
             accountType: null,
+            workspaceHref: '/login',
             taskManagerHref: '/login',
+            user: null,
+            modules: DEFAULT_WORKSPACE_STATE.modules,
           });
         }
       }
@@ -75,9 +92,15 @@ export function useWorkspaceRouting() {
       loadWorkspaceState();
     });
 
+    const handleFocus = () => {
+      loadWorkspaceState();
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 

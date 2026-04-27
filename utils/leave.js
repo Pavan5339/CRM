@@ -91,7 +91,7 @@ function isMissingEmploymentColumnsError(error) {
 }
 
 const EMPLOYEE_LEAVE_CONTEXT_SELECT_BASE =
-  'id, employee_id, name, employee_status, date_of_joining, working_days, second_saturday_off';
+  'id, employee_id, name, employee_status, date_of_joining, working_days, second_saturday_off, reporting_manager_id';
 const EMPLOYEE_LEAVE_CONTEXT_SELECT_WITH_EMPLOYMENT_FIELDS =
   `${EMPLOYEE_LEAVE_CONTEXT_SELECT_BASE}, employment_lifecycle_status, current_stage`;
 
@@ -151,6 +151,46 @@ export async function listActiveEmployeesForLeave() {
 
   if (error) {
     throw new Error(error.message || 'Failed to load active employees');
+  }
+
+  return (employees || []).map((employee) => {
+    const employment = deriveEmploymentFields(employee);
+    return {
+      ...employee,
+      employment_lifecycle_status:
+        employee.employment_lifecycle_status ?? employment.employmentLifecycleStatus,
+      current_stage: employee.current_stage ?? employment.currentStage,
+      resolved_employment_lifecycle_status: employment.employmentLifecycleStatus,
+      resolved_current_stage: employment.currentStage,
+    };
+  });
+}
+
+export async function listDirectReportEmployeesForLeave(reportingManagerId) {
+  if (!reportingManagerId) {
+    return [];
+  }
+
+  let employeeResult = await adminClient
+    .from('hrm_employees')
+    .select(EMPLOYEE_LEAVE_CONTEXT_SELECT_WITH_EMPLOYMENT_FIELDS)
+    .eq('reporting_manager_id', reportingManagerId)
+    .eq('employment_lifecycle_status', 'active')
+    .order('name', { ascending: true });
+
+  if (employeeResult.error && isMissingEmploymentColumnsError(employeeResult.error)) {
+    employeeResult = await adminClient
+      .from('hrm_employees')
+      .select(EMPLOYEE_LEAVE_CONTEXT_SELECT_BASE)
+      .eq('reporting_manager_id', reportingManagerId)
+      .eq('employee_status', 'active')
+      .order('name', { ascending: true });
+  }
+
+  const { data: employees, error } = employeeResult;
+
+  if (error) {
+    throw new Error(error.message || 'Failed to load reporting employees');
   }
 
   return (employees || []).map((employee) => {

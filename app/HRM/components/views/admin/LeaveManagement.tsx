@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHrmFeedback } from '../../ui/HrmFeedback';
+import HrmEmptyState from '../../ui/HrmEmptyState';
+import { LoadingPanel } from '../../ui/Skeleton';
 
 type LeaveAdminItem = {
   id: string;
@@ -269,9 +271,10 @@ export default function LeaveManagement() {
 
       <section className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
         {isLoading ? (
-          <div className="rounded-2xl bg-surface-container-low px-5 py-12 text-center text-sm text-on-surface-variant">
-            Loading leave management data...
-          </div>
+          <LoadingPanel
+            title="Loading leave management"
+            message="Leave requests, review history, and live balance data are being prepared."
+          />
         ) : null}
 
         {!isLoading && activeSection === 'pending' ? (
@@ -287,9 +290,11 @@ export default function LeaveManagement() {
             </div>
 
             {(data?.pending || []).length === 0 ? (
-              <div className="rounded-2xl bg-surface-container-low px-5 py-12 text-center text-sm text-on-surface-variant">
-                No pending leave requests.
-              </div>
+              <HrmEmptyState
+                icon="hourglass_disabled"
+                title="No pending leave requests"
+                message="New leave applications will appear here as soon as employees send them for review."
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1040px] text-left">
@@ -368,9 +373,11 @@ export default function LeaveManagement() {
             </div>
 
             {(data?.history || []).length === 0 ? (
-              <div className="rounded-2xl bg-surface-container-low px-5 py-12 text-center text-sm text-on-surface-variant">
-                No reviewed leave requests yet.
-              </div>
+              <HrmEmptyState
+                icon="history_toggle_off"
+                title="No reviewed requests yet"
+                message="Approved and rejected leave decisions will start building a review history here."
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[980px] text-left">
@@ -426,9 +433,11 @@ export default function LeaveManagement() {
             </div>
 
             {balanceRows.length === 0 ? (
-              <div className="rounded-2xl bg-surface-container-low px-5 py-12 text-center text-sm text-on-surface-variant">
-                No leave balance records available yet.
-              </div>
+              <HrmEmptyState
+                icon="table_rows_narrow"
+                title="No leave balance records yet"
+                message="Once leave credit and employee balances are available, this summary table will fill in automatically."
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[860px] text-left">

@@ -26,7 +26,15 @@ export async function GET() {
       return NextResponse.json({
         authenticated: false,
         accountType: null,
+        destination: '/login',
         taskManagerHref: '/login',
+        workspaceHref: '/login',
+        modules: {
+          taskManager: { enabled: false, href: null },
+          hrm: { enabled: false, href: null },
+          auditing: { enabled: false, href: null },
+          crm: { enabled: false, href: null },
+        },
       });
     }
 
@@ -36,14 +44,31 @@ export async function GET() {
       return NextResponse.json({
         authenticated: true,
         accountType: null,
+        destination: '/login',
         taskManagerHref: '/login',
+        workspaceHref: '/login',
+        modules: {
+          taskManager: { enabled: false, href: null },
+          hrm: { enabled: false, href: null },
+          auditing: { enabled: false, href: null },
+          crm: { enabled: false, href: null },
+        },
       });
     }
 
     return NextResponse.json({
       authenticated: true,
       accountType: authContext.accountType,
-      taskManagerHref: getTaskManagerHref(authContext.accountType),
+      destination: authContext.destination,
+      taskManagerHref:
+        authContext.moduleAccess?.taskManager?.href || getTaskManagerHref(authContext.accountType),
+      workspaceHref: authContext.destination,
+      modules: authContext.moduleAccess || {
+        taskManager: { enabled: false, href: null },
+        hrm: { enabled: false, href: null },
+        auditing: { enabled: false, href: null },
+        crm: { enabled: false, href: null },
+      },
       user: authContext.user,
     });
   } catch (error) {
@@ -53,7 +78,15 @@ export async function GET() {
       {
         authenticated: false,
         accountType: null,
+        destination: '/login',
         taskManagerHref: '/login',
+        workspaceHref: '/login',
+        modules: {
+          taskManager: { enabled: false, href: null },
+          hrm: { enabled: false, href: null },
+          auditing: { enabled: false, href: null },
+          crm: { enabled: false, href: null },
+        },
         error: error.message || 'Failed to resolve auth context',
       },
       { status: 500 }

@@ -14,6 +14,7 @@ import {
 } from './attendanceShared';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
 import { useHrmFeedback } from '../ui/HrmFeedback';
+import HrmEmptyState from '../ui/HrmEmptyState';
 
 type RegularizationTab = 'apply' | 'pending' | 'history';
 
@@ -93,8 +94,13 @@ function StatusTable({
           <tbody className="divide-y divide-outline-variant/10">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-5 py-12 text-center text-sm text-on-surface-variant">
-                  {emptyMessage}
+                <td colSpan={8} className="px-5 py-6">
+                  <HrmEmptyState
+                    compact
+                    icon="event_busy"
+                    title="Nothing to review here"
+                    message={emptyMessage}
+                  />
                 </td>
               </tr>
             ) : (

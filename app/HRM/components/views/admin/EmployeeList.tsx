@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { formatEmploymentValue, getEmployeeTypeLabel } from '@/utils/hrm-employment';
+import HrmEmptyState from '../../ui/HrmEmptyState';
+import { TableRowsSkeleton } from '../../ui/Skeleton';
 
 function getInitials(name = '') {
   return String(name)
@@ -21,7 +23,7 @@ function statusTone(status = '') {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'active') return 'bg-emerald-50 text-emerald-700';
   if (normalized === 'inactive') return 'bg-slate-100 text-slate-700';
-  if (normalized === 'terminated') return 'bg-rose-50 text-rose-700';
+  if (normalized === 'separated') return 'bg-rose-50 text-rose-700';
   return 'bg-surface-container-low text-on-surface-variant';
 }
 
@@ -269,7 +271,7 @@ export default function EmployeeList({
           <option value="">All Status</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
-          <option value="terminated">Terminated</option>
+          <option value="separated">Separated</option>
         </select>
       </section>
 
@@ -295,11 +297,20 @@ export default function EmployeeList({
             <tbody className="divide-y divide-outline-variant/10">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-on-surface-variant">Loading employee directory...</td>
+                  <td colSpan={6} className="px-0 py-0">
+                    <TableRowsSkeleton rows={6} columns={6} />
+                  </td>
                 </tr>
               ) : filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-on-surface-variant">No employees match the current filters.</td>
+                  <td colSpan={6} className="px-5 py-6">
+                    <HrmEmptyState
+                      compact
+                      icon="group_off"
+                      title="No employees found"
+                      message="Try adjusting the current filters or add a new employee to start building the directory."
+                    />
+                  </td>
                 </tr>
               ) : (
                 filteredEmployees.map((employee) => (

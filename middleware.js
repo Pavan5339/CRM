@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { resolveAuthenticatedUserContext } from '@/utils/auth/context'
+import { isEmployeeAccessDisabledNow } from '@/utils/hrm-employment'
 import { supabasePublicKey, supabaseUrl } from '@/utils/supabase/config'
 
 export async function middleware(request) {
@@ -84,6 +85,12 @@ export async function middleware(request) {
     if (isHRMEmployeePath && authContext.accountType !== 'employee') {
       const url = request.nextUrl.clone()
       url.pathname = authContext.destination
+      return NextResponse.redirect(url)
+    }
+
+    if (authContext.accountType === 'employee' && isEmployeeAccessDisabledNow(authContext.employee)) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
       return NextResponse.redirect(url)
     }
 

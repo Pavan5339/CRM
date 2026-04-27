@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useHrmFeedback } from '../../ui/HrmFeedback';
+import HrmEmptyState from '../../ui/HrmEmptyState';
+import { TableRowsSkeleton } from '../../ui/Skeleton';
 
 type HolidayRow = {
   id: string;
@@ -184,13 +186,16 @@ export default function HolidayManager() {
             </div>
 
             {loading ? (
-              <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">
-                Loading holidays...
+              <div className="overflow-hidden rounded-2xl border border-outline-variant/10">
+                <TableRowsSkeleton rows={5} columns={5} />
               </div>
             ) : nextSerialRows.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-outline-variant/20 bg-surface px-5 py-6 text-sm text-on-surface-variant">
-                No holidays have been added yet.
-              </div>
+              <HrmEmptyState
+                compact
+                icon="event_busy"
+                title="No holidays added yet"
+                message="Create the first holiday entry so employees can see the calendar in attendance and dashboard views."
+              />
             ) : (
               <div className="overflow-hidden rounded-2xl border border-outline-variant/10">
                 <table className="w-full border-collapse text-left text-sm">

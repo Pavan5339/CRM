@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import React from 'react';
 import Link from 'next/link';
 
@@ -9,6 +8,8 @@ interface AdminSidebarProps {
   setCurrentTab: (tab: string) => void;
   onLogout: () => Promise<void> | void;
   isLoggingOut?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   admin?: {
     name?: string;
     designation?: string;
@@ -22,9 +23,9 @@ export default function AdminSidebar({
   admin,
   onLogout,
   isLoggingOut = false,
+  isCollapsed = false,
+  onToggleCollapse,
 }: AdminSidebarProps) {
-  const fallbackInitial = admin?.name?.trim()?.charAt(0)?.toUpperCase() || 'H';
-
   const navItems = [
     { id: 'admin-dashboard', label: 'Admin Dashboard', icon: 'admin_panel_settings' },
     { id: 'admin-employee-list', label: 'Employee Directory', icon: 'groups' },
@@ -40,78 +41,103 @@ export default function AdminSidebar({
   ];
 
   return (
-    <aside className="subtle-scrollbar fixed left-0 top-0 z-50 flex h-screen w-60 flex-col overflow-y-auto border-r border-outline-variant/15 bg-[#EEF2F5] py-6 pr-4">
-      <div className="mb-8 px-6 text-center">
-        <h1 className="text-2xl font-extrabold tracking-tight text-on-background font-headline">HR Admin</h1>
-      </div>
-      
-      <div className="px-6 mb-8 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-container-high flex items-center justify-center text-sm font-bold text-on-surface">
-          {admin?.avatar ? (
-            <Image
-              alt={admin?.name || 'HR Admin'}
-              className="w-10 h-10 rounded-full object-cover"
-              src={admin.avatar}
-              width={40}
-              height={40}
-              unoptimized
-            />
-          ) : (
-            <span>{fallbackInitial}</span>
-          )}
-        </div>
-        <div>
-          <p className="font-headline text-sm font-bold text-on-surface">{admin?.name || 'HR Admin'}</p>
-          <p className="text-[10px] tracking-widest uppercase text-error font-bold">
-            {admin?.designation || 'Administrator'}
-          </p>
+    <aside
+      className={`subtle-scrollbar fixed left-0 top-0 z-50 flex h-screen flex-col overflow-y-auto border-r border-outline-variant/15 bg-[#EEF2F5] py-5 transition-all duration-300 ${
+        isCollapsed ? 'w-24' : 'w-64'
+      }`}
+    >
+      <div className={`mb-8 ${isCollapsed ? 'px-3' : 'px-5'}`}>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between gap-3'}`}>
+          {!isCollapsed ? (
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-3 pl-9">
+              <p className="truncate font-headline text-xl font-extrabold tracking-tight text-on-surface">
+                HR Admin
+              </p>
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#C9D5E1] bg-white text-[#5B6776] shadow-sm transition hover:border-[#B8C6D6] hover:text-primary"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+              >
+                <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+              </button>
+            </div>
+          ) : null}
+          {isCollapsed ? (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#C9D5E1] bg-white text-[#5B6776] shadow-sm transition hover:border-[#B8C6D6] hover:text-primary"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+            </button>
+          ) : null}
         </div>
       </div>
 
-      <nav className="flex-grow space-y-2">
+      <nav className="flex-grow space-y-2 pr-3">
         {navItems.map((item) => {
           const isActive = currentTab === item.id;
           return (
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center gap-3 px-5 py-3 transition-colors group ${
-                isActive 
-                  ? 'text-primary bg-surface-container-lowest rounded-r-full font-bold shadow-sm border-y border-r border-outline-variant/10' 
-                  : 'text-on-surface-variant hover:text-primary hover:bg-surface-container-lowest/50 rounded-r-full'
-              }`}
+              className={`w-full flex items-center transition-colors ${
+                isActive
+                  ? 'rounded-r-2xl border-y border-r border-outline-variant/10 bg-surface-container-lowest font-bold text-primary shadow-sm'
+                  : 'text-on-surface-variant hover:bg-surface-container-lowest/50 hover:text-primary'
+              } ${isCollapsed ? 'justify-center px-3 py-3.5' : 'gap-3 px-5 py-3'} ${isActive ? '' : 'rounded-r-2xl'}`}
+              title={isCollapsed ? item.label : undefined}
             >
-              <span 
-                className="material-symbols-outlined" 
+              <span
+                className="material-symbols-outlined shrink-0"
                 style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}
               >
                 {item.icon}
               </span>
-              <span
-                className={`font-body text-sm min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left ${
-                  isActive ? 'font-bold' : 'font-medium'
-                }`}
-              >
-                {item.label}
-              </span>
+              {!isCollapsed ? (
+                <span
+                  className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left font-body text-sm ${
+                    isActive ? 'font-bold' : 'font-medium'
+                  }`}
+                >
+                  {item.label}
+                </span>
+              ) : null}
             </button>
           );
         })}
       </nav>
 
-      <div className="mt-auto border-t border-outline-variant/10 pt-6 space-y-2">
+      <div className="mt-auto space-y-2 border-t border-outline-variant/10 pt-5 pr-3">
         <button
           type="button"
           onClick={onLogout}
           disabled={isLoggingOut}
-          className="w-full flex items-center gap-3 px-5 py-2.5 text-on-surface-variant hover:text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          className={`w-full flex items-center text-on-surface-variant transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 ${
+            isCollapsed ? 'justify-center rounded-r-2xl px-3 py-3' : 'gap-3 rounded-r-2xl px-5 py-3 hover:bg-surface-container-lowest/50'
+          }`}
+          title={isCollapsed ? (isLoggingOut ? 'Logging Out...' : 'Log Out') : undefined}
         >
           <span className="material-symbols-outlined">logout</span>
-          <span className="font-body text-sm font-medium">{isLoggingOut ? 'Logging Out...' : 'Log Out'}</span>
+          {!isCollapsed ? (
+            <span className="font-body text-sm font-medium">{isLoggingOut ? 'Logging Out...' : 'Log Out'}</span>
+          ) : null}
         </button>
-        <Link href="/" className="w-full flex items-center gap-3 px-5 py-2.5 text-on-surface-variant hover:text-primary transition-colors">
+        <Link
+          href="/"
+          className={`w-full flex items-center text-on-surface-variant transition-colors hover:text-primary ${
+            isCollapsed ? 'justify-center rounded-r-2xl px-3 py-3' : 'gap-3 rounded-r-2xl px-5 py-3 hover:bg-surface-container-lowest/50'
+          }`}
+          title={isCollapsed ? 'Home Page' : undefined}
+        >
           <span className="material-symbols-outlined">home</span>
-          <span className="font-body text-sm font-medium">Home Page</span>
+          {!isCollapsed ? (
+            <span className="font-body text-sm font-medium">Home Page</span>
+          ) : null}
         </Link>
       </div>
     </aside>

@@ -166,6 +166,39 @@ function getGreetingMeta(date: Date) {
   };
 }
 
+const WEEKLY_MOTIVATION_MESSAGES = [
+  {
+    title: 'Keep Going',
+    body: 'Small steps every day build strong results. Stay steady, stay proud, and keep moving forward.',
+  },
+  {
+    title: 'You Are Growing',
+    body: 'Every task you complete adds to your progress. Trust your effort and let your work speak for you.',
+  },
+  {
+    title: 'One Good Day',
+    body: 'A focused day can change the whole week. Stay calm, stay kind, and do your best with confidence.',
+  },
+  {
+    title: 'Stay Inspired',
+    body: 'Good work comes from clear thinking and a positive heart. Keep your energy pointed toward progress.',
+  },
+  {
+    title: 'You Can Do This',
+    body: 'Challenges are part of growth. Keep learning, keep showing up, and keep believing in yourself.',
+  },
+  {
+    title: 'Progress Matters',
+    body: 'You do not need perfection every day. Consistent effort and honest work always create momentum.',
+  },
+];
+
+function getWeekOfYear(date: Date) {
+  const start = new Date(date.getFullYear(), 0, 1);
+  const diffInDays = Math.floor((date.getTime() - start.getTime()) / 86400000);
+  return Math.floor(diffInDays / 7);
+}
+
 export default function Dashboard({
   employee,
   setCurrentTab,
@@ -199,6 +232,10 @@ export default function Dashboard({
     'group relative flex-1 overflow-hidden rounded-2xl bg-gradient-to-b from-violet-400 via-violet-500 to-violet-600 px-4 py-3 text-xs font-semibold text-white shadow-[0_14px_28px_rgba(139,92,246,0.28)] transition-all duration-200 before:absolute before:inset-x-4 before:top-1 before:h-[42%] before:rounded-full before:bg-white/20 before:blur-md hover:-translate-y-0.5 hover:shadow-[0_18px_32px_rgba(139,92,246,0.34)] active:translate-y-1 active:shadow-[0_8px_18px_rgba(139,92,246,0.22)] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0';
   const attendanceMonth = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}`;
   const todayDateKey = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
+  const weeklyMotivation = useMemo(() => {
+    const weekIndex = getWeekOfYear(new Date()) % WEEKLY_MOTIVATION_MESSAGES.length;
+    return WEEKLY_MOTIVATION_MESSAGES[weekIndex];
+  }, []);
 
   // Escape key handler for modals
   useEffect(() => {
@@ -661,9 +698,9 @@ export default function Dashboard({
           <div className="w-16 h-16 bg-surface-container-lowest rounded-full flex items-center justify-center mb-4 shadow-sm">
             <span className="material-symbols-outlined text-tertiary text-3xl">auto_awesome</span>
           </div>
-          <h3 className="text-base font-bold font-headline mb-1 text-on-surface">Clear Skies!</h3>
-          <p className="text-xs text-on-tertiary-container leading-relaxed">No reviews or appraisals are pending your attention right now.</p>
-          <button className="mt-6 text-xs font-bold uppercase tracking-widest text-tertiary hover:underline">View History</button>
+          <h3 className="text-base font-bold font-headline mb-1 text-on-surface">{weeklyMotivation.title}</h3>
+          <p className="text-xs text-on-tertiary-container leading-relaxed">{weeklyMotivation.body}</p>
+          <div className="mt-6 text-xs font-bold uppercase tracking-widest text-tertiary">Take a small pause and keep going</div>
         </div>
 
         {/* Upcoming Holidays List */}

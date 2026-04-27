@@ -109,7 +109,7 @@ async function tryEmployeeLogin(identifier, password, loginAs) {
     return {
       ok: false,
       payload: {
-        error: 'Your employee account is inactive or terminated. Please contact HR.',
+        error: 'Your employee account is inactive or separated. Please contact HR.',
       },
       status: 403,
     };

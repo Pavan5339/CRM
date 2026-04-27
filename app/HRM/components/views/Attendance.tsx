@@ -9,6 +9,7 @@ import {
   type AttendanceStatus,
 } from './attendanceShared';
 import EmployeePageHeader from '../ui/EmployeePageHeader';
+import { MetricCardSkeleton, Skeleton } from '../ui/Skeleton';
 
 interface AttendanceProps {
   onOpenRegularizeAttendance: () => void;
@@ -157,21 +158,25 @@ export default function Attendance({ onOpenRegularizeAttendance }: AttendancePro
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {kpiItems.map((item) => (
-            <div
-              key={item.label}
-              className={`rounded-3xl border border-white/70 ${item.shell} px-5 py-4 shadow-[0_16px_34px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[25px] text-black">{item.icon}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">{item.label}</span>
+          {isLoading ? (
+            <MetricCardSkeleton count={3} />
+          ) : (
+            kpiItems.map((item) => (
+              <div
+                key={item.label}
+                className={`rounded-3xl border border-white/70 ${item.shell} px-5 py-4 shadow-[0_16px_34px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-[25px] text-black">{item.icon}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">{item.label}</span>
+                </div>
+                <div className="mt-5 text-center">
+                  <p className="text-3xl font-headline font-bold tracking-tight text-on-surface">{item.value}</p>
+                  <p className="mt-3 text-[11px] leading-5 text-on-surface-variant">{item.helper}</p>
+                </div>
               </div>
-              <div className="mt-5 text-center">
-                <p className="text-3xl font-headline font-bold tracking-tight text-on-surface">{item.value}</p>
-                <p className="mt-3 text-[11px] leading-5 text-on-surface-variant">{item.helper}</p>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         <div className="col-span-12 lg:col-span-4 bg-[#F6ECFF] rounded-2xl p-5 relative overflow-hidden flex flex-col justify-center editorial-shadow">
@@ -271,7 +276,18 @@ export default function Attendance({ onOpenRegularizeAttendance }: AttendancePro
             <h4 className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-5">Selected Date</h4>
 
             {isLoading ? (
-              <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">Loading attendance...</div>
+              <div className="flex-1 space-y-5">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-8 w-40" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {Array.from({ length: 6 }, (_, index) => (
+                    <Skeleton key={index} className="h-[84px] rounded-xl" />
+                  ))}
+                </div>
+                <Skeleton className="h-16 rounded-2xl" />
+              </div>
             ) : (() => {
               if (selectedRecord && selectedRecord.status === 'holiday') {
                 const cfg = STATUS_CONFIG.holiday;

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { adminClient } from '@/utils/supabase/admin';
-import { resolveAuthenticatedUserContext } from '@/utils/auth/context';
+import { hasLinkedEmployeeAccess, resolveAuthenticatedUserContext } from '@/utils/auth/context';
 import {
   applyApprovedLeaveToAttendance,
   buildLeaveBalanceMap,
@@ -14,7 +14,7 @@ import {
 } from '@/utils/leave';
 import { syncPayrollLopEntriesForLeaveApproval } from '@/utils/payroll';
 
-async function requireHrAdminAccess() {
+async function requireEmployeeContext() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -26,7 +26,7 @@ async function requireHrAdminAccess() {
   }
 
   const authContext = await resolveAuthenticatedUserContext(supabase, user);
-  if (!authContext?.isHrAdmin) {
+  if (!hasLinkedEmployeeAccess(authContext)) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
@@ -46,9 +46,14 @@ async function createLedgerEntry(payload) {
 
 export async function PATCH(request, context) {
   try {
-    const auth = await requireHrAdminAccess();
+    const auth = await requireEmployeeContext();
     if (auth.error) {
       return auth.error;
+    }
+
+    const reviewerEmployeeId = auth.authContext.employee?.id || null;
+    if (!reviewerEmployeeId) {
+      return NextResponse.json({ error: 'Employee reviewer not found.' }, { status: 403 });
     }
 
     const { id } = await readParams(context.params);
@@ -84,12 +89,31 @@ export async function PATCH(request, context) {
       return NextResponse.json({ error: 'Leave request not found.' }, { status: 404 });
     }
 
+    const employee = await getEmployeeLeaveContext(leaveRequest.employee_id);
+    const assignedReportingManagerId = leaveRequest.reporting_manager_id || employee.reporting_manager_id || null;
+
+    if (!assignedReportingManagerId || assignedReportingManagerId !== reviewerEmployeeId) {
+      return NextResponse.json({ error: 'Only the assigned reporting manager can review this leave request.' }, { status: 403 });
+    }
+
     if (leaveRequest.status !== 'pending') {
       return NextResponse.json({ error: 'This leave request has already been reviewed.' }, { status: 400 });
     }
 
-    const reviewerEmployeeId = auth.authContext.employee?.id || null;
-    const reviewerName = auth.authContext.hrAdmin?.name || auth.authContext.user?.name || 'HR Admin';
+    const reviewerName = auth.authContext.employee?.name || auth.authContext.user?.name || 'Reporting Manager';
+
+    if (
+      leaveRequest.reporting_manager_id !== assignedReportingManagerId ||
+      !leaveRequest.reporting_manager_name_snapshot
+    ) {
+      await adminClient
+        .from('hrm_leave_requests')
+        .update({
+          reporting_manager_id: assignedReportingManagerId,
+          reporting_manager_name_snapshot: reviewerName,
+        })
+        .eq('id', leaveRequest.id);
+    }
 
     if (action === 'reject') {
       const { error: rejectError } = await adminClient
@@ -97,9 +121,9 @@ export async function PATCH(request, context) {
         .update({
           status: 'rejected',
           review_note: reviewNote || null,
-          rejection_reason: reviewNote || 'Rejected by HR',
+          rejection_reason: reviewNote || 'Rejected by reporting manager',
           reviewed_by: reviewerEmployeeId,
-          reviewed_by_role: 'hr_admin',
+          reviewed_by_role: 'reporting_manager',
           reviewed_by_name: reviewerName,
           reviewed_at: new Date().toISOString(),
         })
@@ -112,7 +136,6 @@ export async function PATCH(request, context) {
       return NextResponse.json({ message: 'Leave request rejected.' }, { status: 200 });
     }
 
-    const employee = await getEmployeeLeaveContext(leaveRequest.employee_id);
     const { leaveTypes, balances, year } = await syncEmployeeLeaveBalances(employee);
     const leaveType = leaveTypes.find((item) => item.id === leaveRequest.leave_type_id);
     const balanceMap = buildLeaveBalanceMap(balances);
@@ -146,7 +169,7 @@ export async function PATCH(request, context) {
         lop_days: lopDays,
         review_note: reviewNote || null,
         reviewed_by: reviewerEmployeeId,
-        reviewed_by_role: 'hr_admin',
+        reviewed_by_role: 'reporting_manager',
         reviewed_by_name: reviewerName,
         reviewed_at: reviewedAt,
       })
@@ -210,7 +233,7 @@ export async function PATCH(request, context) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error reviewing leave request:', error);
+    console.error('Error reviewing leave request as reporting manager:', error);
     if (String(error?.message || '').includes('Leave schema update is pending')) {
       return NextResponse.json(
         { error: 'Leave schema update is pending. Please apply the latest migration first.' },

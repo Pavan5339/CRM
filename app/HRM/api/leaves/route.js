@@ -8,6 +8,7 @@ import {
   formatLeaveSession,
   getEmployeeLeaveContext,
   isMissingLeaveSchemaError,
+  listDirectReportEmployeesForLeave,
   listActiveLeaveTypes,
   syncEmployeeLeaveBalances,
 } from '@/utils/leave';
@@ -52,6 +53,10 @@ function mapLeaveRequest(row, leaveTypeMap) {
     lopDays: Number(row.lop_days ?? 0),
     reviewNote: row.review_note || '',
     rejectionReason: row.rejection_reason || '',
+    reviewedByRole: row.reviewed_by_role || '',
+    reviewedByName: row.reviewed_by_name || '',
+    reportingManagerId: row.reporting_manager_id || '',
+    reportingManagerName: row.reporting_manager_name_snapshot || '',
     createdAt: row.created_at,
     reviewedAt: row.reviewed_at,
   };
@@ -68,11 +73,26 @@ export async function GET() {
     const { leaveTypes, balances, year } = await syncEmployeeLeaveBalances(employee);
     const leaveTypeMap = new Map(leaveTypes.map((type) => [type.id, type]));
 
-    const { data: requests, error: requestError } = await adminClient
-      .from('hrm_leave_requests')
-      .select('*')
-      .eq('employee_id', employee.id)
-      .order('created_at', { ascending: false });
+    const directReports = await listDirectReportEmployeesForLeave(employee.id);
+    const directReportIds = directReports.map((item) => item.id).filter(Boolean);
+
+    const [requestResult, teamRequestResult] = await Promise.all([
+      adminClient
+        .from('hrm_leave_requests')
+        .select('*')
+        .eq('employee_id', employee.id)
+        .order('created_at', { ascending: false }),
+      directReportIds.length
+        ? adminClient
+            .from('hrm_leave_requests')
+            .select('*')
+            .in('employee_id', directReportIds)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    const { data: requests, error: requestError } = requestResult;
+    const { data: teamRequests, error: teamRequestError } = teamRequestResult;
 
     if (requestError) {
       if (isMissingLeaveSchemaError(requestError)) {
@@ -90,6 +110,21 @@ export async function GET() {
       }
       return NextResponse.json({ error: requestError.message || 'Failed to load leave requests' }, { status: 500 });
     }
+
+    if (teamRequestError && !isMissingLeaveSchemaError(teamRequestError)) {
+      return NextResponse.json({ error: teamRequestError.message || 'Failed to load team leave requests' }, { status: 500 });
+    }
+
+    const teamEmployeeMap = new Map(directReports.map((item) => [item.id, item]));
+    const mappedTeamRequests = (teamRequests || []).map((row) => {
+      const employeeRow = teamEmployeeMap.get(row.employee_id);
+      return {
+        ...mapLeaveRequest(row, leaveTypeMap),
+        employeeId: row.employee_id,
+        employeeCode: employeeRow?.employee_id || '',
+        employeeName: employeeRow?.name || 'Employee',
+      };
+    });
 
     return NextResponse.json(
       {
@@ -112,6 +147,11 @@ export async function GET() {
         })),
         summary: buildLeaveSummary(balances),
         history: (requests || []).map((row) => mapLeaveRequest(row, leaveTypeMap)),
+        teamInbox: {
+          isReportingManager: directReportIds.length > 0,
+          pending: mappedTeamRequests.filter((item) => item.status === 'pending'),
+          history: mappedTeamRequests.filter((item) => item.status !== 'pending'),
+        },
         year,
       },
       { status: 200 }
@@ -200,12 +240,14 @@ export async function POST(request) {
     const insertPayload = {
       employee_id: employee.id,
       leave_type_id: leaveType.id,
+      reporting_manager_id: employee.reporting_manager_id || null,
       start_date: startDate,
       end_date: endDate,
       session,
       applied_session: session,
       status: 'pending',
       reason,
+      reporting_manager_name_snapshot: null,
       duration_days: calculation.totalDays,
       total_days: calculation.totalDays,
       approved_days: 0,
@@ -228,6 +270,21 @@ export async function POST(request) {
       }
 
       return NextResponse.json({ error: createError?.message || 'Failed to submit leave request' }, { status: 500 });
+    }
+
+    if (created?.reporting_manager_id) {
+      const { data: reportingManager } = await adminClient
+        .from('hrm_employees')
+        .select('id, name')
+        .eq('id', created.reporting_manager_id)
+        .maybeSingle();
+
+      if (reportingManager?.name) {
+        await adminClient
+          .from('hrm_leave_requests')
+          .update({ reporting_manager_name_snapshot: reportingManager.name })
+          .eq('id', created.id);
+      }
     }
 
     return NextResponse.json(

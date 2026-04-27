@@ -2,7 +2,8 @@
 
 import Image from 'next/image';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import EmployeePageHeader from '../../ui/EmployeePageHeader';
+import HrmEmptyState from '../../ui/HrmEmptyState';
+import { LoadingPanel, Skeleton } from '../../ui/Skeleton';
 
 type OrgChartNode = {
   id: string;
@@ -87,15 +88,69 @@ function Avatar({ node }: { node: OrgChartNode }) {
   );
 }
 
-function CountBadge({ count }: { count: number }) {
+function CountBadge({ count, isActive = false }: { count: number; isActive?: boolean }) {
   if (!count) {
     return null;
   }
 
   return (
-    <span className="inline-flex min-w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600">
+    <span
+      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-[11px] font-semibold ${
+        isActive
+          ? 'border-violet-300 bg-violet-50 text-violet-700'
+          : 'border-slate-200 bg-white text-slate-600'
+      }`}
+    >
       {count}
     </span>
+  );
+}
+
+function OrgNodeCard({
+  node,
+  registerNodeRef,
+  onToggle,
+  hasChildren,
+  showChildren,
+  isHighlighted,
+}: {
+  node: OrgChartNode;
+  registerNodeRef: (nodeId: string, element: HTMLButtonElement | null) => void;
+  onToggle: (nodeId: string) => void;
+  hasChildren: boolean;
+  showChildren: boolean;
+  isHighlighted: boolean;
+}) {
+  return (
+    <button
+      ref={(element) => {
+        registerNodeRef(node.id, element);
+      }}
+      type="button"
+      onClick={() => {
+        if (hasChildren) {
+          onToggle(node.id);
+        }
+      }}
+      className={`group relative w-[260px] rounded-[28px] border px-4 py-4 text-left transition-all ${buildStatusTone(node, isHighlighted)} ${
+        hasChildren ? 'cursor-pointer hover:-translate-y-0.5 hover:border-violet-300' : 'cursor-default'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <Avatar node={node} />
+        <div className="min-w-0 flex-1">
+          <div className="min-w-0">
+            <p className="truncate text-[17px] font-bold text-slate-900">{node.name}</p>
+            <p className="mt-1 truncate text-sm font-medium text-slate-500">{node.title}</p>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <span>{node.kind === 'super_admin' ? 'Executive' : node.kind === 'group' ? 'Fallback Group' : 'Employee'}</span>
+            {node.employeeId ? <span className="truncate tracking-[0.14em] text-slate-500">{node.employeeId}</span> : null}
+          </div>
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -128,59 +183,37 @@ function TreeNode({
 
   return (
     <div className="flex flex-col items-center">
-      <button
-        ref={(element) => {
-          registerNodeRef(nodeId, element);
-        }}
-        type="button"
-        onClick={() => {
-          if (hasChildren) {
-            onToggle(nodeId);
-          }
-        }}
-        className={`group relative w-[260px] rounded-[28px] border px-4 py-4 text-left transition-all ${buildStatusTone(node, isHighlighted)} ${
-          hasChildren ? 'cursor-pointer hover:-translate-y-0.5 hover:border-violet-300' : 'cursor-default'
-        }`}
-      >
-        <div className="flex items-start gap-3">
-          <Avatar node={node} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-[17px] font-bold text-slate-900">{node.name}</p>
-                <p className="mt-1 truncate text-sm font-medium text-slate-500">{node.title}</p>
-              </div>
-              <CountBadge count={node.directReportCount} />
-            </div>
+      <OrgNodeCard
+        node={node}
+        registerNodeRef={registerNodeRef}
+        onToggle={onToggle}
+        hasChildren={hasChildren}
+        showChildren={showChildren}
+        isHighlighted={isHighlighted}
+      />
 
-            <div className="mt-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              <span>{node.kind === 'super_admin' ? 'Executive' : node.kind === 'group' ? 'Fallback Group' : 'Employee'}</span>
-              {node.employeeId ? <span className="truncate tracking-[0.14em] text-slate-500">{node.employeeId}</span> : null}
-            </div>
-          </div>
-        </div>
-
-        {hasChildren ? (
-          <div className="mt-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
-            <span>{showChildren ? 'Hide team' : 'Show team'}</span>
-            <span className="material-symbols-outlined text-[18px]">
-              {showChildren ? 'remove' : 'add'}
-            </span>
-          </div>
-        ) : null}
-      </button>
+      {hasChildren ? (
+        <button
+          type="button"
+          onClick={() => onToggle(nodeId)}
+          className="mt-3 inline-flex flex-col items-center gap-2 text-center"
+        >
+          <div className="h-4 w-[2px] bg-slate-400" />
+          <CountBadge count={node.directReportCount} isActive={showChildren} />
+        </button>
+      ) : null}
 
       {showChildren ? (
-        <div className="mt-4 flex w-full flex-col items-center">
-          <div className="h-6 w-px bg-slate-300" />
+        <div className="mt-3 flex w-full flex-col items-center">
+          <div className="h-5 w-[2px] bg-slate-400" />
           <div className="relative">
             {node.childIds.length > 1 ? (
-              <div className="absolute left-12 right-12 top-0 h-px bg-slate-300" />
+              <div className="absolute left-12 right-12 top-0 h-[2px] bg-slate-400" />
             ) : null}
             <div className="flex items-start justify-center gap-6 px-2 pt-0">
               {node.childIds.map((childId) => (
                 <div key={childId} className="flex flex-col items-center">
-                  <div className="h-6 w-px bg-slate-300" />
+                  <div className="h-5 w-[2px] bg-slate-400" />
                   <TreeNode
                     nodeId={childId}
                     nodes={nodes}
@@ -210,7 +243,7 @@ export default function OrganizationChart({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(MIN_ZOOM);
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([]);
   const [dragState, setDragState] = useState<{
     active: boolean;
@@ -227,6 +260,7 @@ export default function OrganizationChart({
   });
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const topClusterRef = useRef<HTMLDivElement | null>(null);
   const nodeRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   useEffect(() => {
@@ -314,6 +348,21 @@ export default function OrganizationChart({
     return expanded;
   }, [expandedNodeIds, searchExpandedNodeIds]);
 
+  const rootChildIds = useMemo(() => {
+    const ids = new Set<string>();
+
+    (data?.roots || []).forEach((rootId) => {
+      const rootNode = nodes.get(rootId);
+      (rootNode?.childIds || []).forEach((childId) => ids.add(childId));
+    });
+
+    return Array.from(ids).sort((leftId, rightId) => {
+      const left = nodes.get(leftId);
+      const right = nodes.get(rightId);
+      return String(left?.name || '').localeCompare(String(right?.name || ''), 'en', { sensitivity: 'base' });
+    });
+  }, [data?.roots, nodes]);
+
   useEffect(() => {
     if (!searchMatches.length) {
       return;
@@ -338,6 +387,39 @@ export default function OrganizationChart({
       window.clearTimeout(timer);
     };
   }, [searchMatches]);
+
+  useEffect(() => {
+    if (!data?.roots?.length || searchQuery.trim()) {
+      return;
+    }
+
+    const viewport = viewportRef.current;
+    const cluster = topClusterRef.current;
+
+    if (!viewport || !cluster) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const viewportRect = viewport.getBoundingClientRect();
+      const clusterRect = cluster.getBoundingClientRect();
+
+      const nextScrollLeft =
+        viewport.scrollLeft +
+        (clusterRect.left - viewportRect.left) -
+        Math.max(0, (viewport.clientWidth - clusterRect.width) / 2);
+
+      viewport.scrollTo({
+        left: Math.max(0, nextScrollLeft),
+        top: 0,
+        behavior: 'smooth',
+      });
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [data?.roots, searchQuery, zoom]);
 
   function handleToggle(nodeId: string) {
     setExpandedNodeIds((current) =>
@@ -395,28 +477,35 @@ export default function OrganizationChart({
     handleZoom(zoom + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
   }
 
-  const summaryCard = (
-    <div className="inline-flex rounded-full bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] p-1 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-      <div className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(180deg,#eadcff_0%,#cfbdfd_100%)] px-4 py-2.5 text-sm font-semibold text-violet-950 shadow-[0_10px_18px_rgba(167,139,250,0.16)]">
-        <span className="material-symbols-outlined text-[18px]">account_tree</span>
-        Live Reporting View
-      </div>
-    </div>
-  );
+  const peopleSummary = `${data?.metadata?.employeeCount || 0} employees • ${data?.metadata?.superAdminCount || 0} super admins`;
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-6 px-7 py-7 pb-10">
-      <EmployeePageHeader
-        icon="account_tree"
-        title="Organization Chart"
-        description={`Today: ${todayLabel}`}
-        action={summaryCard}
-      />
+    <div className="space-y-4 px-0 pt-3 pb-0">
+      <section className="flex flex-col gap-2 px-6 pt-2 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+            <span className="material-symbols-outlined text-[18px]">account_tree</span>
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-headline font-bold tracking-tight text-on-background">
+              Organization Chart
+            </h1>
+            <p className="mt-1 text-xs text-on-surface-variant">Today: {todayLabel}</p>
+          </div>
+        </div>
 
-      <section className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="pt-1 text-right lg:pr-6">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+            Live Reporting View
+          </p>
+          <p className="mt-1 text-xs text-on-surface-variant">{peopleSummary}</p>
+        </div>
+      </section>
+
+      <section className="space-y-2 px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-1 flex-col gap-4 md:flex-row md:items-center">
-            <label className="relative block w-full max-w-xl">
+            <label className="relative block w-full max-w-lg">
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined text-[20px]">
                 search
               </span>
@@ -425,25 +514,16 @@ export default function OrganizationChart({
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Find by employee name or ID"
-                className="w-full rounded-2xl border border-outline-variant/20 bg-white py-3 pl-12 pr-4 text-sm text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                className="h-11 w-full rounded-lg border border-black bg-transparent pl-11 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-black"
               />
             </label>
-
-            <div className="flex items-center gap-3 text-sm text-slate-500">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 font-medium">
-                {data?.metadata?.employeeCount || 0} employees
-              </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 font-medium">
-                {data?.metadata?.superAdminCount || 0} super admins
-              </span>
-            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <div className="flex flex-wrap items-center gap-3 pt-1 lg:justify-end lg:pr-6">
             <button
               type="button"
               onClick={() => handleZoom(zoom - ZOOM_STEP)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+              className="inline-flex h-11 items-center gap-2 border border-black px-3 text-sm font-semibold text-slate-700 transition hover:text-black"
             >
               <span className="material-symbols-outlined text-[18px]">zoom_out</span>
               Zoom Out
@@ -451,34 +531,38 @@ export default function OrganizationChart({
             <button
               type="button"
               onClick={() => handleZoom(1)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+              className="inline-flex h-11 items-center border border-black px-3 text-sm font-semibold text-slate-700 transition hover:text-black"
             >
               {Math.round(zoom * 100)}%
             </button>
             <button
               type="button"
               onClick={() => handleZoom(zoom + ZOOM_STEP)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+              className="inline-flex h-11 items-center gap-2 border border-black px-3 text-sm font-semibold text-slate-700 transition hover:text-black"
             >
               <span className="material-symbols-outlined text-[18px]">zoom_in</span>
               Zoom In
             </button>
           </div>
         </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-          <span className="rounded-full bg-slate-100 px-3 py-1.5 font-medium">Click a node to open its team</span>
-          <span className="rounded-full bg-slate-100 px-3 py-1.5 font-medium">Drag anywhere to move around the chart</span>
-          <span className="rounded-full bg-slate-100 px-3 py-1.5 font-medium">Use Ctrl + mouse wheel to zoom</span>
-        </div>
       </section>
 
-      <section className="p-0">
+      <section className="overflow-hidden p-0">
         {isLoading ? (
-          <div className="flex min-h-[520px] items-center justify-center rounded-[1.5rem] border border-dashed border-outline-variant/25 bg-surface">
-            <div className="flex items-center gap-3 text-sm font-medium text-slate-500">
-              <span className="material-symbols-outlined animate-pulse text-[22px]">account_tree</span>
-              Building organization chart...
+          <div className="space-y-6 rounded-[1.5rem] border border-dashed border-outline-variant/25 bg-surface p-8">
+            <LoadingPanel
+              title="Building organization chart"
+              message="Reporting lines, teams, and hierarchy branches are being assembled."
+              className="border-none bg-transparent px-0 py-0 shadow-none"
+            />
+            <div className="flex flex-col items-center gap-8">
+              <Skeleton className="h-28 w-64 rounded-[28px]" />
+              <div className="h-8 w-px bg-slate-200" />
+              <div className="flex flex-wrap justify-center gap-6">
+                <Skeleton className="h-24 w-56 rounded-[28px]" />
+                <Skeleton className="h-24 w-56 rounded-[28px]" />
+                <Skeleton className="h-24 w-56 rounded-[28px]" />
+              </div>
             </div>
           </div>
         ) : error ? (
@@ -490,9 +574,12 @@ export default function OrganizationChart({
           </div>
         ) : !data?.roots?.length ? (
           <div className="flex min-h-[520px] items-center justify-center rounded-[1.5rem] border border-dashed border-outline-variant/25 bg-surface p-6 text-center">
-            <div className="space-y-2">
-              <p className="text-lg font-semibold text-slate-700">No reporting data available yet</p>
-              <p className="text-sm text-slate-500">Add employees and reporting relationships to see the organization tree.</p>
+            <div className="w-full max-w-lg">
+              <HrmEmptyState
+                icon="account_tree"
+                title="No reporting data available yet"
+                message="Add employees and reporting relationships to start building the organization tree here."
+              />
             </div>
           </div>
         ) : (
@@ -503,7 +590,7 @@ export default function OrganizationChart({
             onMouseUp={endDragging}
             onMouseLeave={endDragging}
             onWheel={handleWheel}
-            className={`subtle-scrollbar h-[72vh] overflow-auto bg-transparent p-0 ${
+            className={`h-[calc(100vh-170px)] overflow-auto bg-transparent p-0 scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
               dragState.active ? 'cursor-grabbing select-none' : 'cursor-grab'
             }`}
           >
@@ -515,21 +602,91 @@ export default function OrganizationChart({
                 minWidth: '100%',
               }}
             >
-              <div className="flex min-w-[1180px] justify-center px-8 pb-20 pt-6">
-                <div className="space-y-10">
-                  <div className="flex items-start justify-center gap-14">
-                    {data.roots.map((rootId) => (
-                      <TreeNode
-                        key={rootId}
-                        nodeId={rootId}
-                        nodes={nodes}
-                        expandedNodeIds={effectiveExpandedNodeIds}
-                        highlightedNodeIds={highlightedNodeIds}
-                        registerNodeRef={registerNodeRef}
-                        onToggle={handleToggle}
-                      />
-                    ))}
-                  </div>
+              <div className="flex min-w-[1650px] justify-start px-0 pb-0 pt-1">
+                <div className="space-y-8">
+                  {data.roots.length > 1 ? (
+                    <div ref={topClusterRef} className="flex flex-col items-center">
+                      <div className="relative flex items-start justify-center gap-14 pb-9">
+                        <div className="absolute left-[130px] right-[130px] bottom-4 h-[2px] bg-slate-400" />
+                        <div className="absolute left-[130px] bottom-4 h-5 w-[2px] -translate-x-1/2 bg-slate-400" />
+                        <div className="absolute right-[130px] bottom-4 h-5 w-[2px] translate-x-1/2 bg-slate-400" />
+                        <div className="absolute left-1/2 bottom-0 h-4 w-[2px] -translate-x-1/2 bg-slate-400" />
+                        {data.roots.map((rootId) => {
+                          const rootNode = nodes.get(rootId);
+                          if (!rootNode) {
+                            return null;
+                          }
+
+                          return (
+                            <div key={rootId} className="flex flex-col items-center">
+                              <OrgNodeCard
+                                node={rootNode}
+                                registerNodeRef={registerNodeRef}
+                                onToggle={handleToggle}
+                                hasChildren={rootNode.childIds.length > 0}
+                                showChildren={false}
+                                isHighlighted={highlightedNodeIds.has(rootId)}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {rootChildIds.length ? (
+                        <div className="mt-0 flex flex-col items-center">
+                          {rootChildIds.length === 1 ? (
+                            <div className="flex flex-col items-center">
+                              <div className="h-6 w-[2px] bg-slate-400" />
+                              <TreeNode
+                                nodeId={rootChildIds[0]}
+                                nodes={nodes}
+                                expandedNodeIds={effectiveExpandedNodeIds}
+                                highlightedNodeIds={highlightedNodeIds}
+                                registerNodeRef={registerNodeRef}
+                                onToggle={handleToggle}
+                                depth={1}
+                              />
+                            </div>
+                          ) : (
+                            <div className="relative pt-0">
+                              <div className="absolute left-[130px] right-[130px] top-0 h-[2px] bg-slate-400" />
+                              <div className="absolute left-1/2 top-0 h-5 w-[2px] -translate-x-1/2 bg-slate-400" />
+                              <div className="flex items-start justify-center gap-6 px-2 pt-0">
+                                {rootChildIds.map((childId) => (
+                                  <div key={childId} className="flex flex-col items-center">
+                                    <div className="h-6 w-[2px] bg-slate-400" />
+                                    <TreeNode
+                                      nodeId={childId}
+                                      nodes={nodes}
+                                      expandedNodeIds={effectiveExpandedNodeIds}
+                                      highlightedNodeIds={highlightedNodeIds}
+                                      registerNodeRef={registerNodeRef}
+                                      onToggle={handleToggle}
+                                      depth={1}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div ref={topClusterRef} className="flex items-start justify-center gap-14">
+                      {data.roots.map((rootId) => (
+                        <TreeNode
+                          key={rootId}
+                          nodeId={rootId}
+                          nodes={nodes}
+                          expandedNodeIds={effectiveExpandedNodeIds}
+                          highlightedNodeIds={highlightedNodeIds}
+                          registerNodeRef={registerNodeRef}
+                          onToggle={handleToggle}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

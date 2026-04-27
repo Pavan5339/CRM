@@ -22,8 +22,12 @@ const EMPLOYEE_PROFILE_SELECT_BASE = `
   address,
   nationality,
   marital_status,
+  reporting_manager_id,
   module_access:hrm_module_access!module_access_employee_id_fkey (
-    task_manager
+    task_manager,
+    hrm_admin,
+    auditing,
+    crm
   ),
   department:hrm_departments (id, name),
   designation:hrm_designations (id, title),
@@ -39,7 +43,15 @@ const EMPLOYEE_PROFILE_SELECT_WITH_EMPLOYMENT_FIELDS = `
   ${EMPLOYEE_PROFILE_SELECT_WITH_SALARY},
   employee_type,
   employment_lifecycle_status,
-  current_stage
+  current_stage,
+  probation_started_at,
+  probation_ends_at,
+  notice_started_at,
+  notice_ends_at,
+  separated_at,
+  separation_reason,
+  separation_reason_code,
+  access_disabled_at
 `;
 
 function isMissingEmploymentColumnError(error) {
@@ -48,6 +60,14 @@ function isMissingEmploymentColumnError(error) {
     message.includes('employee_type') ||
     message.includes('employment_lifecycle_status') ||
     message.includes('current_stage') ||
+    message.includes('probation_started_at') ||
+    message.includes('probation_ends_at') ||
+    message.includes('notice_started_at') ||
+    message.includes('notice_ends_at') ||
+    message.includes('separated_at') ||
+    message.includes('separation_reason') ||
+    message.includes('separation_reason_code') ||
+    message.includes('access_disabled_at') ||
     message.includes('could not find the column') ||
     (message.includes('column') && message.includes('does not exist'))
   );
@@ -116,12 +136,40 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
+    const moduleAccess = Array.isArray(employee.module_access)
+      ? employee.module_access[0]
+      : employee.module_access;
+
+    if (!moduleAccess?.hrm_admin) {
+      return NextResponse.json(
+        { error: 'HRM access is not enabled for your account.' },
+        { status: 403 }
+      );
+    }
+
+    let reportingManagerName = '';
+    let reportingManagerEmployeeId = '';
+
+    if (employee.reporting_manager_id) {
+      const { data: reportingManager } = await adminClient
+        .from('hrm_employees')
+        .select('id, name, employee_id')
+        .eq('id', employee.reporting_manager_id)
+        .maybeSingle();
+
+      reportingManagerName = reportingManager?.name || '';
+      reportingManagerEmployeeId = reportingManager?.employee_id || '';
+    }
+
     const employment = deriveEmploymentFields(employee);
 
     return NextResponse.json(
       {
         employee: {
           ...employee,
+          reporting_manager_name: reportingManagerName,
+          reporting_manager_employee_id: reportingManagerEmployeeId,
+          directory_reporting_manager: reportingManagerName,
           employee_type: employee.employee_type ?? employment.employeeType,
           employment_lifecycle_status:
             employee.employment_lifecycle_status ?? employment.employmentLifecycleStatus,

@@ -24,7 +24,11 @@ const EMPLOYEE_DASHBOARD_SELECT_WITH_EMPLOYMENT_FIELDS = `
   ${EMPLOYEE_DASHBOARD_SELECT_BASE},
   employee_type,
   employment_lifecycle_status,
-  current_stage
+  current_stage,
+  probation_ends_at,
+  notice_started_at,
+  notice_ends_at,
+  separated_at
 `;
 
 const HR_ADMIN_SELECT = `
@@ -157,6 +161,10 @@ function isMissingEmploymentColumnError(error) {
     message.includes('employee_type') ||
     message.includes('employment_lifecycle_status') ||
     message.includes('current_stage') ||
+    message.includes('probation_ends_at') ||
+    message.includes('notice_started_at') ||
+    message.includes('notice_ends_at') ||
+    message.includes('separated_at') ||
     message.includes('could not find the column') ||
     (message.includes('column') && message.includes('does not exist'))
   );
@@ -167,6 +175,7 @@ async function loadEmployeeStateRowsForDashboard() {
     .from('hrm_employees')
     .select(
       'id, auth_user_id, employee_id, name, email, profile_picture_url, date_of_birth, employee_status, employee_type, employment_lifecycle_status, current_stage'
+      + ', date_of_joining, probation_ends_at, notice_started_at, notice_ends_at, separated_at'
     )
     .order('date_of_birth', { ascending: true, nullsFirst: false });
 

@@ -34,7 +34,6 @@ export default function Sidebar({ currentTab, setCurrentTab, employee, onLogout,
   const moduleAccess = Array.isArray(employee?.module_access)
     ? employee?.module_access?.[0]
     : employee?.module_access;
-  const hasTaskManagerAccess = employee ? moduleAccess?.task_manager !== false : false;
   const attendanceButtonClassName =
     'group relative w-full overflow-hidden rounded-2xl bg-gradient-to-b from-violet-400 via-violet-500 to-violet-600 px-4 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(139,92,246,0.28)] transition-all duration-200 before:absolute before:inset-x-3 before:top-1 before:h-[42%] before:rounded-full before:bg-white/20 before:blur-md hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(139,92,246,0.34)] active:translate-y-1 active:shadow-[0_6px_14px_rgba(139,92,246,0.22)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0';
 
@@ -87,12 +86,12 @@ export default function Sidebar({ currentTab, setCurrentTab, employee, onLogout,
     { id: 'profile', label: 'Profile', icon: 'person' },
   ];
 
-  const handleTaskManagerRedirect = () => {
-    if (!hasTaskManagerAccess || typeof window === 'undefined') {
+  const handleModulesRedirect = () => {
+    if (typeof window === 'undefined') {
       return;
     }
 
-    window.location.href = '/Taskmanager/dashboard';
+    window.location.href = '/other-modules';
   };
 
   const handleQuickCheckIn = async () => {
@@ -202,21 +201,20 @@ export default function Sidebar({ currentTab, setCurrentTab, employee, onLogout,
 
       <div className="mt-auto border-t border-outline-variant/10 pt-4">
         <button
-          onClick={handleTaskManagerRedirect}
-          disabled={!hasTaskManagerAccess}
-          className="w-full flex items-center gap-3 px-5 py-2.5 text-on-surface-variant hover:text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-on-surface-variant"
-          title={hasTaskManagerAccess ? 'Open Task Manager' : 'Task Manager access is not enabled'}
-        >
-          <span className="material-symbols-outlined">home_app_logo</span>
-          <span className="font-body text-sm font-medium">Task Manager</span>
-        </button>
-        <button
           onClick={onLogout}
           disabled={isLoggingOut}
           className="w-full flex items-center gap-3 px-5 py-2.5 text-error/80 hover:text-error transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         >
           <span className="material-symbols-outlined">logout</span>
           <span className="font-body text-sm font-medium">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+        </button>
+        <button
+          onClick={handleModulesRedirect}
+          className="w-full flex items-center gap-3 px-5 py-2.5 text-on-surface-variant hover:text-primary transition-colors"
+          title="Open Other Modules"
+        >
+          <span className="material-symbols-outlined">widgets</span>
+          <span className="font-body text-sm font-medium">Other Modules</span>
         </button>
         <Link
           href="/"

@@ -8,21 +8,23 @@ import { Footer } from '@/app/components-homepage/Footer';
 import { useWorkspaceRouting } from '@/app/components-homepage/useWorkspaceRouting';
 
 export default function HomeShell() {
-  const { isAuthenticated, taskManagerHref } = useWorkspaceRouting();
+  const { isAuthenticated, workspaceHref, user } = useWorkspaceRouting();
 
   const workspaceLabel = isAuthenticated ? 'Workspace' : 'Login';
 
   return (
     <>
       <Navbar
-        workspaceHref={taskManagerHref}
+        workspaceHref={workspaceHref}
         workspaceLabel={workspaceLabel}
         othersHref="/other-modules"
+        isAuthenticated={isAuthenticated}
+        user={user}
       />
-      <Hero taskManagerHref={taskManagerHref} />
+      <Hero taskManagerHref={workspaceHref} />
       <LogoTicker />
       <FeatureSteps />
-      <Footer taskManagerHref={taskManagerHref} />
+      <Footer taskManagerHref={workspaceHref} />
     </>
   );
 }

@@ -2,10 +2,9 @@
 
 import React, { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import {
-  CURRENT_STAGE_OPTIONS,
   EMPLOYEE_TYPE_OPTIONS,
-  EMPLOYMENT_LIFECYCLE_STATUS_OPTIONS,
 } from '@/utils/hrm-employment';
+import { DEFAULT_PROBATION_PERIOD_DAYS } from '@/utils/employee-lifecycle';
 import { useHrmFeedback } from '../../ui/HrmFeedback';
 
 type Option = {
@@ -118,8 +117,6 @@ const GENDER_OPTIONS = [
   { value: 'others', label: 'Others' },
 ];
 const RELIGION_OPTIONS = ['Hindu', 'Muslim', 'Sikh', 'Christian', 'Buddhist', 'Jain', 'Parsi', 'Other'];
-const PROBATION_PERIOD_OPTIONS = ['90', '180'];
-const NOTICE_PERIOD_OPTIONS = ['30', '60', '90'];
 const FIXED_DEPARTMENT_OPTIONS = [
   'Finance & Accounts',
   'Marketing',
@@ -198,8 +195,8 @@ const defaultFormState: FormState = {
   confirmationDate: '',
   employeeType: 'full_time_employee',
   lifecycleStatus: 'active',
-  currentStage: 'none',
-  probationPeriodDays: '',
+  currentStage: 'probation',
+  probationPeriodDays: String(DEFAULT_PROBATION_PERIOD_DAYS),
   noticePeriodDays: '',
   referredBy: '',
   currentCompanyExperience: '',
@@ -813,10 +810,6 @@ export default function AddEmployee({
         ...(sameAsCurrentAddress && permanentField ? { [permanentField]: value } : {}),
       };
 
-      if (name === 'lifecycleStatus' && value === 'terminated') {
-        nextForm.currentStage = 'none';
-      }
-
       return nextForm;
     });
 
@@ -1334,25 +1327,11 @@ export default function AddEmployee({
             </div>
           </Section>
 
-          <Section title="Joining Details" subtitle="Record employee type, lifecycle status, current stage, and onboarding references.">
+          <Section title="Joining Details" subtitle="Record employee type, joining dates, and onboarding references.">
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               <Field label="Employee Type">
                 <select className={selectClassName()} name="employeeType" value={form.employeeType} onChange={handleInputChange}>
                   {EMPLOYEE_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Lifecycle Status">
-                <select className={selectClassName()} name="lifecycleStatus" value={form.lifecycleStatus} onChange={handleInputChange}>
-                  {EMPLOYMENT_LIFECYCLE_STATUS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Current Stage">
-                <select className={selectClassName()} name="currentStage" value={form.currentStage} onChange={handleInputChange}>
-                  {CURRENT_STAGE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
@@ -1364,28 +1343,17 @@ export default function AddEmployee({
                 <input className={inputClassName(false, !!fieldErrors.confirmationDate)} name="confirmationDate" type="date" value={form.confirmationDate} onChange={handleInputChange} />
               </Field>
               <Field label="Probation Period (days)">
-                <select className={selectClassName()} name="probationPeriodDays" value={form.probationPeriodDays} onChange={handleInputChange}>
-                  <option value="">Select probation period</option>
-                  {PROBATION_PERIOD_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option} days
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Notice Period (days)">
-                <select className={selectClassName()} name="noticePeriodDays" value={form.noticePeriodDays} onChange={handleInputChange}>
-                  <option value="">Select notice period</option>
-                  {NOTICE_PERIOD_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option} days
-                    </option>
-                  ))}
-                </select>
+                <input className={inputClassName(true)} value={`${DEFAULT_PROBATION_PERIOD_DAYS} days`} disabled readOnly />
               </Field>
               <Field label="Referred By">
                 <input className={inputClassName()} name="referredBy" value={form.referredBy} onChange={handleInputChange} />
               </Field>
+              <div className="md:col-span-2 xl:col-span-3 rounded-[1.2rem] border border-slate-200 bg-white px-5 py-5">
+                <p className="text-sm font-bold text-on-surface">Default Lifecycle</p>
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  Employees are created as <span className="font-semibold text-on-surface">Active + Probation</span>. Probation is fixed for {DEFAULT_PROBATION_PERIOD_DAYS} days from the joining date and can be removed later only from the HR employee profile action buttons.
+                </p>
+              </div>
             </div>
           </Section>
 
@@ -1437,7 +1405,7 @@ export default function AddEmployee({
                     placeholder="Type custom designation if not in dropdown"
                   />
                   <p className="text-xs text-on-surface-variant">
-                    Select from dropdown, or choose "Other" and type a new designation.
+                    Select from dropdown, or choose &quot;Other&quot; and type a new designation.
                   </p>
                 </div>
               </Field>
