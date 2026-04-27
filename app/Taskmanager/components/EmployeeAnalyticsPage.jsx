@@ -272,7 +272,7 @@ export default function EmployeeAnalyticsPage({ employeeId }) {
 
   const avatarSrc = employee?.profile_picture_url || null;
   const employeeName = employee?.name || 'Employee';
-  const nextDueLabel = stats?.nextDueTask?.due_date ? formatDate(stats.nextDueTask.due_date) : 'No upcoming due date';
+  const nextDueLabel = stats?.nextDueTask?.due_date ? formatDate(stats.nextDueTask.due_date, { includeTime: true }) : 'No upcoming due date';
 
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
@@ -382,7 +382,7 @@ export default function EmployeeAnalyticsPage({ employeeId }) {
                                 {String(task.status || 'pending').replace('_', ' ')}
                               </span>
                             </td>
-                            <td className="py-4 pr-4 text-slate-700">{formatDate(task.due_date)}</td>
+                            <td className="py-4 pr-4 text-slate-700">{formatDate(task.due_date, { includeTime: true })}</td>
                             <td className="py-4 pr-4">
                               <span className={`inline-block max-w-full whitespace-normal rounded-full px-2.5 py-1 text-[11px] font-semibold leading-4 ${dueTiming.className}`}>
                                 {dueTiming.label}
@@ -437,7 +437,7 @@ export default function EmployeeAnalyticsPage({ employeeId }) {
                         <Link href={`/Taskmanager/admin/tasks/${task.id}`} className="font-semibold text-slate-900 hover:text-[#7F40EE]">
                           {task.task_name}
                         </Link>
-                        <p className="mt-1 text-xs text-slate-500">Due {formatDate(task.due_date)}</p>
+                        <p className="mt-1 text-xs text-slate-500">Due {formatDate(task.due_date, { includeTime: true })}</p>
                       </div>
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase ${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}>
                         {String(task.status || 'pending').replace('_', ' ')}

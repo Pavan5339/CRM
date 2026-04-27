@@ -5,7 +5,66 @@ import { hasLinkedEmployeeAccess, resolveAuthenticatedUserContext } from '@/util
 import {
   findEmployeeById,
   insertAssignmentActivityRows,
+  isMissingTaskCreatorEmployeeColumn,
 } from '@/utils/api-helpers';
+
+const EMPLOYEE_TASK_SELECT = `
+  id,
+  task_name,
+  description,
+  label,
+  priority,
+  status,
+  progress_percentage,
+  created_by,
+  created_by_employee_id,
+  created_at,
+  due_date,
+  task_attachments (
+    id
+  ),
+  task_subtasks (
+    id,
+    title,
+    is_completed,
+    assigned_employee_id,
+    created_at
+  ),
+  task_assignments (
+    employee:hrm_employees (
+      id,
+      name,
+      email,
+      role,
+      profile_picture_url
+    )
+  )
+`;
+
+const EMPLOYEE_TASK_SELECT_LEGACY = EMPLOYEE_TASK_SELECT
+  .replace(/\s*created_by_employee_id,\n/, '\n');
+
+async function employeeCanAccessTask(taskId, employeeId) {
+  const [{ data: assignment, error: assignmentError }, { data: createdTask, error: createdTaskError }] = await Promise.all([
+    adminClient
+      .from('task_assignments')
+      .select('task_id')
+      .eq('task_id', taskId)
+      .eq('employee_id', employeeId)
+      .maybeSingle(),
+    adminClient
+      .from('tasks')
+      .select('id')
+      .eq('id', taskId)
+      .eq('created_by_employee_id', employeeId)
+      .maybeSingle(),
+  ]);
+
+  return (
+    (!assignmentError && !!assignment) ||
+    (!isMissingTaskCreatorEmployeeColumn(createdTaskError) && !createdTaskError && !!createdTask)
+  );
+}
 
 async function findTaskManagerMembers() {
   const { data: members, error } = await adminClient
@@ -106,49 +165,58 @@ export async function GET(request) {
 
     const employee = actorData.employee;
 
-    const { data: assignmentRows, error: tasksError } = await adminClient
+    let [{ data: assignmentRows, error: tasksError }, { data: createdTasks, error: createdTasksError }] = await Promise.all([
+      adminClient
       .from('task_assignments')
       .select(`
         task:tasks (
-          id,
-          task_name,
-          description,
-          label,
-          priority,
-          status,
-          progress_percentage,
-          created_by,
-          created_at,
-          due_date,
-          task_attachments (
-            id
-          ),
-          task_subtasks (
-            id,
-            title,
-            is_completed,
-            assigned_employee_id,
-            created_at
-          ),
-          task_assignments (
-            employee:hrm_employees (
-              id,
-              name,
-              email,
-              role,
-              profile_picture_url
-            )
-          )
+          ${EMPLOYEE_TASK_SELECT}
         )
       `)
       .eq('employee_id', employee.id)
-      .order('assigned_at', { ascending: false });
+        .order('assigned_at', { ascending: false }),
+      adminClient
+        .from('tasks')
+        .select(EMPLOYEE_TASK_SELECT)
+        .eq('created_by_employee_id', employee.id)
+        .order('created_at', { ascending: false }),
+    ]);
+
+    if (isMissingTaskCreatorEmployeeColumn(tasksError) || isMissingTaskCreatorEmployeeColumn(createdTasksError)) {
+      const legacyResult = await adminClient
+        .from('task_assignments')
+        .select(`
+          task:tasks (
+            ${EMPLOYEE_TASK_SELECT_LEGACY}
+          )
+        `)
+        .eq('employee_id', employee.id)
+        .order('assigned_at', { ascending: false });
+
+      assignmentRows = legacyResult.data || [];
+      tasksError = legacyResult.error;
+      createdTasks = [];
+      createdTasksError = null;
+    }
 
     if (tasksError) {
       return NextResponse.json({ error: tasksError.message }, { status: 500 });
     }
 
-    const tasks = (assignmentRows || []).map((row) => row.task).filter(Boolean);
+    if (createdTasksError) {
+      return NextResponse.json({ error: createdTasksError.message }, { status: 500 });
+    }
+
+    const tasksById = new Map();
+    for (const task of (assignmentRows || []).map((row) => row.task).filter(Boolean)) {
+      tasksById.set(task.id, task);
+    }
+    for (const task of createdTasks || []) {
+      tasksById.set(task.id, task);
+    }
+    const tasks = Array.from(tasksById.values()).sort(
+      (left, right) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime()
+    );
 
     const members = await findTaskManagerMembers();
 
@@ -185,15 +253,10 @@ export async function PATCH(request) {
         return NextResponse.json({ error: 'subtaskTitle is required' }, { status: 400 });
       }
 
-      const { data: assignment, error: assignmentError } = await adminClient
-        .from('task_assignments')
-        .select('task_id')
-        .eq('task_id', taskId)
-        .eq('employee_id', employee.id)
-        .single();
+      const canAccessTask = await employeeCanAccessTask(taskId, employee.id);
 
-      if (assignmentError || !assignment) {
-        return NextResponse.json({ error: 'Task is not assigned to you' }, { status: 403 });
+      if (!canAccessTask) {
+        return NextResponse.json({ error: 'Task is not assigned to you or created by you' }, { status: 403 });
       }
 
       if (nextAssignedEmployeeId) {
@@ -250,15 +313,10 @@ export async function PATCH(request) {
         return NextResponse.json({ error: 'Subtask not found' }, { status: 404 });
       }
 
-      const { data: assignment, error: assignmentError } = await adminClient
-        .from('task_assignments')
-        .select('task_id')
-        .eq('task_id', subtask.task_id)
-        .eq('employee_id', employee.id)
-        .single();
+      const canAccessTask = await employeeCanAccessTask(subtask.task_id, employee.id);
 
-      if (assignmentError || !assignment) {
-        return NextResponse.json({ error: 'Task is not assigned to you' }, { status: 403 });
+      if (!canAccessTask) {
+        return NextResponse.json({ error: 'Task is not assigned to you or created by you' }, { status: 403 });
       }
 
       if (subtask.assigned_employee_id && subtask.assigned_employee_id !== employee.id) {
@@ -284,23 +342,18 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'taskId and status are required' }, { status: 400 });
     }
 
-    const allowedStatuses = ['in_progress', 'completed'];
+    const allowedStatuses = ['pending', 'in_progress', 'completed'];
     if (!allowedStatuses.includes(status)) {
       return NextResponse.json(
-        { error: 'Employees can only set status to in_progress or completed' },
+        { error: 'Employees can only set status to pending, in_progress, or completed' },
         { status: 400 }
       );
     }
 
-    const { data: assignment, error: assignmentError } = await adminClient
-      .from('task_assignments')
-      .select('task_id')
-      .eq('task_id', taskId)
-      .eq('employee_id', employee.id)
-      .single();
+    const canAccessTask = await employeeCanAccessTask(taskId, employee.id);
 
-    if (assignmentError || !assignment) {
-      return NextResponse.json({ error: 'Task is not assigned to you' }, { status: 403 });
+    if (!canAccessTask) {
+      return NextResponse.json({ error: 'Task is not assigned to you or created by you' }, { status: 403 });
     }
 
     const { data: updatedTasks, error: updateTaskError } = await adminClient

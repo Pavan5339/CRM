@@ -29,15 +29,24 @@ const STATUS_TO_API = {
   Completed: 'completed',
 };
 
-const formatDate = (value) => {
+const formatDate = (value, options = {}) => {
+  const { includeTime = false } = options;
   if (!value) return 'N/A';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleDateString('en-GB', {
+  return date.toLocaleString('en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+    ...(includeTime ? { hour: '2-digit', minute: '2-digit' } : {}),
   });
+};
+
+const buildDueDateIso = (dateValue, timeValue = '') => {
+  if (!dateValue) return null;
+  const cleanTime = typeof timeValue === 'string' && timeValue.trim() ? timeValue.trim() : '23:59';
+  const parsedDate = new Date(`${dateValue}T${cleanTime}`);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString();
 };
 
 const deriveDueDate = (task) => {
@@ -97,9 +106,13 @@ const normalizeTask = (task, fallbackAssignees = [], currentUserId = null) => {
   const assignees = Array.isArray(task.task_assignments)
     ? task.task_assignments.map((assignment) => assignment?.employee?.id).filter(Boolean)
     : fallbackAssignees;
-  const createdByLabel = task?.created_by
-    ? (currentUserId && task.created_by === currentUserId ? 'You' : 'Admin')
-    : 'Employee';
+  const isCurrentCreator =
+    currentUserId && (task?.created_by === currentUserId || task?.created_by_employee_id === currentUserId);
+  const createdByLabel = isCurrentCreator
+    ? 'You'
+    : task?.created_by
+      ? 'Admin'
+      : 'Employee';
 
   return {
     id: task.id,
@@ -109,7 +122,7 @@ const normalizeTask = (task, fallbackAssignees = [], currentUserId = null) => {
     priority: PRIORITY_LABELS[task.priority] || 'Medium',
     status: STATUS_LABELS[task.status] || 'Pending',
     startDate: formatDate(task.created_at),
-    dueDate: formatDate(deriveDueDate(task)),
+    dueDate: formatDate(deriveDueDate(task), { includeTime: true }),
     frequency: task.frequency || null,
     lastCycleReset: task.last_cycle_reset || null,
     completedSubtasks,
@@ -338,7 +351,7 @@ export function DataProvider({ children, initialUser = null, mode = 'employee', 
   };
 
   const addTask = async (newTask) => {
-    const dueDateISO = newTask?.dueDate ? new Date(newTask.dueDate).toISOString() : null;
+    const dueDateISO = buildDueDateIso(newTask?.dueDate, newTask?.dueTime);
 
     const response = await fetch('/Taskmanager/api/tasks', {
       method: 'POST',

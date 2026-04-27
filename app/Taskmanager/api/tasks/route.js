@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { adminClient } from '@/utils/supabase/admin';
 import {
   fetchEmployeeDirectory,
+  getActor,
   getAssignmentActivityActorPayload,
+  isTaskCreator,
+  isMissingTaskCreatorEmployeeColumn,
   normalizeDueDate,
   normalizeSubtasks,
-  requireAdmin,
   requireTaskManager,
   syncTaskSubtasks,
   insertAssignmentActivityRows,
@@ -96,22 +99,37 @@ export async function POST(request) {
 
     await ensureTaskLabelExists(supabase, normalizedLabel);
 
+    const taskInsertPayload = {
+      task_name: taskName,
+      description,
+      label: normalizedLabel,
+      priority,
+      due_date: normalizedDueDate,
+      frequency: normalizedFrequency,
+      last_cycle_reset: new Date().toISOString(),
+      status: 'pending',
+      created_by: actor.type === 'admin' ? actor.userId : null,
+      created_by_employee_id: actor.type === 'employee' ? actor.employeeId : null,
+    };
+
     // Insert task
-    const { data: task, error: taskError } = await supabase
+    let { data: task, error: taskError } = await supabase
       .from('tasks')
-      .insert({
-        task_name: taskName,
-        description,
-        label: normalizedLabel,
-        priority,
-        due_date: normalizedDueDate,
-        frequency: normalizedFrequency,
-        last_cycle_reset: new Date().toISOString(),
-        status: 'pending',
-        created_by: actor.type === 'admin' ? actor.userId : null
-      })
+      .insert(taskInsertPayload)
       .select()
       .single();
+
+    if (isMissingTaskCreatorEmployeeColumn(taskError)) {
+      const legacyTaskInsertPayload = { ...taskInsertPayload };
+      delete legacyTaskInsertPayload.created_by_employee_id;
+      const legacyResult = await supabase
+        .from('tasks')
+        .insert(legacyTaskInsertPayload)
+        .select()
+        .single();
+      task = legacyResult.data;
+      taskError = legacyResult.error;
+    }
 
     if (taskError) {
       return NextResponse.json({ error: taskError.message }, { status: 500 });
@@ -372,15 +390,43 @@ export async function PUT(request) {
 
 export async function DELETE(request) {
   try {
-    const auth = await requireAdmin();
-    if (auth.error) return auth.error;
-    const { supabase } = auth;
+    const actor = await getActor(request);
+    if (!actor) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const supabase = adminClient;
 
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('id');
 
     if (!taskId) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
+    }
+
+    const { data: taskToDelete, error: fetchError } = await supabase
+      .from('tasks')
+      .select('created_by, created_by_employee_id')
+      .eq('id', taskId)
+      .single();
+    let resolvedTaskToDelete = taskToDelete;
+    let resolvedFetchError = fetchError;
+
+    if (isMissingTaskCreatorEmployeeColumn(fetchError)) {
+      const legacyResult = await supabase
+        .from('tasks')
+        .select('created_by')
+        .eq('id', taskId)
+        .single();
+      resolvedTaskToDelete = legacyResult.data;
+      resolvedFetchError = legacyResult.error;
+    }
+
+    if (resolvedFetchError || !resolvedTaskToDelete) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    if (actor.type !== 'admin' && !isTaskCreator(resolvedTaskToDelete, actor)) {
+      return NextResponse.json({ error: 'Only task creators can delete tasks' }, { status: 403 });
     }
 
     // Delete the task (cascade will delete assignments and attachments)

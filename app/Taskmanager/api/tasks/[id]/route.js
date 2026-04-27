@@ -8,6 +8,8 @@ import {
   getAssignmentActivityAction,
   getAssignmentActivityActorPayload,
   hasTaskAccess,
+  isTaskCreator,
+  isMissingTaskCreatorEmployeeColumn,
   normalizeDueDate,
   insertAssignmentActivityRows,
 } from '@/utils/api-helpers';
@@ -86,9 +88,7 @@ async function fetchStorageAttachments(taskId) {
 }
 
 async function fetchTaskById(taskId) {
-  const { data: task, error } = await adminClient
-    .from('tasks')
-    .select(`
+  const taskSelect = `
       id,
       task_name,
       description,
@@ -101,6 +101,7 @@ async function fetchTaskById(taskId) {
       last_cycle_reset,
       rating,
       created_by,
+      created_by_employee_id,
       created_at,
       updated_at,
       task_assignments (
@@ -128,12 +129,31 @@ async function fetchTaskById(taskId) {
         created_at,
         updated_at
       )
-    `)
+    `;
+  const legacyTaskSelect = taskSelect.replace(/\s*created_by_employee_id,\n/, '\n');
+
+  let { data: task, error } = await adminClient
+    .from('tasks')
+    .select(taskSelect)
     .eq('id', taskId)
     .order('assigned_at', { ascending: false, referencedTable: 'task_assignments' })
     .order('uploaded_at', { ascending: false, referencedTable: 'task_attachments' })
     .order('created_at', { ascending: true, referencedTable: 'task_subtasks' })
     .single();
+
+  if (isMissingTaskCreatorEmployeeColumn(error)) {
+    const legacyResult = await adminClient
+      .from('tasks')
+      .select(legacyTaskSelect)
+      .eq('id', taskId)
+      .order('assigned_at', { ascending: false, referencedTable: 'task_assignments' })
+      .order('uploaded_at', { ascending: false, referencedTable: 'task_attachments' })
+      .order('created_at', { ascending: true, referencedTable: 'task_subtasks' })
+      .single();
+
+    task = legacyResult.data;
+    error = legacyResult.error;
+  }
 
   if (error || !task) {
     return null;
@@ -203,13 +223,16 @@ export async function GET(request, { params }) {
 
     const taskLabels = (labelsResult.data || []).map((item) => item.name).filter(Boolean);
 
+    const canManageTask = actor.type === 'admin' || isTaskCreator(task, actor);
+    const canRateTask = task.status === 'completed' && isTaskCreator(task, actor);
+
     const viewer = {
       type: actor.type,
       employeeId: actor.type === 'employee' ? actor.employeeId : null,
-      canManageTask: actor.type === 'admin',
+      canManageTask,
       canManageSubtasks: actor.type === 'admin' || actor.type === 'employee',
       canComment: actor.type === 'admin' || actor.type === 'employee',
-      canRateTask: task.status === 'completed' && !!actor.authUserId && task.created_by === actor.authUserId,
+      canRateTask,
     };
 
     return NextResponse.json({ success: true, task, viewer, employees, assignmentActivity, comments, taskLabels });
@@ -242,18 +265,30 @@ export async function PATCH(request, { params }) {
     if (typeof body?.rating === 'number') {
       const { data: taskToCheck, error: fetchError } = await adminClient
         .from('tasks')
-        .select('created_by, status')
+        .select('created_by, created_by_employee_id, status')
         .eq('id', taskId)
         .single();
+      let resolvedTaskToCheck = taskToCheck;
+      let resolvedFetchError = fetchError;
+
+      if (isMissingTaskCreatorEmployeeColumn(fetchError)) {
+        const legacyResult = await adminClient
+          .from('tasks')
+          .select('created_by, status')
+          .eq('id', taskId)
+          .single();
+        resolvedTaskToCheck = legacyResult.data;
+        resolvedFetchError = legacyResult.error;
+      }
         
-      if (fetchError || !taskToCheck) {
+      if (resolvedFetchError || !resolvedTaskToCheck) {
         return NextResponse.json({ error: 'Task not found' }, { status: 404 });
       }
       
-      if (taskToCheck.created_by !== actor.authUserId) {
+      if (!isTaskCreator(resolvedTaskToCheck, actor)) {
         return NextResponse.json({ error: 'Only the task creator can rate this task' }, { status: 403 });
       }
-      if (taskToCheck.status !== 'completed') {
+      if (resolvedTaskToCheck.status !== 'completed') {
         return NextResponse.json({ error: 'Task must be completed before rating' }, { status: 400 });
       }
       if (body.rating < 1 || body.rating > 5) {
@@ -512,9 +547,30 @@ export async function PATCH(request, { params }) {
       typeof body?.status === 'string';
 
     if (hasMainFields) {
-      // Require admin for main task fields update
-      if (actor.type !== 'admin') {
-        return NextResponse.json({ error: 'Only admins can update task details' }, { status: 403 });
+      const { data: taskToCheck, error: taskFetchError } = await adminClient
+        .from('tasks')
+        .select('created_by, created_by_employee_id')
+        .eq('id', taskId)
+        .single();
+      let resolvedTaskToCheck = taskToCheck;
+      let resolvedTaskFetchError = taskFetchError;
+
+      if (isMissingTaskCreatorEmployeeColumn(taskFetchError)) {
+        const legacyResult = await adminClient
+          .from('tasks')
+          .select('created_by')
+          .eq('id', taskId)
+          .single();
+        resolvedTaskToCheck = legacyResult.data;
+        resolvedTaskFetchError = legacyResult.error;
+      }
+
+      if (resolvedTaskFetchError || !resolvedTaskToCheck) {
+        return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      }
+
+      if (actor.type !== 'admin' && !isTaskCreator(resolvedTaskToCheck, actor)) {
+        return NextResponse.json({ error: 'Only task creators can update task details' }, { status: 403 });
       }
 
       const updatePayload = {};

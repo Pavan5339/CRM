@@ -84,6 +84,11 @@ function employeeHasTaskManagerAccess(employee) {
   return Boolean(getModuleAccessRecord(employee)?.task_manager);
 }
 
+export function isMissingTaskCreatorEmployeeColumn(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('created_by_employee_id') && message.includes('does not exist');
+}
+
 export async function requireAdmin() {
   const supabase = await createClient();
   const {
@@ -258,14 +263,32 @@ export async function hasTaskAccess(taskId, actor) {
   if (!actor) return false;
   if (actor.type === 'admin') return true;
 
-  const { data: assignment, error } = await adminClient
+  const [{ data: assignment, error: assignmentError }, { data: createdTask, error: createdTaskError }] = await Promise.all([
+    adminClient
     .from('task_assignments')
     .select('task_id')
     .eq('task_id', taskId)
     .eq('employee_id', actor.employeeId)
-    .single();
+      .maybeSingle(),
+    adminClient
+      .from('tasks')
+      .select('id')
+      .eq('id', taskId)
+      .eq('created_by_employee_id', actor.employeeId)
+      .maybeSingle(),
+  ]);
 
-  return !error && !!assignment;
+  return (
+    (!assignmentError && !!assignment) ||
+    (!isMissingTaskCreatorEmployeeColumn(createdTaskError) && !createdTaskError && !!createdTask)
+  );
+}
+
+export function isTaskCreator(task, actor) {
+  if (!task || !actor) return false;
+  if (actor.type === 'admin') return !!actor.authUserId && task.created_by === actor.authUserId;
+  if (actor.type === 'employee') return !!actor.employeeId && task.created_by_employee_id === actor.employeeId;
+  return false;
 }
 
 export async function fetchEmployeeDirectory(supabase = adminClient, options = {}) {

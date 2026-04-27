@@ -48,6 +48,30 @@ const formatDate = (value) => {
   });
 };
 
+const toDateInputValue = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toTimeInputValue = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+const buildDueDateIso = (dateValue, timeValue = '') => {
+  if (!dateValue) return null;
+  const cleanTime = typeof timeValue === 'string' && timeValue.trim() ? timeValue.trim() : '23:59';
+  const parsedDate = new Date(`${dateValue}T${cleanTime}`);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString();
+};
+
 const getDisplayName = (person, fallback = 'Unknown user') => {
   if (!person) return fallback;
   return person.name || person.full_name || person.email || fallback;
@@ -319,6 +343,7 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
     frequency: '',
     status: 'pending',
     dueDate: '',
+    dueTime: '',
   });
 
   const backHref = mode === 'admin' ? '/Taskmanager/admin/tasks' : '/Taskmanager/dashboard';
@@ -377,7 +402,8 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
         priority: fetchedTask.priority || 'medium',
         frequency: fetchedTask.frequency || '',
         status: fetchedTask.status || 'pending',
-        dueDate: fetchedTask.due_date ? new Date(fetchedTask.due_date).toISOString().slice(0, 10) : '',
+        dueDate: toDateInputValue(fetchedTask.due_date),
+        dueTime: toTimeInputValue(fetchedTask.due_date),
       });
     } catch (err) {
       setError(err.message || 'Failed to load task details');
@@ -401,7 +427,10 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
       const response = await fetch(`/Taskmanager/api/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({
+          ...editForm,
+          dueDate: buildDueDateIso(editForm.dueDate, editForm.dueTime),
+        }),
       });
 
       const result = await response.json();
@@ -1261,12 +1290,21 @@ export default function TaskDetailPage({ taskId, mode = 'employee' }) {
                   </select>
                 </div>
 
-                <input
-                  type='date'
-                  value={editForm.dueDate}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, dueDate: event.target.value }))}
-                  className='w-full rounded-lg border border-slate-200 px-3 py-2 text-sm'
-                />
+                <div className='grid grid-cols-2 gap-2'>
+                  <input
+                    type='date'
+                    value={editForm.dueDate}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, dueDate: event.target.value }))}
+                    className='w-full rounded-lg border border-slate-200 px-3 py-2 text-sm'
+                  />
+                  <input
+                    type='time'
+                    value={editForm.dueTime}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, dueTime: event.target.value }))}
+                    disabled={!editForm.dueDate}
+                    className='w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400'
+                  />
+                </div>
 
                 <button
                   type='button'
