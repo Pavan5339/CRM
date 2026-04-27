@@ -14,6 +14,7 @@ import HolidayManager from './views/admin/HolidayManager';
 import LeaveManagement from './views/admin/LeaveManagement';
 import EmployeeDirectoryWorkspace from './views/admin/EmployeeDirectoryWorkspace';
 import OrganizationChart from './views/admin/OrganizationChart';
+import ModuleAccessManager from './views/admin/ModuleAccessManager';
 import Tickets from './views/Tickets';
 import Expenses from './views/Expenses';
 import { ShellSkeleton } from './ui/Skeleton';
@@ -100,6 +101,7 @@ export default function AdminApp() {
     'admin-payouts': <PayoutsPayroll />,
     'admin-analytics': <EmployeeAnalytics />,
     'admin-organization-chart': <OrganizationChart />,
+    'admin-module-access': <ModuleAccessManager />,
     'admin-regularization': <RegularizationInbox />,
     'admin-tickets': <Tickets variant="admin" />,
     'admin-expenses': <Expenses variant="admin" />,

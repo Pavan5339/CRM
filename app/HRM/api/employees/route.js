@@ -1822,6 +1822,9 @@ export async function PATCH(request) {
     const designationTitle = body?.designation !== undefined ? cleanText(body.designation) : undefined;
     const reportingTo = body?.reportingTo !== undefined ? body.reportingTo : undefined;
     const taskManagerAccess = body?.taskManagerAccess !== undefined ? parseBoolean(body.taskManagerAccess) : undefined;
+    const hrmAdminAccess = body?.hrmAdminAccess !== undefined ? parseBoolean(body.hrmAdminAccess) : undefined;
+    const auditingAccess = body?.auditingAccess !== undefined ? parseBoolean(body.auditingAccess) : undefined;
+    const crmAccess = body?.crmAccess !== undefined ? parseBoolean(body.crmAccess) : undefined;
 
     const payload = {};
     if (name !== undefined) payload.name = name;
@@ -1944,16 +1947,30 @@ export async function PATCH(request) {
         payload.pan_number !== undefined ? payload.pan_number : existingEmployee.pan_number,
     });
 
-    if (Object.keys(payload).length === 0 && taskManagerAccess === undefined) {
+    const hasModuleAccessUpdate =
+      taskManagerAccess !== undefined ||
+      hrmAdminAccess !== undefined ||
+      auditingAccess !== undefined ||
+      crmAccess !== undefined;
+
+    if (Object.keys(payload).length === 0 && !hasModuleAccessUpdate) {
       return NextResponse.json({ error: 'No fields provided for update' }, { status: 400 });
     }
 
-    const { data: employee, error } = await adminClient
-      .from('hrm_employees')
-      .update(payload)
-      .eq('id', id)
-      .select('*')
-      .single();
+    const employeeResult = Object.keys(payload).length
+      ? await adminClient
+          .from('hrm_employees')
+          .update(payload)
+          .eq('id', id)
+          .select('*')
+          .single()
+      : await adminClient
+          .from('hrm_employees')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+    const { data: employee, error } = employeeResult;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -1963,15 +1980,15 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
     }
 
-    if (taskManagerAccess !== undefined) {
+    if (hasModuleAccessUpdate) {
       await upsertModuleAccess(employee.id, {
-        task_manager: taskManagerAccess,
+        task_manager: taskManagerAccess !== undefined ? taskManagerAccess : currentModuleAccess?.task_manager || false,
         task_manager_role: currentModuleAccess?.task_manager_role || null,
-        auditing: currentModuleAccess?.auditing || false,
+        auditing: auditingAccess !== undefined ? auditingAccess : currentModuleAccess?.auditing || false,
         auditing_role: currentModuleAccess?.auditing_role || null,
-        crm: currentModuleAccess?.crm || false,
+        crm: crmAccess !== undefined ? crmAccess : currentModuleAccess?.crm || false,
         crm_role: currentModuleAccess?.crm_role || null,
-        hrm_admin: currentModuleAccess?.hrm_admin || false,
+        hrm_admin: hrmAdminAccess !== undefined ? hrmAdminAccess : currentModuleAccess?.hrm_admin || false,
         granted_by: currentModuleAccess?.granted_by || authContext.employee?.id || null,
         granted_at: currentModuleAccess?.granted_at || new Date().toISOString(),
       });

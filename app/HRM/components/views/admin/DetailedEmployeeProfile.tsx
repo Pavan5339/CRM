@@ -21,6 +21,14 @@ const RELIGION_OPTIONS = ['Hindu', 'Muslim', 'Sikh', 'Christian', 'Buddhist', 'J
 const YES_NO_OPTIONS = ['Yes', 'No'];
 const PROBATION_PERIOD_OPTIONS = ['90', '180'];
 const NOTICE_PERIOD_OPTIONS = ['30', '60', '90'];
+const DEPARTMENT_DESIGNATION_SUGGESTIONS: Record<string, string[]> = {
+  'Human Resource': ['Manager', 'HR Manager', 'HR Executive', 'HR Recruiter', 'Talent Acquisition Executive'],
+  'Finance & Accounts': ['Manager', 'Accounts Manager', 'Account Manager', 'Accountant', 'Finance Executive'],
+  Marketing: ['Manager', 'Marketing Manager', 'Digital Marketing Executive', 'SEO Executive', 'Brand Executive'],
+  'Cyber Security': ['Manager', 'Security Manager', 'Security Analyst', 'Cyber Security Analyst', 'Compliance Analyst'],
+  'Artificial Intelligence': ['Manager', 'AI Manager', 'AI Engineer', 'ML Engineer', 'Data Scientist'],
+  'Information Technology': ['Manager', 'IT Manager', 'Software Developer', 'Frontend Developer', 'Backend Developer'],
+};
 const DOCUMENT_TYPES = [
   { key: 'aadhaar_card', label: 'Aadhaar Card' },
   { key: 'pan_card', label: 'PAN Card' },
@@ -89,6 +97,7 @@ const defaultForm = {
   bankIfscCode: '',
   bankName: '',
 };
+const CUSTOM_DESIGNATION_VALUE = '__custom_designation__';
 
 const CURRENT_TO_PERMANENT_FIELD_MAP: Record<string, keyof typeof defaultForm> = {
   address: 'permanentAddress',
@@ -330,6 +339,16 @@ function inputClassName(disabled = false, multiline = false) {
   }`;
 }
 
+function getSuggestedDesignations(departmentName: string, designations: any[]) {
+  const normalizedDepartment = String(departmentName || '').trim();
+  const curated = DEPARTMENT_DESIGNATION_SUGGESTIONS[normalizedDepartment] || [];
+  const apiOptions = (designations || [])
+    .map((designation: any) => String(designation?.title || '').trim())
+    .filter(Boolean);
+
+  return [...new Set([...curated, ...apiOptions])].sort((left, right) => left.localeCompare(right));
+}
+
 function SectionShell({
   title,
   subtitle,
@@ -448,13 +467,13 @@ export default function DetailedEmployeeProfile({
 
   const filteredDesignations = useMemo(() => {
     const selectedDepartment = (meta.departments || []).find((item: any) => item.name === form.department);
-    if (!selectedDepartment?.id) {
-      return meta.designations || [];
-    }
+    const departmentMatchedDesignations = !selectedDepartment?.id
+      ? meta.designations || []
+      : (meta.designations || []).filter(
+          (item: any) => !item.department_id || item.department_id === selectedDepartment.id
+        );
 
-    return (meta.designations || []).filter(
-      (item: any) => !item.department_id || item.department_id === selectedDepartment.id
-    );
+    return getSuggestedDesignations(form.department, departmentMatchedDesignations);
   }, [form.department, meta.departments, meta.designations]);
 
   const documentList = useMemo(() => {
@@ -963,12 +982,48 @@ export default function DetailedEmployeeProfile({
             <input name="division" value={form.division} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)} />
           </Field>
           <Field label="Designation">
-            <select name="designation" value={form.designation} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>
-              <option value="">Select designation</option>
-              {filteredDesignations.map((item: any) => (
-                <option key={item.id} value={item.title}>{item.title}</option>
-              ))}
-            </select>
+            <div className="space-y-2">
+              <select
+                value={filteredDesignations.includes(form.designation) ? form.designation : (form.designation ? CUSTOM_DESIGNATION_VALUE : '')}
+                onChange={(event) =>
+                  handleChange({
+                    target: {
+                      name: 'designation',
+                      value: event.target.value === CUSTOM_DESIGNATION_VALUE ? '' : event.target.value,
+                    },
+                  } as React.ChangeEvent<HTMLSelectElement>)
+                }
+                disabled={!isEditing}
+                className={inputClassName(!isEditing)}
+              >
+                <option value="">Select designation</option>
+                {filteredDesignations.map((designation: string) => (
+                  <option key={designation} value={designation}>
+                    {designation}
+                  </option>
+                ))}
+                <option value={CUSTOM_DESIGNATION_VALUE}>Other, type manually</option>
+              </select>
+              <input
+                list="employee-profile-designation-options"
+                name="designation"
+                value={form.designation}
+                onChange={handleChange}
+                disabled={!isEditing}
+                className={inputClassName(!isEditing)}
+                placeholder="Select or type designation"
+              />
+              {isEditing ? (
+                <p className="text-xs text-on-surface-variant">
+                  Select from dropdown, or choose "Other" and type a new designation.
+                </p>
+              ) : null}
+              <datalist id="employee-profile-designation-options">
+                {filteredDesignations.map((designation: string) => (
+                  <option key={designation} value={designation} />
+                ))}
+              </datalist>
+            </div>
           </Field>
           <Field label="Reporting To">
             <select name="reportingTo" value={form.reportingTo} onChange={handleChange} disabled={!isEditing} className={inputClassName(!isEditing)}>

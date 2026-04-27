@@ -128,6 +128,14 @@ const FIXED_DEPARTMENT_OPTIONS = [
   'Information Technology',
   'Human Resource',
 ];
+const DEPARTMENT_DESIGNATION_SUGGESTIONS: Record<string, string[]> = {
+  'Human Resource': ['Manager', 'HR Manager', 'HR Executive', 'HR Recruiter', 'Talent Acquisition Executive'],
+  'Finance & Accounts': ['Manager', 'Accounts Manager', 'Account Manager', 'Accountant', 'Finance Executive'],
+  Marketing: ['Manager', 'Marketing Manager', 'Digital Marketing Executive', 'SEO Executive', 'Brand Executive'],
+  'Cyber Security': ['Manager', 'Security Manager', 'Security Analyst', 'Cyber Security Analyst', 'Compliance Analyst'],
+  'Artificial Intelligence': ['Manager', 'AI Manager', 'AI Engineer', 'ML Engineer', 'Data Scientist'],
+  'Information Technology': ['Manager', 'IT Manager', 'Software Developer', 'Frontend Developer', 'Backend Developer'],
+};
 
 const DOCUMENT_TYPES = [
   { key: 'aadhaar_card', label: 'Aadhaar Card' },
@@ -214,6 +222,8 @@ const defaultFormState: FormState = {
   bankName: '',
 };
 
+const CUSTOM_DESIGNATION_VALUE = '__custom_designation__';
+
 function Section({
   title,
   subtitle,
@@ -259,6 +269,16 @@ function Field({
 
 function inputClassName(multiline = false, hasError = false) {
   return `w-full rounded-2xl border ${hasError ? 'border-rose-400 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100' : 'border-slate-300 bg-white focus:border-slate-900 focus:ring-slate-200'} px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 ${multiline ? 'min-h-[120px] resize-y' : ''}`;
+}
+
+function getSuggestedDesignations(departmentName: string, designations: Option[]) {
+  const normalizedDepartment = String(departmentName || '').trim();
+  const curated = DEPARTMENT_DESIGNATION_SUGGESTIONS[normalizedDepartment] || [];
+  const apiOptions = designations
+    .map((designation) => String(designation.title || '').trim())
+    .filter(Boolean);
+
+  return [...new Set([...curated, ...apiOptions])].sort((left, right) => left.localeCompare(right));
 }
 
 function selectClassName(hasError = false) {
@@ -517,11 +537,11 @@ export default function AddEmployee({
 
   const filteredDesignations = useMemo(() => {
     const selectedDepartment = departments.find((department) => department.name === form.department);
-    if (!selectedDepartment?.id) {
-      return designations;
-    }
+    const departmentMatchedDesignations = !selectedDepartment?.id
+      ? designations
+      : designations.filter((designation) => !designation.department_id || designation.department_id === selectedDepartment.id);
 
-    return designations.filter((designation) => !designation.department_id || designation.department_id === selectedDepartment.id);
+    return getSuggestedDesignations(form.department, departmentMatchedDesignations);
   }, [departments, designations, form.department]);
 
   const clearFieldError = (fieldKey: string) => {
@@ -1386,7 +1406,40 @@ export default function AddEmployee({
                 <input className={inputClassName()} name="division" value={form.division} onChange={handleInputChange} />
               </Field>
               <Field label="Designation" required error={fieldErrors.designation}>
-                <input className={inputClassName(false, !!fieldErrors.designation)} list="designation-options" name="designation" value={form.designation} onChange={handleInputChange} />
+                <div className="space-y-2">
+                  <select
+                    className={selectClassName(!!fieldErrors.designation)}
+                    value={filteredDesignations.includes(form.designation) ? form.designation : (form.designation ? CUSTOM_DESIGNATION_VALUE : '')}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      handleInputChange({
+                        target: {
+                          name: 'designation',
+                          value: nextValue === CUSTOM_DESIGNATION_VALUE ? '' : nextValue,
+                        },
+                      } as ChangeEvent<HTMLSelectElement>);
+                    }}
+                  >
+                    <option value="">Select designation</option>
+                    {filteredDesignations.map((designation) => (
+                      <option key={designation} value={designation}>
+                        {designation}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_DESIGNATION_VALUE}>Other, type manually</option>
+                  </select>
+                  <input
+                    className={inputClassName(false, !!fieldErrors.designation)}
+                    list="designation-options"
+                    name="designation"
+                    value={form.designation}
+                    onChange={handleInputChange}
+                    placeholder="Type custom designation if not in dropdown"
+                  />
+                  <p className="text-xs text-on-surface-variant">
+                    Select from dropdown, or choose "Other" and type a new designation.
+                  </p>
+                </div>
               </Field>
               <Field label="Reporting To" error={fieldErrors.reportingTo}>
                 <select className={selectClassName(!!fieldErrors.reportingTo)} name="reportingTo" value={form.reportingTo} onChange={handleInputChange}>
@@ -1465,7 +1518,7 @@ export default function AddEmployee({
             </div>
             <datalist id="designation-options">
               {filteredDesignations.map((designation) => (
-                <option key={designation.id} value={designation.title} />
+                <option key={designation} value={designation} />
               ))}
             </datalist>
 
