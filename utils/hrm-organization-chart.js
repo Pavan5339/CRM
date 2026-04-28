@@ -1,4 +1,5 @@
 import { adminClient } from '@/utils/supabase/admin';
+import { deriveEmploymentFields } from '@/utils/hrm-employment';
 
 const hrmEmployeeColumnSupportPromises = new Map();
 
@@ -96,6 +97,7 @@ function createNodeMap(superAdmins, employees) {
 
   employees.forEach((employee) => {
     const nodeId = buildEmployeeNodeId(employee.id);
+    const employment = deriveEmploymentFields(employee);
     nodes.set(nodeId, {
       id: nodeId,
       entityId: employee.id,
@@ -107,7 +109,7 @@ function createNodeMap(superAdmins, employees) {
       parentId: null,
       childIds: [],
       directReportCount: 0,
-      status: cleanText(employee.employee_status) || 'active',
+      status: employment.employmentLifecycleStatus || 'active',
       reportingManagerId: employee.reporting_manager_id || null,
       reportingSuperAdminId: employee.reporting_super_admin_id || null,
     });
@@ -147,6 +149,15 @@ function wouldCreateCycle(nodes, parentId, childId) {
 }
 
 function buildOrganizationTree(superAdmins, employees) {
+  const visibleManagerIds = new Set(
+    employees
+      .map((employee) => employee.reporting_manager_id)
+      .filter(Boolean)
+  );
+  const scopedEmployees = employees.filter((employee) => {
+    const lifecycleStatus = deriveEmploymentFields(employee).employmentLifecycleStatus;
+    return lifecycleStatus !== 'separated' || visibleManagerIds.has(employee.id);
+  });
   const nodes = createNodeMap(superAdmins, employees);
   const unassignedNodeId = buildGroupNodeId('unassigned');
   let hasUnassignedEmployees = false;
@@ -167,7 +178,7 @@ function buildOrganizationTree(superAdmins, employees) {
 
   const superAdminNodeIds = new Set(superAdmins.map((item) => buildSuperAdminNodeId(item.id)));
 
-  employees.forEach((employee) => {
+  scopedEmployees.forEach((employee) => {
     const childNodeId = buildEmployeeNodeId(employee.id);
     const managerNodeId = employee.reporting_manager_id ? buildEmployeeNodeId(employee.reporting_manager_id) : null;
     const superAdminNodeId = employee.reporting_super_admin_id
@@ -198,6 +209,12 @@ function buildOrganizationTree(superAdmins, employees) {
     node.directReportCount = node.childIds.length;
   });
 
+  Array.from(nodes.values()).forEach((node) => {
+    if (node.kind === 'employee' && !scopedEmployees.some((employee) => buildEmployeeNodeId(employee.id) === node.id)) {
+      nodes.delete(node.id);
+    }
+  });
+
   const roots = superAdmins
     .slice()
     .sort(compareByName)
@@ -221,6 +238,8 @@ function buildOrganizationTree(superAdmins, employees) {
 
 export async function loadOrganizationChartData() {
   const reportingSuperAdminSupported = await supportsHrmEmployeeColumn('reporting_super_admin_id');
+  const lifecycleSupported = await supportsHrmEmployeeColumn('employment_lifecycle_status');
+  const currentStageSupported = await supportsHrmEmployeeColumn('current_stage');
 
   const employeeSelect = `
     id,
@@ -232,6 +251,8 @@ export async function loadOrganizationChartData() {
     employee_status,
     reporting_manager_id,
     ${reportingSuperAdminSupported ? 'reporting_super_admin_id,' : ''}
+    ${lifecycleSupported ? 'employment_lifecycle_status,' : ''}
+    ${currentStageSupported ? 'current_stage,' : ''}
     department:hrm_departments (
       id,
       name
@@ -265,6 +286,8 @@ export async function loadOrganizationChartData() {
   const employees = (employeesResult.data || []).map((employee) => ({
     ...employee,
     reporting_super_admin_id: reportingSuperAdminSupported ? employee.reporting_super_admin_id || null : null,
+    employment_lifecycle_status: lifecycleSupported ? employee.employment_lifecycle_status || null : null,
+    current_stage: currentStageSupported ? employee.current_stage || null : null,
   }));
 
   const chart = buildOrganizationTree(superAdmins, employees);
@@ -274,7 +297,7 @@ export async function loadOrganizationChartData() {
     metadata: {
       rootCount: chart.roots.length,
       superAdminCount: superAdmins.length,
-      employeeCount: employees.length,
+      employeeCount: chart.nodes.filter((node) => node.kind === 'employee').length,
       reportingSuperAdminSupported,
       generatedAt: new Date().toISOString(),
     },

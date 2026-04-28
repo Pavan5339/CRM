@@ -8,6 +8,7 @@ interface EmployeePageHeaderProps {
   description?: string;
   eyebrow?: string;
   action?: React.ReactNode;
+  compact?: boolean;
 }
 
 export default function EmployeePageHeader({
@@ -16,25 +17,26 @@ export default function EmployeePageHeader({
   description,
   eyebrow,
   action,
+  compact = false,
 }: EmployeePageHeaderProps) {
   return (
-    <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className={`flex flex-col ${compact ? 'gap-3' : 'gap-4'} lg:flex-row lg:items-start lg:justify-between`}>
       <div className="min-w-0">
         {eyebrow ? (
           <span className="inline-flex items-center rounded-full bg-surface-container-low px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
             {eyebrow}
           </span>
         ) : null}
-        <div className={`flex items-start gap-4 ${eyebrow ? 'mt-4' : ''}`}>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 shadow-[0_12px_28px_rgba(139,92,246,0.14)]">
-            <span className="material-symbols-outlined text-[24px]">{icon}</span>
+        <div className={`flex items-start ${compact ? 'gap-3' : 'gap-4'} ${eyebrow ? 'mt-4' : ''}`}>
+          <div className={`flex shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 shadow-[0_12px_28px_rgba(139,92,246,0.14)] ${compact ? 'h-10 w-10' : 'h-12 w-12'}`}>
+            <span className={`material-symbols-outlined ${compact ? 'text-[20px]' : 'text-[24px]'}`}>{icon}</span>
           </div>
           <div className="min-w-0">
-            <h1 className="text-3xl font-headline font-bold tracking-tight text-on-background">
+            <h1 className={`${compact ? 'text-[1.8rem]' : 'text-3xl'} font-headline font-bold tracking-tight text-on-background`}>
               {title}
             </h1>
             {description ? (
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
+              <p className={`mt-2 ${compact ? 'max-w-2xl text-[13px] leading-5' : 'max-w-3xl text-sm leading-6'} text-on-surface-variant`}>
                 {description}
               </p>
             ) : null}

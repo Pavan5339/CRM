@@ -83,18 +83,16 @@ export default function EmployeeDirectoryWorkspace({
               setCurrentTab={setCurrentTab}
             />
           ) : (
-            <div className="rounded-[2rem] border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
-              <EmployeeList
-                hideHeader
-                setCurrentTab={setCurrentTab}
-                setSelectedEmployeeId={(employeeId) => setSelectedEmployeeId(employeeId)}
-                selectedEmployeeId={selectedEmployeeId}
-                onEmployeeSelect={(employeeId) => setSelectedEmployeeId(employeeId)}
-                onAddEmployee={() => {
-                  setCurrentTab('admin-add-employee');
-                }}
-              />
-            </div>
+            <EmployeeList
+              hideHeader
+              setCurrentTab={setCurrentTab}
+              setSelectedEmployeeId={(employeeId) => setSelectedEmployeeId(employeeId)}
+              selectedEmployeeId={selectedEmployeeId}
+              onEmployeeSelect={(employeeId) => setSelectedEmployeeId(employeeId)}
+              onAddEmployee={() => {
+                setCurrentTab('admin-add-employee');
+              }}
+            />
           )}
         </div>
       ) : (

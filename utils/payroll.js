@@ -9,6 +9,7 @@ const PAYROLL_PROFILE_SELECT = `
   pf_mode,
   pf_value,
   tds_enabled,
+  tds_mode,
   tds_value,
   retention_enabled,
   notes,
@@ -188,9 +189,10 @@ export async function ensurePayrollProfile(employeeId, actorUserId = null) {
     .insert({
       employee_id: employeeId,
       pf_enabled: false,
-      pf_mode: 'percent',
-      pf_value: 10,
+      pf_mode: 'fixed',
+      pf_value: 0,
       tds_enabled: false,
+      tds_mode: 'percent',
       tds_value: 0,
       retention_enabled: false,
       created_by: actorUserId,
@@ -264,11 +266,15 @@ export async function listPayrollDirectory() {
       const salary = roundCurrency(employee.salary);
       const pfEstimate =
         profile?.pf_enabled
-          ? profile.pf_mode === 'fixed'
-            ? roundCurrency(profile.pf_value)
-            : roundCurrency((salary * toNumber(profile.pf_value, 0)) / 100)
+          ? roundCurrency(toNumber(profile.pf_value, 0) * 2)
           : 0;
-      const tdsEstimate = profile?.tds_enabled ? roundCurrency(toNumber(profile.tds_value, 0) * 2) : 0;
+      const tdsEstimate = calculatePolicyAmount({
+        enabled: Boolean(profile?.tds_enabled),
+        mode: profile?.tds_mode || 'percent',
+        value: profile?.tds_value,
+        amountBase: salary,
+        ratio: 1,
+      });
       const retentionEstimate =
         profile?.retention_enabled && retention?.status === 'active'
           ? roundCurrency(retention.monthly_amount)
@@ -469,8 +475,9 @@ export function buildPayslipHtml(snapshot = {}) {
           <h2>Deductions</h2>
           <div class="row"><span class="label">LOP</span><span class="value">${formatCurrencyDisplay(deductions.lopDeduction)}</span></div>
           <div class="row"><span class="label">Employee PF</span><span class="value">${formatCurrencyDisplay(deductions.pfEmployeeDeduction)}</span></div>
+          <div class="row"><span class="label">Employer PF</span><span class="value">${formatCurrencyDisplay(deductions.pfEmployerDeduction)}</span></div>
+          <div class="row"><span class="label">Total PF</span><span class="value">${formatCurrencyDisplay(deductions.totalPfDeduction)}</span></div>
           <div class="row"><span class="label">Employee TDS</span><span class="value">${formatCurrencyDisplay(deductions.tdsEmployeeDeduction)}</span></div>
-          <div class="row"><span class="label">Employer TDS</span><span class="value">${formatCurrencyDisplay(deductions.tdsEmployerDeduction)}</span></div>
           <div class="row"><span class="label">Total TDS</span><span class="value">${formatCurrencyDisplay(deductions.totalTdsDeduction)}</span></div>
           <div class="row"><span class="label">Retention</span><span class="value">${formatCurrencyDisplay(deductions.retentionDeduction)}</span></div>
           <div class="row"><span class="label">Total Deductions</span><span class="value">${formatCurrencyDisplay(totals.totalDeductions)}</span></div>
@@ -519,6 +526,8 @@ export function buildPayslipSnapshot({ payrollItem, employee, run, payslipNumber
     deductions: {
       lopDeduction: payrollItem.lop_deduction,
       pfEmployeeDeduction: payrollItem.pf_employee_deduction,
+      pfEmployerDeduction: payrollItem.pf_employer_deduction ?? 0,
+      totalPfDeduction: payrollItem.total_pf_deduction ?? payrollItem.pf_employee_deduction ?? 0,
       tdsEmployeeDeduction: payrollItem.tds_employee_deduction ?? payrollItem.tds_deduction ?? 0,
       tdsEmployerDeduction: payrollItem.tds_employer_deduction ?? 0,
       totalTdsDeduction: payrollItem.total_tds_deduction ?? payrollItem.tds_deduction ?? 0,
@@ -819,19 +828,21 @@ export function calculateEmployeePayroll({
   const activeRetention = profile?.retention_enabled
     ? getCurrentRetentionSchedule(retentionSchedules, buildMonthKey(year, month))
     : null;
-  const pfEmployeeDeduction = calculatePolicyAmount({
-    enabled: Boolean(profile?.pf_enabled),
-    mode: profile?.pf_mode || 'percent',
-    value: profile?.pf_value,
+  const pfEmployeeDeduction = profile?.pf_enabled ? roundCurrency(toNumber(profile.pf_value, 0) * ratio) : 0;
+  const pfEmployerDeduction = profile?.pf_enabled ? roundCurrency(toNumber(profile.pf_value, 0) * ratio) : 0;
+  const totalPfDeduction = roundCurrency(pfEmployeeDeduction + pfEmployerDeduction);
+  const tdsEmployeeDeduction = calculatePolicyAmount({
+    enabled: Boolean(profile?.tds_enabled),
+    mode: profile?.tds_mode || 'percent',
+    value: profile?.tds_value,
     amountBase: proratedSalary,
     ratio,
   });
-  const tdsEmployeeDeduction = profile?.tds_enabled ? roundCurrency(toNumber(profile.tds_value, 0) * ratio) : 0;
-  const tdsEmployerDeduction = profile?.tds_enabled ? roundCurrency(toNumber(profile.tds_value, 0) * ratio) : 0;
-  const totalTdsDeduction = roundCurrency(tdsEmployeeDeduction + tdsEmployerDeduction);
+  const tdsEmployerDeduction = 0;
+  const totalTdsDeduction = roundCurrency(tdsEmployeeDeduction);
   const retentionDeduction = activeRetention ? roundCurrency(toNumber(activeRetention.monthly_amount, 0) * ratio) : 0;
   const totalDeductions = roundCurrency(
-    lopDeduction + pfEmployeeDeduction + totalTdsDeduction + retentionDeduction
+    lopDeduction + totalPfDeduction + totalTdsDeduction + retentionDeduction
   );
   const netSalary = roundCurrency(proratedSalary - totalDeductions + toNumber(retentionReleaseAmount, 0));
 
@@ -851,6 +862,8 @@ export function calculateEmployeePayroll({
     lopDays: normalizedLopDays,
     lopDeduction,
     pfEmployeeDeduction,
+    pfEmployerDeduction,
+    totalPfDeduction,
     tdsEmployeeDeduction,
     tdsEmployerDeduction,
     totalTdsDeduction,
@@ -1028,6 +1041,8 @@ export async function generatePayrollRun({ year, month, actorUserId }) {
       lop_days: row.lopDays,
       lop_deduction: row.lopDeduction,
       pf_employee_deduction: row.pfEmployeeDeduction,
+      pf_employer_deduction: row.pfEmployerDeduction,
+      total_pf_deduction: row.totalPfDeduction,
       tds_employee_deduction: row.tdsEmployeeDeduction,
       tds_employer_deduction: row.tdsEmployerDeduction,
       total_tds_deduction: row.totalTdsDeduction,
@@ -1051,9 +1066,10 @@ export async function generatePayrollRun({ year, month, actorUserId }) {
         },
         policy: {
           pfEnabled: Boolean(row.profile?.pf_enabled),
-          pfMode: row.profile?.pf_mode || 'percent',
+          pfMode: 'fixed',
           pfValue: toNumber(row.profile?.pf_value, 0),
           tdsEnabled: Boolean(row.profile?.tds_enabled),
+          tdsMode: row.profile?.tds_mode || 'percent',
           tdsValue: toNumber(row.profile?.tds_value, 0),
           retentionEnabled: Boolean(row.profile?.retention_enabled),
           retentionMonthlyAmount: toNumber(row.retentionSchedule?.monthly_amount, 0),
@@ -1066,6 +1082,8 @@ export async function generatePayrollRun({ year, month, actorUserId }) {
         deductions: {
           lopDeduction: row.lopDeduction,
           pfEmployeeDeduction: row.pfEmployeeDeduction,
+          pfEmployerDeduction: row.pfEmployerDeduction,
+          totalPfDeduction: row.totalPfDeduction,
           tdsEmployeeDeduction: row.tdsEmployeeDeduction,
           tdsEmployerDeduction: row.tdsEmployerDeduction,
           totalTdsDeduction: row.totalTdsDeduction,

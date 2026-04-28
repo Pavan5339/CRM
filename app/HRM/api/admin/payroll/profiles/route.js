@@ -56,9 +56,10 @@ export async function PATCH(request) {
       .from('hrm_payroll_profiles')
       .update({
         pf_enabled: parseBoolean(body.pfEnabled),
-        pf_mode: body.pfMode === 'fixed' ? 'fixed' : 'percent',
-        pf_value: parseNumeric(body.pfValue, 10),
+        pf_mode: 'fixed',
+        pf_value: parseNumeric(body.pfValue, 0),
         tds_enabled: parseBoolean(body.tdsEnabled),
+        tds_mode: body.tdsMode === 'fixed' ? 'fixed' : 'percent',
         tds_value: parseNumeric(body.tdsValue, 0),
         retention_enabled: parseBoolean(body.retentionEnabled),
         notes: cleanText(body.notes),
