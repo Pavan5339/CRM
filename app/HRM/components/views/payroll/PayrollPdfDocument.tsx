@@ -124,8 +124,9 @@ export default function PayrollPdfDocument({ snapshot }: { snapshot: any }) {
             <Text style={styles.cardTitle}>Deductions</Text>
             <View style={styles.row}><Text style={styles.label}>LOP</Text><Text style={styles.value}>{money(deductions.lopDeduction)}</Text></View>
             <View style={styles.row}><Text style={styles.label}>Employee PF</Text><Text style={styles.value}>{money(deductions.pfEmployeeDeduction)}</Text></View>
+            <View style={styles.row}><Text style={styles.label}>Employer PF</Text><Text style={styles.value}>{money(deductions.pfEmployerDeduction)}</Text></View>
+            <View style={styles.row}><Text style={styles.label}>Total PF</Text><Text style={styles.value}>{money(deductions.totalPfDeduction)}</Text></View>
             <View style={styles.row}><Text style={styles.label}>Employee TDS</Text><Text style={styles.value}>{money(deductions.tdsEmployeeDeduction)}</Text></View>
-            <View style={styles.row}><Text style={styles.label}>Employer TDS</Text><Text style={styles.value}>{money(deductions.tdsEmployerDeduction)}</Text></View>
             <View style={styles.row}><Text style={styles.label}>Total TDS</Text><Text style={styles.value}>{money(deductions.totalTdsDeduction)}</Text></View>
             <View style={styles.row}><Text style={styles.label}>Retention</Text><Text style={styles.value}>{money(deductions.retentionDeduction)}</Text></View>
             <View style={styles.row}><Text style={styles.label}>Total Deductions</Text><Text style={styles.value}>{money(totals.totalDeductions)}</Text></View>

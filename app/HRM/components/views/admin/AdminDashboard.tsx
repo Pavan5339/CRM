@@ -178,7 +178,7 @@ export default function AdminDashboard({ admin, setCurrentTab, setSelectedEmploy
     return () => window.clearInterval(timer);
   }, []);
 
-  const greetingName = admin?.name || dashboard?.admin?.name || 'HR Admin';
+  const greetingName = String(admin?.name || dashboard?.admin?.name || 'HR Admin').replace(/\bHr\b/g, 'HR');
   const liveDateTimeLabel = currentDateTime.toLocaleString('en-IN', {
     day: '2-digit',
     month: 'short',

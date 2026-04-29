@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { AUDIT_TEMPLATES } from "./templateLibrary";
+import PdplWorkspace from "./PdplWorkspace";
 
 // ─── FONTS ───────────────────────────────────────────────────────────────────
 const FontLink = () => (
@@ -143,28 +145,35 @@ const INIT_PROJECTS = [
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 function calcProgress(p) {
-  const all = p.procedures.flatMap(pr=>pr.steps);
+  const procedures = Array.isArray(p?.procedures) ? p.procedures : [];
+  const all = procedures.flatMap(pr=>pr.steps || []);
   if(!all.length) return 0;
   return Math.round(all.filter(s=>s.status==='done').length/all.length*100);
 }
 function avatarColor(id){ return AVATAR_COLORS[(id-1)%AVATAR_COLORS.length]; }
+function getProjectProcedures(project){
+  return Array.isArray(project?.procedures) ? project.procedures : [];
+}
+function getProjectSteps(project){
+  return getProjectProcedures(project).flatMap(proc => proc.steps || []);
+}
 
 // ─── BADGE MAPS ───────────────────────────────────────────────────────────────
 const STATUS_MAP = {
-  todo:     {label:'Not Started', bg:C.bg2,      color:C.text3,  border:C.border},
-  progress: {label:'In Progress', bg:C.amberBg,  color:C.amber,  border:C.amberBorder},
-  done:     {label:'Done',        bg:C.greenBg,  color:C.green,  border:C.greenBorder},
+  todo:     {label:'Not Started', bg:'#ffffff', color:'#475569', border:'#cbd5e1', dot:'#94a3b8'},
+  progress: {label:'In Progress', bg:'#fff7ed', color:'#b45309', border:'#fdba74', dot:'#f59e0b'},
+  done:     {label:'Completed', bg:'#f0fdf4', color:'#15803d', border:'#86efac', dot:'#22c55e'},
 };
 const AQC_MAP = {
-  pending: {label:'— Pending', bg:C.bg2,      color:C.text3, border:C.border},
-  pass:    {label:'✓ Pass',    bg:C.greenBg,  color:C.green, border:C.greenBorder},
-  review:  {label:'⚠ Review',  bg:C.amberBg,  color:C.amber, border:C.amberBorder},
-  fail:    {label:'✕ Fail',    bg:C.redBg,    color:C.red,   border:C.redBorder},
+  pending: {label:'Pending', bg:'#ffffff', color:'#475569', border:'#cbd5e1', dot:'#94a3b8'},
+  pass:    {label:'Passed', bg:'#f0fdf4', color:'#15803d', border:'#86efac', dot:'#22c55e'},
+  review:  {label:'Needs Review', bg:'#fff7ed', color:'#b45309', border:'#fdba74', dot:'#f59e0b'},
+  fail:    {label:'Failed', bg:'#fef2f2', color:'#b91c1c', border:'#fca5a5', dot:'#ef4444'},
 };
 const RISK_MAP = {
-  high:   {label:'▲ High', bg:C.redBg,    color:C.red,   border:C.redBorder},
-  medium: {label:'◆ Med',  bg:C.amberBg,  color:C.amber, border:C.amberBorder},
-  low:    {label:'▽ Low',  bg:C.tealBg,   color:C.teal,  border:C.tealBorder},
+  high:   {label:'High Risk', bg:'#fef2f2', color:'#b91c1c', border:'#fca5a5', dot:'#ef4444'},
+  medium: {label:'Medium Risk', bg:'#fff7ed', color:'#b45309', border:'#fdba74', dot:'#f59e0b'},
+  low:    {label:'Low Risk', bg:'#ecfeff', color:'#0f766e', border:'#67e8f9', dot:'#06b6d4'},
 };
 const TYPE_COLORS = {
   hr:  {accent:C.teal,   bg:C.tealBg,    border:C.tealBorder},
@@ -177,10 +186,26 @@ const TYPE_COLORS = {
 
 const Badge = ({map,val,small}) => {
   const m = map[val]||map[Object.keys(map)[0]];
-  return <span style={{display:'inline-flex',alignItems:'center',padding:small?'2px 7px':'3px 9px',borderRadius:20,fontSize:small?10:11,fontWeight:600,fontFamily:MONO,background:m.bg,color:m.color,border:`1px solid ${m.border}`,whiteSpace:'nowrap'}}>{m.label}</span>;
+  return <span style={{display:'inline-flex',alignItems:'center',gap:6,padding:small?'4px 9px':'5px 11px',borderRadius:999,fontSize:small?10.5:11.5,fontWeight:700,background:m.bg,color:m.color,border:`1px solid ${m.border}`,whiteSpace:'nowrap'}}>
+    <span style={{width:7,height:7,borderRadius:'50%',background:m.dot||m.color,flexShrink:0}} />
+    {m.label}
+  </span>;
 };
 const Avatar = ({member,size=28}) => (
   <div title={member.name} style={{width:size,height:size,borderRadius:'50%',background:avatarColor(member.id),display:'flex',alignItems:'center',justifyContent:'center',fontSize:size*0.38,fontWeight:700,color:'#fff',flexShrink:0}}>{member.initials}</div>
+);
+
+const DrawerCardSelect=({options,val,onSelect,mapObj,cols=3})=>(
+  <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:7}}>
+    {options.map(k=>{
+      const m=mapObj[k];const sel=val===k;
+      return(
+        <button key={k} onClick={()=>onSelect(k)} style={{padding:'9px 8px',borderRadius:9,fontSize:12,fontWeight:600,fontFamily:MONO,cursor:'pointer',textAlign:'center',border:sel?`2px solid ${m.border}`:`1.5px solid ${C.border}`,color:sel?m.color:C.text3,background:sel?m.bg:'#fff',boxShadow:sel?`0 2px 8px ${m.border}55`:'none',transform:sel?'translateY(-1px)':'none',transition:'all .18s'}}>
+          {m.label}
+        </button>
+      );
+    })}
+  </div>
 );
 
 // ─── TOAST ────────────────────────────────────────────────────────────────────
@@ -206,7 +231,7 @@ const ToastContainer=({toasts})=>(
 
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 const NAV_ITEMS=[
-  {section:'Workspace',items:[{id:'dashboard',icon:'⬡',label:'Dashboard'},{id:'my-tasks',icon:'◎',label:'My Tasks'}]},
+  {section:'Workspace',items:[{id:'audit categorys',icon:'◫',label:'Audit Category Library'},{id:'dashboard',icon:'⬡',label:'Dashboard'},{id:'my-tasks',icon:'◎',label:'My Tasks'}]},
   {section:'Reports',items:[{id:'export-excel',icon:'⬒',label:'Export Excel',action:true},{id:'export-pdf',icon:'⬓',label:'Export PDF',action:true}]},
   {section:'Admin',items:[{id:'team',icon:'◈',label:'Team Members'}]},
 ];
@@ -271,39 +296,86 @@ const StatCard=({icon,value,label,change,changeType,accent})=>(
 const ProjectCard=({project,members,onClick})=>{
   const prog=calcProgress(project);
   const tc=TYPE_COLORS[project.type]||TYPE_COLORS.hr;
-  const allSteps=project.procedures.flatMap(pr=>pr.steps);
+  const allSteps=getProjectSteps(project);
   const assigneeIds=[...new Set(allSteps.map(s=>s.assignee).filter(Boolean))].slice(0,4);
   const sb={active:{bg:C.tealBg,color:C.teal,border:C.tealBorder,label:'Active'},review:{bg:C.amberBg,color:C.amber,border:C.amberBorder,label:'Under Review'},closed:{bg:C.bg2,color:C.text3,border:C.border,label:'Closed'}}[project.status]||{bg:C.tealBg,color:C.teal,border:C.tealBorder,label:'Active'};
   return(
-    <div onClick={onClick} style={{background:'#fff',border:`1px solid ${C.border}`,borderRadius:14,padding:22,cursor:'pointer',position:'relative',overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.04)',transition:'all .2s'}}
-      onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-3px)';e.currentTarget.style.boxShadow='0 8px 28px rgba(0,0,0,0.1)';e.currentTarget.style.borderColor=tc.accent+'66';}}
-      onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='0 1px 3px rgba(0,0,0,0.04)';e.currentTarget.style.borderColor=C.border;}}>
-      <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,${tc.accent},${tc.accent}aa)`,borderRadius:'14px 14px 0 0'}}/>
-      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14}}>
-        <div style={{width:42,height:42,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,background:tc.bg,border:`1px solid ${tc.border}`}}>{project.icon}</div>
-        <span style={{fontSize:10.5,fontFamily:MONO,padding:'4px 10px',borderRadius:20,fontWeight:600,background:sb.bg,color:sb.color,border:`1px solid ${sb.border}`}}>{sb.label}</span>
+    <div onClick={onClick} style={{background:`linear-gradient(180deg,#ffffff 0%,${tc.bg} 100%)`,border:`1px solid ${tc.border}`,borderRadius:18,padding:22,cursor:'pointer',position:'relative',overflow:'hidden',boxShadow:'0 10px 30px rgba(15,23,42,0.08)',transition:'all .2s',minHeight:260,display:'flex',flexDirection:'column'}}
+      onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-4px)';e.currentTarget.style.boxShadow='0 18px 40px rgba(15,23,42,0.12)';e.currentTarget.style.borderColor=tc.accent+'88';}}
+      onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='0 10px 30px rgba(15,23,42,0.08)';e.currentTarget.style.borderColor=tc.border;}}>
+      <div style={{position:'absolute',top:-28,right:-18,width:110,height:110,borderRadius:'50%',background:`radial-gradient(circle, ${tc.accent}18 0%, transparent 70%)`}}/>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:18,position:'relative'}}>
+        <div style={{width:52,height:52,borderRadius:16,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,background:'#ffffffcc',border:`1px solid ${tc.border}`,boxShadow:'0 6px 18px rgba(15,23,42,0.06)'}}>{project.icon}</div>
+        <span style={{fontSize:10.5,fontFamily:MONO,padding:'5px 12px',borderRadius:999,fontWeight:700,background:sb.bg,color:sb.color,border:`1px solid ${sb.border}`}}>{sb.label}</span>
       </div>
-      <div style={{fontSize:15,fontWeight:700,color:C.text1,marginBottom:5}}>{project.name}</div>
-      <div style={{fontSize:12.5,color:C.text2,lineHeight:1.5}}>{project.desc}</div>
-      <div style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-          <div style={{flex:1,height:5,background:C.bg2,borderRadius:3,overflow:'hidden'}}>
-            <div style={{height:'100%',borderRadius:3,background:`linear-gradient(90deg,${tc.accent},${tc.accent}cc)`,width:`${prog}%`,transition:'width .5s ease'}}/>
+      <div style={{fontSize:11,color:tc.accent,fontFamily:MONO,letterSpacing:'0.8px',marginBottom:10}}>COMPANY PROJECT</div>
+      <div style={{fontSize:16.5,fontWeight:800,color:C.text1,marginBottom:8,lineHeight:1.35}}>{project.name}</div>
+      <div style={{fontSize:13,color:C.text2,lineHeight:1.6,minHeight:58}}>{project.desc}</div>
+      <div style={{marginTop:'auto',paddingTop:18,borderTop:`1px solid ${C.border}`}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+          <div style={{fontSize:11,color:C.text3,fontFamily:MONO}}>PROGRESS</div>
+          <span style={{fontSize:12.5,fontFamily:MONO,fontWeight:700,color:C.text2}}>{prog}%</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+          <div style={{flex:1,height:6,background:'#e8eef7',borderRadius:999,overflow:'hidden'}}>
+            <div style={{height:'100%',borderRadius:999,background:`linear-gradient(90deg,${tc.accent},${tc.accent}cc)`,width:`${prog}%`,transition:'width .5s ease'}}/>
           </div>
-          <span style={{fontSize:12,fontFamily:MONO,fontWeight:600,color:C.text2,minWidth:32,textAlign:'right'}}>{prog}%</span>
         </div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{display:'flex'}}>
+          <div style={{display:'flex',alignItems:'center'}}>
             {assigneeIds.map((mid,i)=>{const m=members.find(t=>t.id===mid);return m?<div key={mid} title={m.name} style={{width:24,height:24,borderRadius:'50%',background:avatarColor(m.id),border:`2px solid #fff`,marginLeft:i?-6:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#fff'}}>{m.initials}</div>:null;})}
           </div>
-          <span style={{fontSize:11,color:C.text3,fontFamily:MONO}}>{allSteps.filter(s=>s.status==='done').length}/{allSteps.length} steps</span>
+          <span style={{fontSize:11.5,color:C.text3,fontFamily:MONO}}>{allSteps.filter(s=>s.status==='done').length}/{allSteps.length} steps</span>
         </div>
       </div>
     </div>
   );
 };
 
-// ─── TABLE VIEW ───────────────────────────────────────────────────────────────
+const TemplateCard=({template,projectCount,stepCount,onClick})=>(
+  <button
+    type="button"
+    onClick={onClick}
+    style={{
+      background:`linear-gradient(145deg, #ffffff 0%, ${template.bg} 100%)`,
+      border:`1px solid ${template.border}`,
+      borderRadius:24,
+      padding:'26px 24px',
+      cursor:'pointer',
+      position:'relative',
+      overflow:'hidden',
+      boxShadow:'0 10px 32px rgba(15,23,42,0.08)',
+      transition:'all .2s',
+      textAlign:'left',
+      minHeight:220,
+      display:'flex',
+      flexDirection:'column'
+    }}
+    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-4px)';e.currentTarget.style.boxShadow='0 18px 40px rgba(15,23,42,0.12)';}}
+    onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='0 10px 32px rgba(15,23,42,0.08)';}}
+  >
+    <div style={{position:'absolute',inset:0,background:`radial-gradient(circle at top right, ${template.accent}16 0%, transparent 42%)`,pointerEvents:'none'}} />
+    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:14,marginBottom:20,position:'relative'}}>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div style={{width:56,height:56,borderRadius:18,background:'#ffffffcc',border:`1px solid ${template.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,boxShadow:'0 6px 20px rgba(15,23,42,0.06)'}}>
+          {template.icon}
+        </div>
+        <div>
+          <div style={{fontSize:20,fontWeight:800,color:C.text1,lineHeight:1.2}}>{template.name}</div>
+          <div style={{fontSize:11.5,color:template.accent,fontFamily:MONO,marginTop:6,letterSpacing:'0.8px'}}>{template.shortCode}</div>
+        </div>
+      </div>
+      <span style={{fontSize:10.5,fontFamily:MONO,padding:'5px 12px',borderRadius:999,fontWeight:700,background:'#ffffffaa',color:template.accent,border:`1px solid ${template.border}`}}>
+        {template.status}
+      </span>
+    </div>
+    <div style={{fontSize:14,color:C.text2,lineHeight:1.7,marginBottom:22,position:'relative',maxWidth:420}}>{template.description}</div>
+    <div style={{display:'inline-flex',alignItems:'center',gap:8,fontSize:12.5,fontWeight:700,color:template.accent,position:'relative',marginTop:'auto'}}>
+      Open audit category
+    </div>
+  </button>
+);
+
 const TableView=({project,members,onOpenTask,onAddStep,onDeleteStep,onRenameProcedure})=>{
   const [editingProc,setEditingProc]=useState(null);
   const [editingName,setEditingName]=useState('');
@@ -406,7 +478,7 @@ const KanbanView=({project,members,onOpenTask})=>{
     {key:'progress',label:'In Progress',color:C.amber},
     {key:'done',label:'Done',color:C.green},
   ];
-  const allSteps=project.procedures.flatMap((proc,pi)=>proc.steps.map((s,si)=>({...s,procName:proc.name,pi,si})));
+  const allSteps=getProjectProcedures(project).flatMap((proc,pi)=>(proc.steps || []).map((s,si)=>({...s,procName:proc.name,pi,si})));
   return(
     <div style={{display:'flex',gap:16,padding:'20px 24px',overflowX:'auto',flex:1,alignItems:'flex-start'}}>
       {COLS.map(col=>{
@@ -464,19 +536,6 @@ const TaskDrawer=({open,task,procName,members,onClose,onSave})=>{
 
   const inputStyle={background:'#fff',border:`1px solid ${C.border2}`,borderRadius:9,padding:'10px 14px',color:C.text1,fontSize:13.5,fontFamily:'Sora,sans-serif',outline:'none',width:'100%',transition:'border .2s'};
   const labelStyle={fontSize:10.5,fontWeight:700,fontFamily:MONO,color:C.text3,textTransform:'uppercase',letterSpacing:'0.8px',display:'block',marginBottom:8};
-
-  const CardSelect=({options,val,onSelect,mapObj,cols=3})=>(
-    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gap:7}}>
-      {options.map(k=>{
-        const m=mapObj[k];const sel=val===k;
-        return(
-          <button key={k} onClick={()=>onSelect(k)} style={{padding:'9px 8px',borderRadius:9,fontSize:12,fontWeight:600,fontFamily:MONO,cursor:'pointer',textAlign:'center',border:sel?`2px solid ${m.border}`:`1.5px solid ${C.border}`,color:sel?m.color:C.text3,background:sel?m.bg:'#fff',boxShadow:sel?`0 2px 8px ${m.border}55`:'none',transform:sel?'translateY(-1px)':'none',transition:'all .18s'}}>
-            {m.label}
-          </button>
-        );
-      })}
-    </div>
-  );
 
   const addComment=()=>{
     if(!commentText.trim())return;
@@ -555,16 +614,16 @@ const TaskDrawer=({open,task,procName,members,onClose,onSave})=>{
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                   <div>
                     <label style={labelStyle}>Status</label>
-                    <CardSelect options={['todo','progress','done']} val={ft.status} onSelect={v=>set('status',v)} mapObj={STATUS_MAP} cols={1}/>
+                    <DrawerCardSelect options={['todo','progress','done']} val={ft.status} onSelect={v=>set('status',v)} mapObj={STATUS_MAP} cols={1}/>
                   </div>
                   <div>
                     <label style={labelStyle}>Risk Rating</label>
-                    <CardSelect options={['high','medium','low']} val={ft.risk} onSelect={v=>set('risk',v)} mapObj={RISK_MAP} cols={1}/>
+                    <DrawerCardSelect options={['high','medium','low']} val={ft.risk} onSelect={v=>set('risk',v)} mapObj={RISK_MAP} cols={1}/>
                   </div>
                 </div>
                 <div style={{marginTop:18,paddingTop:18,borderTop:`1px solid ${C.border}`}}>
                   <label style={labelStyle}>AQC — Audit Quality Check</label>
-                  <CardSelect options={['pending','pass','review','fail']} val={ft.aqc} onSelect={v=>set('aqc',v)} mapObj={AQC_MAP} cols={4}/>
+                  <DrawerCardSelect options={['pending','pass','review','fail']} val={ft.aqc} onSelect={v=>set('aqc',v)} mapObj={AQC_MAP} cols={4}/>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginTop:18,paddingTop:18,borderTop:`1px solid ${C.border}`}}>
                   <div>
@@ -792,7 +851,7 @@ function buildProceduresFromRows(rows){
 
     if(!stepText) continue; // skip rows without a step
 
-    // Skip if it looks like the description sub-header row from our Excel template
+    // Skip if it looks like the description sub-header row from our Excel audit category
     if(stepText.toLowerCase().includes('audit step description') ||
        stepText.toLowerCase().includes('[required]') ||
        stepText.toLowerCase().startsWith('procedure')) continue;
@@ -1090,7 +1149,21 @@ Recruitment Process,Check Manpower budget is approved.,medium,3,2025-02-18
 
 // ─── NEW PROJECT MODAL ────────────────────────────────────────────────────────
 const NewProjectModal=({open,members,onClose,onCreate})=>{
-  const [form,setForm]=useState({name:'',unit:'',type:'hr',status:'active',start:'',end:'',lead:'',desc:''});
+  const [form,setForm]=useState({
+    name:'',
+    projectName:'',
+    projectLeader:'',
+    clientName:'',
+    start:'',
+    end:'',
+    projectLength:'',
+    coordinatorName:'',
+    unit:'',
+    type:'hr',
+    status:'active',
+    lead:'',
+    desc:'',
+  });
   const [showImport,setShowImport]=useState(false);
   const [importedProcedures,setImportedProcedures]=useState(null);
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
@@ -1104,14 +1177,18 @@ const NewProjectModal=({open,members,onClose,onCreate})=>{
         <div onClick={e=>e.stopPropagation()} style={{background:'#fff',border:`1px solid ${C.border}`,borderRadius:16,width:560,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.15)',animation:'slideUp .3s ease'}}>
           <div style={{padding:'22px 24px 0',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
             <div>
-              <div style={{fontSize:18,fontWeight:800,color:C.text1}}>New Audit Project</div>
-              <div style={{fontSize:12,color:C.text3,marginTop:3}}>Fill in details below, then optionally import steps from CSV</div>
+              <div style={{fontSize:18,fontWeight:800,color:C.text1}}>Add Audited Company</div>
+              <div style={{fontSize:12,color:C.text3,marginTop:3}}>Create a company workspace inside this audit category, then optionally import steps from CSV</div>
             </div>
             <button onClick={onClose} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',cursor:'pointer',fontSize:16,color:C.text2,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
           </div>
           <div style={{padding:24,display:'flex',flexDirection:'column',gap:14}}>
             <div><label style={labelStyle}>Project Name *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder='e.g. HR Audit — Q1 2025' style={inputStyle}/></div>
             <div><label style={labelStyle}>Unit / Entity *</label><input value={form.unit} onChange={e=>set('unit',e.target.value)} placeholder='e.g. Lixil Window Systems Private Limited' style={inputStyle}/></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+              <div><label style={labelStyle}>Project Leader</label><input value={form.projectLeader} onChange={e=>set('projectLeader',e.target.value)} placeholder='e.g. Priya Sharma' style={inputStyle}/></div>
+              <div><label style={labelStyle}>Client&apos;s Name</label><input value={form.clientName} onChange={e=>set('clientName',e.target.value)} placeholder='e.g. PW Company' style={inputStyle}/></div>
+            </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
               <div><label style={labelStyle}>Audit Type</label>
                 <select value={form.type} onChange={e=>set('type',e.target.value)} style={{...inputStyle,appearance:'none',cursor:'pointer'}}>
@@ -1127,6 +1204,10 @@ const NewProjectModal=({open,members,onClose,onCreate})=>{
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
               <div><label style={labelStyle}>Start Date</label><input type='date' value={form.start} onChange={e=>set('start',e.target.value)} style={inputStyle}/></div>
               <div><label style={labelStyle}>End Date</label><input type='date' value={form.end} onChange={e=>set('end',e.target.value)} style={inputStyle}/></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+              <div><label style={labelStyle}>Project Length</label><input value={form.projectLength} onChange={e=>set('projectLength',e.target.value)} placeholder='e.g. 45 Days' style={inputStyle}/></div>
+              <div><label style={labelStyle}>Audit Coordinator</label><input value={form.coordinatorName} onChange={e=>set('coordinatorName',e.target.value)} placeholder='e.g. Rahul Tiwari' style={inputStyle}/></div>
             </div>
             <div><label style={labelStyle}>Lead Auditor</label>
               <select value={form.lead} onChange={e=>set('lead',e.target.value)} style={{...inputStyle,appearance:'none',cursor:'pointer'}}>
@@ -1209,9 +1290,13 @@ const AddMemberModal=({open,onClose,onAdd})=>{
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function AuditFlow(){
-  const [view,setView]=useState('dashboard');
-  const [projects,setProjects]=useState(INIT_PROJECTS);
+  const [view,setView]=useState('templates');
+  const [projects,setProjects]=useState(INIT_PROJECTS.slice(0,1).map(project=>({...project,templateId:'hr-auditing'})));
+  const [auditMembers,setAuditMembers]=useState([]);
+  const [membersLoading,setMembersLoading]=useState(false);
+  const [membersError,setMembersError]=useState('');
   const [members,setMembers]=useState(INIT_MEMBERS);
+  const [selectedTemplateId,setSelectedTemplateId]=useState(null);
   const [currentProjId,setCurrentProjId]=useState(null);
   const [activeTab,setActiveTab]=useState('table');
   const [drawerOpen,setDrawerOpen]=useState(false);
@@ -1224,9 +1309,37 @@ export default function AuditFlow(){
   const [search,setSearch]=useState('');
   const {toasts,show:showToast}=useToast();
 
+  useEffect(()=>{
+    let active = true;
+    const loadAuditMembers = async () => {
+      try {
+        setMembersLoading(true);
+        setMembersError('');
+        const response = await fetch('/Auditing/api/team', { cache: 'no-store' });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to load team members.');
+        if (!active) return;
+        setAuditMembers(Array.isArray(result.members) ? result.members : []);
+      } catch (error) {
+        if (!active) return;
+        setMembersError(error.message || 'Failed to load team members.');
+      } finally {
+        if (active) setMembersLoading(false);
+      }
+    };
+    loadAuditMembers();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedTemplate = AUDIT_TEMPLATES.find(t=>t.id===selectedTemplateId) || null;
+  const isPdplTemplate = selectedTemplateId === 'pdpl-template';
+  const templateProjects = selectedTemplateId ? projects.filter(p=>p.templateId===selectedTemplateId) : [];
   const currentProj=projects.find(p=>p.id===currentProjId);
 
   const openProject=id=>{setCurrentProjId(id);setView('project');setActiveTab('table');};
+  const openTemplate=templateId=>{setSelectedTemplateId(templateId);setCurrentProjId(null);setView('dashboard');setSearch('');};
 
   const openTask=(pi,si)=>{
     const s=currentProj.procedures[pi].steps[si];
@@ -1266,12 +1379,32 @@ export default function AuditFlow(){
   };
 
   const createProject=(form,importedProcedures)=>{
-    if(!form.name||!form.unit){showToast('error','Name and unit are required');return;}
+    const projectName = form.projectName || form.name;
+    const clientName = form.clientName || form.unit;
+    if(!selectedTemplateId){showToast('error','Select an audit category first');return;}
+    if(!projectName||!clientName){showToast('error','Project name and client name are required');return;}
     const icons={hr:'👤',fin:'💰',inv:'📦',bil:'🧾',it:'💻',ops:'⚙️'};
     const procs=importedProcedures||[];
-    setProjects(ps=>[{id:Date.now(),name:form.name,unit:form.unit,type:form.type,icon:icons[form.type]||'📋',status:form.status,start:form.start,end:form.end,lead:parseInt(form.lead)||null,desc:form.desc,procedures:procs},...ps]);
+    setProjects(ps=>[{
+      id:Date.now(),
+      templateId:selectedTemplateId,
+      name:projectName,
+      unit:form.unit || clientName,
+      clientName,
+      projectLeader:form.projectLeader || '',
+      projectLength:form.projectLength || '',
+      coordinatorName:form.coordinatorName || '',
+      type:form.type,
+      icon:icons[form.type]||'??',
+      status:form.status,
+      start:form.start,
+      end:form.end,
+      lead:parseInt(form.lead)||null,
+      desc:form.desc || `${selectedTemplate?.name || 'Audit'} engagement for ${clientName}`,
+      procedures:procs
+    },...ps]);
     setNewProjModal(false);
-    const msg=procs.length?`Project created with ${procs.length} procedures and ${procs.reduce((a,p)=>a+p.steps.length,0)} steps from CSV`:'Project created successfully';
+    const msg=procs.length?`Company workspace created with ${procs.length} procedures and ${procs.reduce((a,p)=>a+p.steps.length,0)} steps from CSV`:'Company workspace created successfully';
     showToast('success',msg);
   };
 
@@ -1308,8 +1441,8 @@ export default function AuditFlow(){
     showToast('success','Export downloaded');
   };
 
-  const filteredProjects=projects.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())||p.unit.toLowerCase().includes(search.toLowerCase()));
-  const allSteps=projects.flatMap(p=>p.procedures.flatMap(pr=>pr.steps));
+  const filteredProjects=templateProjects.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())||p.unit.toLowerCase().includes(search.toLowerCase())||String(p.clientName||'').toLowerCase().includes(search.toLowerCase()));
+  const allSteps=templateProjects.flatMap(p=>getProjectSteps(p));
   const inProgress=allSteps.filter(s=>s.status==='progress').length;
   const done=allSteps.filter(s=>s.status==='done').length;
   const totalDocs=allSteps.reduce((a,s)=>a+(s.docs||[]).length,0);
@@ -1323,31 +1456,75 @@ export default function AuditFlow(){
   return(
     <div style={{display:'flex',height:'100vh',overflow:'hidden',background:C.bg,fontFamily:'Sora,sans-serif'}}>
       <FontLink/>
-      <Sidebar activeView={view} setView={setView} projectCount={projects.length} onExcelExport={()=>showToast('info','Excel export started')} onPdfExport={()=>showToast('info','PDF export started')}/>
 
       <main style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
 
-        {/* ── DASHBOARD ── */}
-        {view==='dashboard'&&(
+        {view==='templates'&&(
           <div style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden'}}>
-            <div style={topbarStyle}>
-              <div style={{fontSize:19,fontWeight:700,color:C.text1,flex:1}}>Dashboard <span style={{color:C.teal}}>Overview</span></div>
-              <div style={{display:'flex',alignItems:'center',gap:8,background:C.bg2,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 12px'}}>
-                <span style={{color:C.text3,fontSize:14}}>⌕</span>
-                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search projects...' style={{background:'none',border:'none',outline:'none',color:C.text1,fontSize:13,fontFamily:'Sora,sans-serif',width:150}}/>
+            <div style={{...topbarStyle,padding:'18px 28px'}}>
+              <div style={{display:'flex',flexDirection:'column',gap:8,flex:1}}>
+                <div style={{fontSize:30,fontWeight:800,color:C.teal,letterSpacing:'-0.8px'}}>AuditFlow</div>
+                <div style={{fontSize:13.5,color:C.text2}}>Select types of auditing structure</div>
               </div>
-              <Btn primary onClick={()=>setNewProjModal(true)}>＋ New Project</Btn>
             </div>
-            <div style={{flex:1,overflowY:'auto',padding:'22px 24px'}}>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:24}}>
-                <StatCard icon='📋' value={projects.length} label='Total Projects' change='↑ 2 this month' changeType='up' accent={C.teal}/>
-                <StatCard icon='⏳' value={inProgress} label='Steps In Progress' change='12 due this week' changeType='warn' accent={C.amber}/>
-                <StatCard icon='🎯' value={done} label='Steps Completed' change='↑ Good progress' changeType='up' accent={C.green}/>
-                <StatCard icon='📎' value={totalDocs} label='Documents Filed' change='Across all projects' changeType='up' accent={C.blue}/>
+            <div style={{flex:1,overflowY:'auto',padding:'24px 28px 34px'}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:20}}>
+                {AUDIT_TEMPLATES.map(template=>{
+                  const templateItems = projects.filter(p=>p.templateId===template.id);
+                  const stepCount = templateItems.reduce((sum,project)=>sum+getProjectSteps(project).length,0);
+                  return <TemplateCard key={template.id} template={template} projectCount={templateItems.length} stepCount={stepCount} onClick={()=>openTemplate(template.id)}/>;
+                })}
               </div>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text1}}>Active Audit Projects</div>
-                <Btn small>View all →</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* ── DASHBOARD ── */}
+        {isPdplTemplate && view!=='templates' ? (
+          <PdplWorkspace
+            selectedTemplate={selectedTemplate}
+            projects={projects}
+            setProjects={setProjects}
+            auditMembers={auditMembers}
+            search={search}
+            setSearch={setSearch}
+            showToast={showToast}
+          />
+        ) : (
+          <>
+        {view==='dashboard'&&selectedTemplate&&(
+          <div style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden'}}>
+            <div style={{...topbarStyle,padding:'20px 28px'}}>
+              <div style={{display:'grid',gridTemplateColumns:'minmax(260px,1fr) auto minmax(360px,1fr)',alignItems:'center',gap:22,width:'100%'}}>
+                <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                  <div style={{fontSize:30,fontWeight:800,color:C.teal,letterSpacing:'-0.8px'}}>AuditFlow</div>
+                  <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                    <div style={{fontSize:16,fontWeight:700,color:C.text1}}>{selectedTemplate ? selectedTemplate.name : 'HR Audit'}</div>
+                    <span style={{width:5,height:5,borderRadius:'50%',background:C.border2}} />
+                    <div style={{fontSize:12.5,color:C.text3}}>Audit category workspace</div>
+                  </div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+                  <button onClick={()=>setView('templates')} style={{background:'transparent',border:`1px solid ${C.border2}`,borderRadius:999,padding:'8px 14px',fontSize:12.5,fontWeight:700,color:C.text2,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>Audit Categories</button>
+                  <button onClick={()=>setView('dashboard')} style={{background:C.tealBg,border:`1px solid ${C.tealBorder}`,borderRadius:999,padding:'8px 14px',fontSize:12.5,fontWeight:700,color:C.teal,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>Dashboard</button>
+                  <button onClick={()=>setView('team')} style={{background:'transparent',border:`1px solid ${C.border2}`,borderRadius:999,padding:'8px 14px',fontSize:12.5,fontWeight:700,color:C.text2,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>Team Members</button>
+                </div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:12}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,background:'#fff',border:`1px solid ${C.border}`,borderRadius:999,padding:'9px 14px',minWidth:300}}>
+                    <span style={{color:C.text3,fontSize:12.5,fontWeight:600}}>Find</span>
+                    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search companies...' style={{background:'none',border:'none',outline:'none',color:C.text1,fontSize:13,fontFamily:'Sora,sans-serif',width:'100%'}}/>
+                  </div>
+                  <Btn primary onClick={()=>setNewProjModal(true)}>+ Add Company Project</Btn>
+                </div>
+              </div>
+            </div>
+            <div style={{flex:1,overflowY:'auto',padding:'24px 28px 32px'}}>
+<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  <div style={{fontSize:15,fontWeight:700,color:C.text1}}>Company Projects</div>
+                  <div style={{fontSize:12.5,color:C.text3}}>Open a company workspace to manage audit steps, imports, and manual updates.</div>
+                </div>
+                <Btn small onClick={()=>setNewProjModal(true)}>+ Add Company Project</Btn>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:14}}>
                 {filteredProjects.map(p=><ProjectCard key={p.id} project={p} members={members} onClick={()=>openProject(p.id)}/>)}
@@ -1362,7 +1539,7 @@ export default function AuditFlow(){
             <div style={{padding:'18px 24px',borderBottom:`1px solid ${C.border}`,background:'#fff',flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:C.text3,marginBottom:10,fontFamily:MONO}}>
                 <span onClick={()=>setView('dashboard')} style={{color:C.teal,cursor:'pointer'}}>Dashboard</span>
-                <span>/</span><span>Projects</span><span>/</span>
+                <span>/</span><span>Companies</span><span>/</span>
                 <span style={{color:C.text2}}>{currentProj.name}</span>
               </div>
               <div style={{display:'flex',alignItems:'center',gap:14}}>
@@ -1370,7 +1547,7 @@ export default function AuditFlow(){
                 <div style={{flex:1}}>
                   <div style={{fontSize:20,fontWeight:800,color:C.text1,letterSpacing:'-0.4px'}}>{currentProj.name}</div>
                   <div style={{display:'flex',alignItems:'center',gap:14,marginTop:5,flexWrap:'wrap'}}>
-                    {[['📅',currentProj.start],['🏢',currentProj.unit],['📊',`${calcProgress(currentProj)}% Complete`],['📎',`${currentProj.procedures.flatMap(pr=>pr.steps).reduce((a,s)=>a+(s.docs||[]).length,0)} files`]].map(([icon,val])=>val&&(
+                    {[['📅',currentProj.start],['🏢',currentProj.projectLeader],['📊',`${calcProgress(currentProj)}% Complete`],['📎',`${getProjectSteps(currentProj).reduce((a,s)=>a+(s.docs||[]).length,0)} files`]].map(([icon,val])=>val&&(
                       <span key={val} style={{fontSize:12,color:C.text2,display:'flex',alignItems:'center',gap:4}}>{icon} {val}</span>
                     ))}
                   </div>
@@ -1384,7 +1561,6 @@ export default function AuditFlow(){
                     }));showToast('success','Procedure added');
                   }}>＋ Procedure</Btn>
                   <Btn small onClick={()=>setImportModal(true)}>⬆ Import CSV</Btn>
-                  <Btn small primary onClick={exportCurrentProject}>⬒ Export</Btn>
                 </div>
               </div>
             </div>
@@ -1407,43 +1583,65 @@ export default function AuditFlow(){
         {/* ── TEAM ── */}
         {view==='team'&&(
           <div style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden'}}>
-            <div style={topbarStyle}>
-              <div style={{fontSize:19,fontWeight:700,color:C.text1,flex:1}}>Team <span style={{color:C.teal}}>Members</span></div>
-              <Btn primary onClick={()=>setAddMemberModal(true)}>＋ Add Member</Btn>
-            </div>
-            <div style={{flex:1,overflowY:'auto',padding:'22px 24px'}}>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>
-                {members.map(m=>{
-                  const tasks=projects.flatMap(p=>p.procedures.flatMap(pr=>pr.steps)).filter(s=>s.assignee===m.id);
-                  const doneCount=tasks.filter(s=>s.status==='done').length;
-                  const pct=tasks.length?Math.round(doneCount/tasks.length*100):0;
-                  const roleColor={Admin:C.teal,Auditor:C.blue,Reviewer:C.amber}[m.role]||C.text2;
-                  return(
-                    <div key={m.id} style={{background:'#fff',border:`1px solid ${C.border}`,borderRadius:14,padding:20,boxShadow:'0 1px 3px rgba(0,0,0,0.04)'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
-                        <Avatar member={m} size={44}/>
-                        <div>
-                          <div style={{fontSize:15,fontWeight:700,color:C.text1}}>{m.name}</div>
-                          <div style={{fontSize:11.5,color:roleColor,fontFamily:MONO}}>{m.role}</div>
-                        </div>
-                      </div>
-                      <div style={{fontSize:12,color:C.text3,marginBottom:12}}>{m.email}</div>
-                      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:5}}>
-                        <div style={{flex:1,height:5,background:C.bg2,borderRadius:3,overflow:'hidden'}}>
-                          <div style={{height:'100%',background:`linear-gradient(90deg,${C.teal},${C.teal2})`,width:`${pct}%`,borderRadius:3}}/>
-                        </div>
-                        <span style={{fontSize:12,fontFamily:MONO,fontWeight:600,color:C.text2}}>{pct}%</span>
-                      </div>
-                      <div style={{fontSize:11,color:C.text3,fontFamily:MONO}}>{doneCount}/{tasks.length} tasks completed</div>
-                    </div>
-                  );
-                })}
+            <div style={{...topbarStyle,padding:'18px 28px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:12,flex:1}}>
+                <button onClick={()=>setView('dashboard')} style={{border:`1px solid ${C.border2}`,background:'#fff',color:C.text2,borderRadius:999,padding:'7px 12px',fontSize:12.5,fontWeight:700,cursor:'pointer',fontFamily:'Sora,sans-serif'}}>? Back</button>
+                <div style={{fontSize:19,fontWeight:700,color:C.text1}}>Team Members</div>
               </div>
+            </div>
+            <div style={{flex:1,overflowY:'auto',padding:'24px 28px 32px'}}>
+              <div style={{fontSize:13,color:C.text2,marginBottom:18}}>Employees with auditing module access from HRM are shown automatically here.</div>
+              {membersLoading ? (
+                <div style={{padding:'28px 0',fontSize:13,color:C.text3}}>Loading auditing members...</div>
+              ) : membersError ? (
+                <div style={{padding:'18px 20px',border:`1px solid ${C.redBorder}`,background:C.redBg,borderRadius:14,color:C.red,fontSize:13}}>{membersError}</div>
+              ) : !auditMembers.length ? (
+                <div style={{padding:'24px 20px',border:`1px solid ${C.border}`,background:'#fff',borderRadius:14,color:C.text3,fontSize:13}}>No auditing members are available yet.</div>
+              ) : (
+                <div style={{background:'#fff',border:`1px solid ${C.border}`,borderRadius:18,overflow:'hidden'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse'}}>
+                    <thead>
+                      <tr>
+                        {['Employee','Employee ID','Role / Designation','Status'].map((heading)=>(
+                          <th key={heading} style={{background:C.bg2,padding:'14px 16px',textAlign:'left',fontSize:10.5,fontWeight:700,fontFamily:MONO,letterSpacing:'0.5px',textTransform:'uppercase',color:C.text3,borderBottom:`1px solid ${C.border}`}}>{heading}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditMembers.map((member)=>{
+                        const badgeMap = {
+                          active:{label:'Active',bg:'#ecfeff',color:'#0f766e',border:'#67e8f9',dot:'#06b6d4'},
+                          inactive:{label:'Inactive',bg:'#ffffff',color:'#475569',border:'#cbd5e1',dot:'#94a3b8'},
+                          separated:{label:'Separated',bg:'#fef2f2',color:'#b91c1c',border:'#fca5a5',dot:'#ef4444'},
+                          probation:{label:'Active - Probation',bg:'#f0fdf4',color:'#15803d',border:'#86efac',dot:'#22c55e'},
+                          notice:{label:'Active - Notice',bg:'#fff7ed',color:'#b45309',border:'#fdba74',dot:'#f59e0b'},
+                        };
+                        const badgeKey = member.status === 'separated' ? 'separated' : member.status === 'inactive' ? 'inactive' : member.stage === 'probation' ? 'probation' : member.stage === 'notice_period' ? 'notice' : 'active';
+                        return (
+                          <tr key={member.id}>
+                            <td style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`}}>
+                              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                <Avatar member={{id:member.id,name:member.name,initials:member.initials}} size={36}/>
+                                <div>
+                                  <div style={{fontSize:13.5,fontWeight:700,color:C.text1}}>{member.name}</div>
+                                  <div style={{fontSize:12,color:C.text3}}>{member.email || 'No email available'}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,fontSize:12.5,color:C.text2,fontFamily:MONO}}>{member.employeeId || '?'}</td>
+                            <td style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,fontSize:12.5,color:C.text2}}>{member.designation || member.role || 'Employee'}</td>
+                            <td style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`}}><Badge map={badgeMap} val={badgeKey} /></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* ── MY TASKS ── */}
         {view==='my-tasks'&&(
           <div style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden'}}>
             <div style={topbarStyle}>
@@ -1472,18 +1670,31 @@ export default function AuditFlow(){
             </div>
           </div>
         )}
+          </>
+        )}
       </main>
 
       {/* Task Drawer */}
-      {currentProj&&<TaskDrawer open={drawerOpen} task={drawerTask} procName={currentProj.procedures[drawerProcIdx]?.name||''} members={members} onClose={()=>setDrawerOpen(false)} onSave={saveTask}/>}
+      {!isPdplTemplate && currentProj&&<TaskDrawer open={drawerOpen} task={drawerTask} procName={currentProj.procedures[drawerProcIdx]?.name||''} members={members} onClose={()=>setDrawerOpen(false)} onSave={saveTask}/>}
 
       {/* Import Modal (from project header) */}
-      {importModal&&<ImportModal open={importModal} onClose={()=>setImportModal(false)} onImport={importToCurrent}/>}
+      {!isPdplTemplate && importModal&&<ImportModal open={importModal} onClose={()=>setImportModal(false)} onImport={importToCurrent}/>}
 
       {/* Modals */}
-      <NewProjectModal open={newProjModal} members={members} onClose={()=>setNewProjModal(false)} onCreate={createProject}/>
-      <AddMemberModal open={addMemberModal} onClose={()=>setAddMemberModal(false)} onAdd={addMember}/>
+      {!isPdplTemplate && <NewProjectModal open={newProjModal} members={members} onClose={()=>setNewProjModal(false)} onCreate={createProject}/>}
+      {!isPdplTemplate && <AddMemberModal open={addMemberModal} onClose={()=>setAddMemberModal(false)} onAdd={addMember}/>}
       <ToastContainer toasts={toasts}/>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

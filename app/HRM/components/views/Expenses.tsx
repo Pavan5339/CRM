@@ -1261,15 +1261,16 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-8">
+    <div className={`mx-auto ${variant === 'admin' ? 'max-w-7xl space-y-5 px-4 pt-4 pb-6 lg:px-5 lg:pt-5' : 'max-w-7xl space-y-6 pb-8'}`}>
       <EmployeePageHeader
         icon="receipt_long"
         title="Expense Claims"
         description="Capture company spend with a cleaner submission flow, structured item breakdowns, receipt uploads, and a sharper review experience."
+        compact={variant === 'admin'}
       />
 
       <section className="overflow-x-auto">
-        <div className="relative inline-grid min-w-[420px] grid-flow-col auto-cols-fr items-center overflow-hidden rounded-[1.25rem] bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] p-1 shadow-[0_16px_30px_rgba(15,23,42,0.05)]">
+        <div className={`relative inline-grid min-w-[420px] grid-flow-col auto-cols-fr items-center overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] shadow-[0_16px_30px_rgba(15,23,42,0.05)] ${variant === 'admin' ? 'rounded-[1.05rem] p-1' : 'rounded-[1.25rem] p-1'}`}>
           {currentSections.map((section) => {
             const isActive = activeSection === section.id;
             return (
@@ -1280,13 +1281,13 @@ export default function Expenses({ variant = 'employee' }: ExpensesProps) {
                   resetDetail();
                   setActiveSection(section.id);
                 }}
-                className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-[1rem] px-4 py-3 text-sm font-semibold transition-all ${
+                className={`relative z-10 inline-flex items-center justify-center gap-2 font-semibold transition-all ${variant === 'admin' ? 'rounded-[0.85rem] px-3.5 py-2.5 text-[13px]' : 'rounded-[1rem] px-4 py-3 text-sm'} ${
                   isActive
                     ? 'bg-[linear-gradient(180deg,#eadcff_0%,#cfbdfd_100%)] text-violet-950 shadow-[0_12px_24px_rgba(167,139,250,0.18)]'
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                <span className="material-symbols-outlined text-[18px]">{section.icon}</span>
+                <span className={`material-symbols-outlined ${variant === 'admin' ? 'text-[17px]' : 'text-[18px]'}`}>{section.icon}</span>
                 {section.label}
               </button>
             );

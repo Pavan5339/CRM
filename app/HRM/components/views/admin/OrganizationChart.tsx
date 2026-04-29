@@ -54,6 +54,10 @@ function buildStatusTone(node: OrgChartNode, isHighlighted: boolean) {
     return 'border-violet-400 bg-violet-50 shadow-[0_18px_44px_rgba(139,92,246,0.16)]';
   }
 
+  if (node.kind === 'employee' && String(node.status || '').toLowerCase() === 'separated') {
+    return 'border-rose-300 bg-[linear-gradient(180deg,#fff4f4_0%,#ffe1e1_100%)] shadow-[0_18px_40px_rgba(190,24,93,0.08)]';
+  }
+
   if (node.kind === 'super_admin') {
     return 'border-slate-300 bg-[linear-gradient(180deg,#ffffff_0%,#eef4ff_100%)] shadow-[0_18px_40px_rgba(15,23,42,0.08)]';
   }

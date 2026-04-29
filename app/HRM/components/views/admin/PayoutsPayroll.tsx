@@ -210,9 +210,9 @@ export default function PayoutsPayroll() {
 
   const [profileForm, setProfileForm] = useState({
     pfEnabled: false,
-    pfMode: 'percent',
-    pfValue: '10',
+    pfValue: '0',
     tdsEnabled: false,
+    tdsMode: 'percent',
     tdsValue: '0',
     retentionEnabled: false,
     notes: '',
@@ -279,9 +279,9 @@ export default function PayoutsPayroll() {
       setDetail(result);
       setProfileForm({
         pfEnabled: Boolean(result.profile?.pf_enabled),
-        pfMode: result.profile?.pf_mode || 'percent',
-        pfValue: String(result.profile?.pf_value ?? 10),
+        pfValue: String(result.profile?.pf_value ?? 0),
         tdsEnabled: Boolean(result.profile?.tds_enabled),
+        tdsMode: result.profile?.tds_mode || 'percent',
         tdsValue: String(result.profile?.tds_value ?? 0),
         retentionEnabled: Boolean(result.profile?.retention_enabled),
         notes: result.profile?.notes || '',
@@ -414,6 +414,7 @@ export default function PayoutsPayroll() {
           employeeId: selectedEmployeeId,
           ...profileForm,
           pfValue: Number(profileForm.pfValue || 0),
+          tdsMode: profileForm.tdsMode,
           tdsValue: Number(profileForm.tdsValue || 0),
         }),
       });
@@ -978,22 +979,13 @@ export default function PayoutsPayroll() {
                         label="PF deduction active"
                       />
                     </FormRow>
-                    <FormRow label="Employee PF Rule">
-                      <div className="grid gap-3 md:grid-cols-[140px_minmax(0,1fr)]">
-                        <SelectInput
-                          value={profileForm.pfMode}
-                          onChange={(event) => setProfileForm((current) => ({ ...current, pfMode: event.target.value }))}
-                        >
-                          <option value="percent">Percent</option>
-                          <option value="fixed">Fixed</option>
-                        </SelectInput>
-                        <TextInput
-                          type="number"
-                          step="0.01"
-                          value={profileForm.pfValue}
-                          onChange={(event) => setProfileForm((current) => ({ ...current, pfValue: event.target.value }))}
-                        />
-                      </div>
+                    <FormRow label="Employee PF Fixed Amount">
+                      <TextInput
+                        type="number"
+                        step="0.01"
+                        value={profileForm.pfValue}
+                        onChange={(event) => setProfileForm((current) => ({ ...current, pfValue: event.target.value }))}
+                      />
                     </FormRow>
                     <FormRow label="TDS Enabled">
                       <ToggleChip
@@ -1002,16 +994,25 @@ export default function PayoutsPayroll() {
                         label="TDS deduction active"
                       />
                     </FormRow>
-                    <FormRow label="TDS Fixed Amount">
-                      <TextInput
-                        type="number"
-                        step="0.01"
-                        value={profileForm.tdsValue}
-                        onChange={(event) => setProfileForm((current) => ({ ...current, tdsValue: event.target.value }))}
-                      />
+                    <FormRow label="TDS Rule">
+                      <div className="grid gap-3 md:grid-cols-[140px_minmax(0,1fr)]">
+                        <SelectInput
+                          value={profileForm.tdsMode}
+                          onChange={(event) => setProfileForm((current) => ({ ...current, tdsMode: event.target.value }))}
+                        >
+                          <option value="percent">Percent</option>
+                          <option value="fixed">Fixed</option>
+                        </SelectInput>
+                        <TextInput
+                          type="number"
+                          step="0.01"
+                          value={profileForm.tdsValue}
+                          onChange={(event) => setProfileForm((current) => ({ ...current, tdsValue: event.target.value }))}
+                        />
+                      </div>
                     </FormRow>
                     <p className="text-xs text-on-surface-variant">
-                      The same TDS amount is deducted from employee side and employer side, and both amounts reduce the employee net salary.
+                      PF is a fixed amount applied to employee and employer sides. TDS can now be configured as a percent or fixed deduction and is applied once from the employee side.
                     </p>
                     <FormRow label="Retention Enabled">
                       <ToggleChip
@@ -1268,8 +1269,8 @@ export default function PayoutsPayroll() {
               <div>How It Works</div>
             </div>
             {[
-              ['PF', 'PF is deducted only once from the employee side. HR can set it as a percent or fixed value per employee.'],
-              ['TDS', 'HR enters one fixed TDS amount. The same amount is applied on employee side and employer side, and both amounts are deducted from employee net salary.'],
+              ['PF', 'PF uses one fixed amount. The same fixed amount is applied on employee side and employer side, and both are included in payroll deductions.'],
+              ['TDS', 'TDS is deducted only once from the employee side and HR can configure it either as a percent value or as one fixed amount.'],
               ['Retention', 'Retention deducts a fixed monthly amount from salary while the schedule is active. HR can later release the retained amount through a separate retention release entry.'],
               ['LOP', 'One LOP day is deducted using monthly salary divided by total calendar days in that payroll month.'],
               ['Join / Exit', 'If an employee joins or exits in the middle of a month, salary is prorated using active calendar days inside the payroll month.'],
@@ -1358,7 +1359,7 @@ export default function PayoutsPayroll() {
                   <table className="w-full min-w-[1460px]">
                     <thead className="border-b border-slate-200/80 bg-[#f8fbff]">
                       <tr>
-                        {['Employee ID', 'Name', 'Company', 'Active Days', 'LOP Days', 'Prorated Salary', 'LOP Deduction', 'PF', 'Total TDS', 'Retention', 'Release', 'Net Salary'].map((label) => (
+                        {['Employee ID', 'Name', 'Company', 'Active Days', 'LOP Days', 'Prorated Salary', 'LOP Deduction', 'Employee PF', 'Employer PF', 'Total PF', 'Employee TDS', 'Total TDS', 'Retention', 'Release', 'Net Salary'].map((label) => (
                           <th key={label} className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
                             {label}
                           </th>
@@ -1387,6 +1388,9 @@ export default function PayoutsPayroll() {
                           <td className="px-5 py-4 text-sm font-semibold text-slate-900">{formatCurrency(row.proratedSalary)}</td>
                           <td className="px-5 py-4 text-sm text-rose-700">{formatCurrency(row.lopDeduction)}</td>
                           <td className="px-5 py-4 text-sm text-slate-700">{formatCurrency(row.pfEmployeeDeduction)}</td>
+                          <td className="px-5 py-4 text-sm text-slate-700">{formatCurrency(row.pfEmployerDeduction)}</td>
+                          <td className="px-5 py-4 text-sm text-slate-700">{formatCurrency(row.totalPfDeduction)}</td>
+                          <td className="px-5 py-4 text-sm text-slate-700">{formatCurrency(row.tdsEmployeeDeduction)}</td>
                           <td className="px-5 py-4 text-sm text-slate-700">{formatCurrency(row.totalTdsDeduction)}</td>
                           <td className="px-5 py-4 text-sm text-slate-700">{formatCurrency(row.retentionDeduction)}</td>
                           <td className="px-5 py-4 text-sm text-slate-700">{formatCurrency(row.retentionReleaseAmount)}</td>
@@ -1426,8 +1430,9 @@ export default function PayoutsPayroll() {
                         <LabelValue label="Prorated Salary" value={formatCurrency(selectedPreviewRow.proratedSalary)} />
                         <LabelValue label="LOP Deduction" value={formatCurrency(selectedPreviewRow.lopDeduction)} />
                         <LabelValue label="Employee PF" value={formatCurrency(selectedPreviewRow.pfEmployeeDeduction)} />
+                        <LabelValue label="Employer PF" value={formatCurrency(selectedPreviewRow.pfEmployerDeduction)} />
+                        <LabelValue label="Total PF" value={formatCurrency(selectedPreviewRow.totalPfDeduction)} />
                         <LabelValue label="Employee TDS" value={formatCurrency(selectedPreviewRow.tdsEmployeeDeduction)} />
-                        <LabelValue label="Employer TDS" value={formatCurrency(selectedPreviewRow.tdsEmployerDeduction)} />
                         <LabelValue label="Total TDS" value={formatCurrency(selectedPreviewRow.totalTdsDeduction)} />
                         <LabelValue label="Retention" value={formatCurrency(selectedPreviewRow.retentionDeduction)} />
                         <LabelValue label="Retention Release" value={formatCurrency(selectedPreviewRow.retentionReleaseAmount)} />
@@ -1591,8 +1596,9 @@ export default function PayoutsPayroll() {
                       <LabelValue label="LOP Days" value={itemDetail.item.lop_days} />
                       <LabelValue label="LOP Deduction" value={formatCurrency(itemDetail.item.lop_deduction)} />
                       <LabelValue label="Employee PF" value={formatCurrency(itemDetail.item.pf_employee_deduction)} />
+                      <LabelValue label="Employer PF" value={formatCurrency(itemDetail.item.pf_employer_deduction)} />
+                      <LabelValue label="Total PF" value={formatCurrency(itemDetail.item.total_pf_deduction)} />
                       <LabelValue label="Employee TDS" value={formatCurrency(itemDetail.item.tds_employee_deduction ?? itemDetail.item.tds_deduction)} />
-                      <LabelValue label="Employer TDS" value={formatCurrency(itemDetail.item.tds_employer_deduction)} />
                       <LabelValue label="Total TDS" value={formatCurrency(itemDetail.item.total_tds_deduction ?? itemDetail.item.tds_deduction)} />
                       <LabelValue label="Retention" value={formatCurrency(itemDetail.item.retention_deduction)} />
                       <LabelValue label="Retention Release" value={formatCurrency(itemDetail.item.retention_release_amount)} />

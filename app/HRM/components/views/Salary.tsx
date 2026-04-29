@@ -270,8 +270,9 @@ export default function Salary({ employee }: { employee?: any }) {
                     <div className="flex items-center justify-between gap-4"><span>Prorated Salary</span><span className="font-semibold">{formatCurrency(selectedMonth.prorated_salary)}</span></div>
                     <div className="flex items-center justify-between gap-4"><span>LOP Deduction</span><span className="font-semibold">{formatCurrency(selectedMonth.lop_deduction)}</span></div>
                     <div className="flex items-center justify-between gap-4"><span>Employee PF</span><span className="font-semibold">{formatCurrency(selectedMonth.pf_employee_deduction)}</span></div>
+                    <div className="flex items-center justify-between gap-4"><span>Employer PF</span><span className="font-semibold">{formatCurrency(selectedMonth.pf_employer_deduction)}</span></div>
+                    <div className="flex items-center justify-between gap-4"><span>Total PF</span><span className="font-semibold">{formatCurrency(selectedMonth.total_pf_deduction)}</span></div>
                     <div className="flex items-center justify-between gap-4"><span>Employee TDS</span><span className="font-semibold">{formatCurrency(selectedMonth.tds_employee_deduction ?? selectedMonth.tds_deduction)}</span></div>
-                    <div className="flex items-center justify-between gap-4"><span>Employer TDS</span><span className="font-semibold">{formatCurrency(selectedMonth.tds_employer_deduction)}</span></div>
                     <div className="flex items-center justify-between gap-4"><span>Total TDS</span><span className="font-semibold">{formatCurrency(selectedMonth.total_tds_deduction ?? selectedMonth.tds_deduction)}</span></div>
                     <div className="flex items-center justify-between gap-4"><span>Retention</span><span className="font-semibold">{formatCurrency(selectedMonth.retention_deduction)}</span></div>
                     <div className="flex items-center justify-between gap-4"><span>Retention Release</span><span className="font-semibold">{formatCurrency(selectedMonth.retention_release_amount)}</span></div>

@@ -713,18 +713,19 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
     variant === 'admin'
       ? 'Review HR tickets, assign responsibility, and keep replies and attachments together in one shared workspace.'
       : 'Raise HR issues, follow their progress, and keep all replies, attachments, and closure updates in one place.';
+  const isAdminView = variant === 'admin';
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-8">
-      <EmployeePageHeader icon="support_agent" title={pageTitle} description={pageDescription} />
+    <div className={`mx-auto ${isAdminView ? 'max-w-7xl space-y-5 px-4 pt-4 pb-6 lg:px-5 lg:pt-5' : 'max-w-7xl space-y-6 pb-8'}`}>
+      <EmployeePageHeader icon="support_agent" title={pageTitle} description={pageDescription} compact={isAdminView} />
 
       <section className="overflow-x-auto">
         <div
           ref={sectionRef}
-          className="relative inline-grid min-w-[560px] grid-cols-4 items-center overflow-hidden rounded-[1.2rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(246,244,255,0.96)_100%)] p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.06)] backdrop-blur"
+          className={`relative inline-grid min-w-[560px] grid-cols-4 items-center overflow-hidden border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(246,244,255,0.96)_100%)] shadow-[0_14px_30px_rgba(15,23,42,0.06)] backdrop-blur ${isAdminView ? 'rounded-[1rem] p-1' : 'rounded-[1.2rem] p-1.5'}`}
         >
           <div
-            className="absolute inset-y-1.5 left-1.5 w-[calc((100%-0.75rem)/4)] rounded-[0.95rem] bg-[linear-gradient(135deg,rgba(245,238,255,1)_0%,rgba(224,210,255,1)_55%,rgba(208,186,255,1)_100%)] shadow-[0_10px_22px_rgba(167,139,250,0.24)] ring-1 ring-white/70 transition-transform duration-300 ease-out"
+            className={`absolute bg-[linear-gradient(135deg,rgba(245,238,255,1)_0%,rgba(224,210,255,1)_55%,rgba(208,186,255,1)_100%)] shadow-[0_10px_22px_rgba(167,139,250,0.24)] ring-1 ring-white/70 transition-transform duration-300 ease-out ${isAdminView ? 'inset-y-1 left-1 w-[calc((100%-0.5rem)/4)] rounded-[0.8rem]' : 'inset-y-1.5 left-1.5 w-[calc((100%-0.75rem)/4)] rounded-[0.95rem]'}`}
             style={{ transform: `translateX(calc(${SECTION_CONFIG.findIndex((section) => section.key === activeSection)} * 100%))` }}
           />
           {SECTION_CONFIG.map((section) => {
@@ -734,11 +735,11 @@ export default function Tickets({ variant = 'employee' }: { variant?: 'employee'
                 key={section.key}
                 type="button"
                 onClick={() => setActiveSection(section.key)}
-                className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-[0.9rem] px-3.5 py-2.5 text-xs font-semibold transition-colors ${
+                className={`relative z-10 inline-flex items-center justify-center gap-2 ${isAdminView ? 'rounded-[0.8rem] px-3 py-2 text-[11px]' : 'rounded-[0.9rem] px-3.5 py-2.5 text-xs'} font-semibold transition-colors ${
                   isActive ? 'text-violet-950' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px]">{section.icon}</span>
+                <span className={`material-symbols-outlined ${isAdminView ? 'text-[15px]' : 'text-[16px]'}`}>{section.icon}</span>
                 <span className="whitespace-nowrap">{section.label}</span>
               </button>
             );
