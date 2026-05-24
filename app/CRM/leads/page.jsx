@@ -11,8 +11,7 @@ import GenericEditModal from '../components/GenericEditModal';
 import { Search, Filter } from 'lucide-react';
 
 export default function LeadsPage() {
-  const { currentUser, permissions } = useCrm();
-  const [leads, setLeads] = useState(MOCK_DATA.leads);
+  const { currentUser, permissions, leads, setLeads, followups } = useCrm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
@@ -182,9 +181,11 @@ export default function LeadsPage() {
            </select>
            <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-200 text-sm focus:outline-none">
               <option value="All">All Sources</option>
-              <option value="Organic">Organic Search</option>
-              <option value="Referral">Referral</option>
-              <option value="Cold Call">Cold Call</option>
+              <option value="Service Enquiry">Service Enquiry</option>
+              <option value="Expert Request">Expert Request</option>
+              <option value="Voice Requirement">Voice Requirement</option>
+              <option value="Partner Registration">Partner Registration</option>
+              <option value="Contact Form">Contact Form</option>
            </select>
            <select value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)} className="border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-200 text-sm focus:outline-none">
               <option value="All">All Assignees</option>
@@ -223,6 +224,7 @@ export default function LeadsPage() {
               <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400">Contact</th>
               <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400">Status</th>
               <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400">Value</th>
+              <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400">Follow-ups</th>
               <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400">Assignee</th>
               <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400 text-right">Actions</th>
             </tr>
@@ -246,6 +248,18 @@ export default function LeadsPage() {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-sm font-semibold dark:text-slate-300">{lead.value}</td>
+                  <td className="py-3 px-4 text-sm">
+                    {(() => {
+                      const leadFollowups = followups.filter(f => f.leadId === lead.id && f.status !== 'Completed');
+                      return leadFollowups.length > 0 ? (
+                        <span className="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400 px-2 py-1 rounded font-medium text-xs">
+                          {leadFollowups.length} Active
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 dark:text-slate-500 text-xs">-</span>
+                      );
+                    })()}
+                  </td>
                   <td className="py-3 px-4 text-sm dark:text-slate-300">
                     <div className="flex items-center space-x-2">
                        <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300 relative">
@@ -314,7 +328,7 @@ export default function LeadsPage() {
           { key: 'value', label: 'Value ($)', type: 'text' },
           { key: 'status', label: 'Status', type: 'select', options: ['New', 'Contacted', 'Qualified', 'Won', 'Lost'] },
           { key: 'priority', label: 'Priority', type: 'select', options: ['High', 'Medium', 'Low'] },
-          { key: 'source', label: 'Source', type: 'text' }
+          { key: 'source', label: 'Source', type: 'select', options: ['Service Enquiry', 'Expert Request', 'Voice Requirement', 'Partner Registration', 'Contact Form'] }
         ]}
       />
     </div>

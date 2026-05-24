@@ -17,6 +17,50 @@ export function CrmProvider({ children }) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [tasks, setTasks] = useState(MOCK_DATA.tasks);
+  
+  // NEW: Global Leads state (with Inquiry sources)
+  const [leads, setLeads] = useState(() => {
+    const sources = ["Service Enquiry", "Expert Request", "Voice Requirement", "Partner Registration", "Contact Form"];
+    return MOCK_DATA.leads.map((l, i) => ({
+      ...l,
+      source: sources[i % sources.length]
+    }));
+  });
+
+  // NEW: Global Activities state
+  const [activities, setActivities] = useState(() => {
+    const actionTypes = ['registered', 'logged in', 'profile updated', 'AI profile submitted', 'agreement signed', 'requirement submitted', 'WhatsApp sent', 'email sent', 'call completed', 'admin note added', 'status changed'];
+    const mapped = MOCK_DATA.activities.map((a, i) => ({
+      ...a,
+      type: actionTypes[i % actionTypes.length]
+    }));
+    return mapped.sort((x, y) => new Date(y.date) - new Date(x.date));
+  });
+
+  const addActivity = (newActivity) => {
+    setActivities(prev => [newActivity, ...prev]);
+  };
+
+  // NEW: Followups state
+  const [followups, setFollowups] = useState([
+    { id: "FWP001", leadId: 1, type: "Service Enquiry", title: "New inquiry from Acme Corp", priority: "High", dueDate: "2026-05-24", dueTime: "10:00 AM", status: "New", assigneeId: "u1", notes: "Inquired about enterprise SLA", created: "May 24, 2026" },
+    { id: "FWP002", leadId: 3, type: "Expert Request", title: "Consultation request from Tony Stark", priority: "High", dueDate: "2026-05-24", dueTime: "11:30 AM", status: "In Progress", assigneeId: "u2", notes: "Needs details on integration APIs", created: "May 23, 2026" },
+    { id: "FWP003", leadId: 7, type: "Voice Requirement", title: "Cyberdyne voice prompt setup", priority: "Medium", dueDate: "2026-05-25", dueTime: "02:00 PM", status: "New", assigneeId: "u3", notes: "Submitted voice form with strict guidelines", created: "May 24, 2026" },
+    { id: "FWP004", leadId: 2, type: "Partner Registration", title: "Review Global Tech partner profile", priority: "Medium", dueDate: "2026-05-22", dueTime: "09:00 AM", status: "Overdue", assigneeId: "u1", notes: "Profile is 60% complete, missing agreement", created: "May 20, 2026" },
+    { id: "FWP005", leadId: 4, type: "Contact Form", title: "General inquiry from Bruce Wayne", priority: "Low", dueDate: "2026-05-26", dueTime: "-", status: "New", assigneeId: "u3", notes: "Questions about bulk pricing", created: "May 24, 2026" }
+  ]);
+
+  const addFollowup = (newFollowup) => {
+    setFollowups(prev => [newFollowup, ...prev]);
+  };
+
+  const updateFollowup = (id, updates) => {
+    setFollowups(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+  };
+
+  const deleteFollowup = (id) => {
+    setFollowups(prev => prev.filter(f => f.id !== id));
+  };
 
   const updateTask = (taskId, updates) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
@@ -24,13 +68,6 @@ export function CrmProvider({ children }) {
 
   const addTask = (newTask) => {
     setTasks(prev => [newTask, ...prev]);
-  };
-
-  // Quick helper to switch users
-  const switchUser = (roleKey) => {
-    if (MOCK_USERS[roleKey]) {
-      setCurrentUser(MOCK_USERS[roleKey]);
-    }
   };
 
   const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
@@ -48,7 +85,6 @@ export function CrmProvider({ children }) {
   }, [isDarkMode]);
 
   // RBAC helpers
-  const canManageUsers = currentUser.role === "admin";
   const canManageSystemSettings = currentUser.role === "admin";
   const canManageEmailTemplates = currentUser.role === "admin";
   const canDeleteLeads = ["admin", "manager"].includes(currentUser.role);
@@ -58,7 +94,6 @@ export function CrmProvider({ children }) {
     <CrmContext.Provider
       value={{
         currentUser,
-        switchUser,
         isDarkMode,
         toggleDarkMode,
         isSidebarCollapsed,
@@ -67,8 +102,17 @@ export function CrmProvider({ children }) {
         setTasks,
         updateTask,
         addTask,
+        activities,
+        setActivities,
+        addActivity,
+        followups,
+        setFollowups,
+        addFollowup,
+        updateFollowup,
+        deleteFollowup,
+        leads,
+        setLeads,
         permissions: {
-          canManageUsers,
           canManageSystemSettings,
           canManageEmailTemplates,
           canDeleteLeads,

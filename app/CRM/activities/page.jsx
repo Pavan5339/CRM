@@ -10,10 +10,7 @@ import GenericEditModal from '../components/GenericEditModal';
 import { Filter, Download, FileText, Printer, Edit, Trash2, Plus, RefreshCw, Search } from 'lucide-react';
 
 export default function ActivitiesPage() {
-  const { currentUser } = useCrm();
-  const [activities, setActivities] = useState(() =>
-    [...MOCK_DATA.activities].sort((a, b) => new Date(b.date) - new Date(a.date))
-  );
+  const { currentUser, activities, setActivities } = useCrm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null);
@@ -95,11 +92,18 @@ export default function ActivitiesPage() {
 
   const getTypeBadge = (type) => {
     switch (type) {
-      case 'Call': return 'bg-blue-500 text-white';
-      case 'Email': return 'bg-red-500 text-white';
-      case 'Meeting': return 'bg-green-500 text-white';
-      case 'Video Call': return 'bg-orange-500 text-white';
-      default: return 'bg-slate-500 text-white';
+      case 'registered':
+      case 'logged in':
+      case 'profile updated': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300';
+      case 'AI profile submitted':
+      case 'requirement submitted': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300';
+      case 'agreement signed': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
+      case 'WhatsApp sent': return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
+      case 'email sent': return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
+      case 'call completed': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300';
+      case 'admin note added':
+      case 'status changed': return 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-300';
+      default: return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400';
     }
   };
 
@@ -140,8 +144,8 @@ export default function ActivitiesPage() {
           <p className="text-3xl font-bold text-slate-800 dark:text-white">{activities.length}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
-          <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">Meetings & Calls</h3>
-          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{activities.filter(a => a.type === 'Call' || a.type === 'Meeting' || a.type === 'Video Call').length}</p>
+          <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">Comms (Call/WhatsApp/Email)</h3>
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{activities.filter(a => ['call completed', 'WhatsApp sent', 'email sent'].includes(a.type)).length}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
           <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">Positive Outcomes</h3>
@@ -177,10 +181,17 @@ export default function ActivitiesPage() {
            </div>
            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-200 text-sm focus:outline-none">
               <option value="All">All Types</option>
-              <option value="Call">Call</option>
-              <option value="Email">Email</option>
-              <option value="Meeting">Meeting</option>
-              <option value="Video Call">Video Call</option>
+              <option value="registered">registered</option>
+              <option value="logged in">logged in</option>
+              <option value="profile updated">profile updated</option>
+              <option value="AI profile submitted">AI profile submitted</option>
+              <option value="agreement signed">agreement signed</option>
+              <option value="requirement submitted">requirement submitted</option>
+              <option value="WhatsApp sent">WhatsApp sent</option>
+              <option value="email sent">email sent</option>
+              <option value="call completed">call completed</option>
+              <option value="admin note added">admin note added</option>
+              <option value="status changed">status changed</option>
            </select>
            <select value={filterOutcome} onChange={(e) => setFilterOutcome(e.target.value)} className="border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-200 text-sm focus:outline-none">
               <option value="All">All Outcomes</option>
@@ -325,7 +336,7 @@ export default function ActivitiesPage() {
         onSave={handleSaveEdit}
         title="Edit Activity"
         fields={[
-          { key: 'type', label: 'Type', type: 'select', options: ['Call', 'Email', 'Meeting', 'Video Call'] },
+          { key: 'type', label: 'Type', type: 'select', options: ['registered', 'logged in', 'profile updated', 'AI profile submitted', 'agreement signed', 'requirement submitted', 'WhatsApp sent', 'email sent', 'call completed', 'admin note added', 'status changed'] },
           { key: 'subject', label: 'Subject', type: 'text' },
           { key: 'description', label: 'Description', type: 'textarea' },
           { key: 'outcome', label: 'Outcome', type: 'select', options: ['Positive', 'Neutral', 'Interested', 'Not Interested'] },

@@ -5,7 +5,7 @@ import MOCK_DATA from '../data/mockData.json';
 export default function AddActivityModal({ isOpen, onClose, onAdd }) {
   const [formData, setFormData] = useState({
     leadId: '',
-    type: 'Call',
+    type: 'admin note added',
     subject: '',
     description: '',
     outcome: '',
@@ -40,7 +40,7 @@ export default function AddActivityModal({ isOpen, onClose, onAdd }) {
       assigneeId: "u1",
       leadId: parseInt(formData.leadId)
     });
-    setFormData({ leadId: '', type: 'Call', subject: '', description: '', outcome: '', nextAction: '', duration: '', callStatus: 'N/A', participants: '', attachmentUrl: '' });
+    setFormData({ leadId: '', type: 'admin note added', subject: '', description: '', outcome: '', nextAction: '', duration: '', callStatus: 'N/A', participants: '', attachmentUrl: '' });
     onClose();
   };
 
@@ -81,10 +81,17 @@ export default function AddActivityModal({ isOpen, onClose, onAdd }) {
                 <div>
                   <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Activity Type *</label>
                   <select name="type" value={formData.type} onChange={handleChange} className="w-full border border-slate-300 dark:border-slate-600 rounded p-2 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">
-                    <option value="Call">Call</option>
-                    <option value="Email">Email</option>
-                    <option value="Meeting">Meeting</option>
-                    <option value="Video Call">Video Call</option>
+                    <option value="registered">registered</option>
+                    <option value="logged in">logged in</option>
+                    <option value="profile updated">profile updated</option>
+                    <option value="AI profile submitted">AI profile submitted</option>
+                    <option value="agreement signed">agreement signed</option>
+                    <option value="requirement submitted">requirement submitted</option>
+                    <option value="WhatsApp sent">WhatsApp sent</option>
+                    <option value="email sent">email sent</option>
+                    <option value="call completed">call completed</option>
+                    <option value="admin note added">admin note added</option>
+                    <option value="status changed">status changed</option>
                   </select>
                 </div>
               </div>
@@ -126,8 +133,8 @@ export default function AddActivityModal({ isOpen, onClose, onAdd }) {
               </div>
             </section>
 
-            {/* Call Details — only if type is Call or Video Call */}
-            {(formData.type === 'Call' || formData.type === 'Video Call') && (
+            {/* Call Details — only if type is call completed */}
+            {(formData.type === 'call completed') && (
               <section>
                 <div className="flex items-center text-[#0b1f3d] dark:text-blue-400 font-bold mb-4 border-b border-slate-300 dark:border-slate-700 pb-2">
                   <Phone className="w-4 h-4 mr-2" />

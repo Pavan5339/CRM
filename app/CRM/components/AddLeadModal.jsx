@@ -139,9 +139,11 @@ export default function AddLeadModal({ isOpen, onClose, onAdd }) {
                   <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Lead Source</label>
                   <select name="leadSource" value={formData.leadSource} onChange={handleChange} className="w-full border border-slate-300 dark:border-slate-600 rounded p-2 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-700 dark:text-slate-400">
                     <option value="">Select Source</option>
-                    <option value="Organic">Organic Search</option>
-                    <option value="Referral">Referral</option>
-                    <option value="Cold Call">Cold Call</option>
+                    <option value="Service Enquiry">Service Enquiry</option>
+                    <option value="Expert Request">Expert Request</option>
+                    <option value="Voice Requirement">Voice Requirement</option>
+                    <option value="Partner Registration">Partner Registration</option>
+                    <option value="Contact Form">Contact Form</option>
                   </select>
                 </div>
                 <div>
