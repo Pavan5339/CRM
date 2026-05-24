@@ -23,8 +23,8 @@ const dmSans = DM_Sans({
 });
 
 export const metadata = {
-  title: "TaskFlow — Internal Task Management",
-  description: "Secure task management built for internal teams",
+  title: "BNC Global — CRM Portal",
+  description: "Secure CRM workspace and pipeline management built for BNC Global",
   icons: {
     icon: "/assets/favicon.jpeg",
     shortcut: "/assets/favicon.jpeg",
