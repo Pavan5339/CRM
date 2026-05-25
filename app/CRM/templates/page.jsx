@@ -46,6 +46,7 @@ const EMPTY_TEMPLATE = {
 };
 
 const TONES = ["Professional", "Warm", "Concise", "Premium", "Urgent"];
+const LOCAL_TEMPLATE_KEY = "crm-email-templates-local";
 
 export default function TemplatesPage() {
   const { currentUser, permissions } = useCrm();
@@ -60,6 +61,7 @@ export default function TemplatesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRemoteTemplateStoreReady, setIsRemoteTemplateStoreReady] = useState(true);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [aiPrompt, setAiPrompt] = useState("Create a polished follow-up email after a product demo for an enterprise lead.");
@@ -93,19 +95,23 @@ export default function TemplatesPage() {
         if (!response.ok) throw new Error(data.error || "Failed to load templates.");
         if (!isActive) return;
 
-        const loaded = data.templates?.length ? data.templates : starterFallback();
+        const loaded = mergeTemplates(loadLocalTemplates(), data.templates?.length ? data.templates : starterFallback());
         setTemplates(loaded);
         setSelectedId(loaded[0]?.id || null);
         setDraft(normalizeForDraft(loaded[0] || EMPTY_TEMPLATE));
         if (data.fallback && data.error) {
+          setIsRemoteTemplateStoreReady(false);
           setNotice("Using starter templates until Supabase migration is applied.");
+        } else {
+          setIsRemoteTemplateStoreReady(true);
         }
       } catch (err) {
         if (!isActive) return;
-        const fallback = starterFallback();
+        const fallback = mergeTemplates(loadLocalTemplates(), starterFallback());
         setTemplates(fallback);
         setSelectedId(fallback[0]?.id || null);
         setDraft(normalizeForDraft(fallback[0] || EMPTY_TEMPLATE));
+        setIsRemoteTemplateStoreReady(false);
         setError(err.message || "Failed to load templates.");
       } finally {
         if (isActive) setIsLoading(false);
@@ -168,14 +174,41 @@ export default function TemplatesPage() {
     setIsSaving(true);
     setError("");
     setNotice("");
-    try {
-      const templateToSave = templateOverride || draft;
-      const payload = {
-        ...templateToSave,
-        html_body: sanitizeEmailHtml(templateToSave.html_body),
-        variables: normalizeVariables(templateToSave.variables),
+    const templateToSave = isTemplateLike(templateOverride) ? templateOverride : draft;
+    const payload = {
+      ...templateToSave,
+      html_body: sanitizeEmailHtml(templateToSave.html_body),
+      variables: normalizeVariables(templateToSave.variables),
+    };
+
+    if (!String(payload.name || "").trim() || !String(payload.subject || "").trim() || !String(payload.html_body || "").trim()) {
+      setError("Template name, subject, and HTML body are required before saving.");
+      setIsSaving(false);
+      return;
+    }
+
+    if (!isRemoteTemplateStoreReady || String(payload.id || "").startsWith("local-")) {
+      const localTemplate = {
+        ...payload,
+        id: String(payload.id || "").startsWith("local-") ? payload.id : `local-${Date.now()}`,
+        updated_at: new Date().toISOString(),
+        created_at: payload.created_at || new Date().toISOString(),
       };
-      const isPersisted = payload.id && !String(payload.id).startsWith("starter-") && !String(payload.id).startsWith("draft-");
+      saveLocalTemplate(localTemplate);
+      setTemplates((prev) => [localTemplate, ...prev.filter((template) => template.id !== localTemplate.id)]);
+      setSelectedId(localTemplate.id);
+      setDraft(normalizeForDraft(localTemplate));
+      setNotice(isRemoteTemplateStoreReady ? "Template saved locally." : "Template saved locally because Supabase is unavailable.");
+      setIsSaving(false);
+      return;
+    }
+
+    try {
+      const isPersisted =
+        payload.id &&
+        !String(payload.id).startsWith("starter-") &&
+        !String(payload.id).startsWith("draft-") &&
+        !String(payload.id).startsWith("local-");
       const response = await fetch("/CRM/api/templates", {
         method: isPersisted ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -192,7 +225,24 @@ export default function TemplatesPage() {
       setDraft(normalizeForDraft(data.template));
       setNotice("Template saved.");
     } catch (err) {
-      setError(err.message || "Failed to save template.");
+      setIsRemoteTemplateStoreReady(false);
+      const localTemplate = {
+        ...templateToSave,
+        id: String(templateToSave.id || "").startsWith("local-") ? templateToSave.id : `local-${Date.now()}`,
+        html_body: payload.html_body,
+        variables: payload.variables,
+        updated_at: new Date().toISOString(),
+        created_at: templateToSave.created_at || new Date().toISOString(),
+      };
+
+      saveLocalTemplate(localTemplate);
+      setTemplates((prev) => {
+        const withoutCurrent = prev.filter((template) => template.id !== templateToSave.id && template.id !== localTemplate.id);
+        return [localTemplate, ...withoutCurrent];
+      });
+      setSelectedId(localTemplate.id);
+      setDraft(normalizeForDraft(localTemplate));
+      setNotice(`Template saved locally. Supabase save failed: ${err.message || "Unknown error"}`);
     } finally {
       setIsSaving(false);
     }
@@ -270,7 +320,7 @@ export default function TemplatesPage() {
             <Copy className="mr-2 h-4 w-4" />
             Copy HTML
           </button>
-          <button onClick={saveTemplate} disabled={isSaving} className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400">
+          <button onClick={() => saveTemplate()} disabled={isSaving || isLoading} className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400">
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Save
           </button>
@@ -518,4 +568,40 @@ function starterFallback() {
     created_at: new Date(2026, 4, 24 - index).toISOString(),
     updated_at: new Date(2026, 4, 24 - index).toISOString(),
   }));
+}
+
+function isTemplateLike(value) {
+  return Boolean(value && typeof value === "object" && !value.nativeEvent && ("html_body" in value || "subject" in value));
+}
+
+function loadLocalTemplates() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(LOCAL_TEMPLATE_KEY) || "[]");
+    return Array.isArray(parsed)
+      ? parsed
+          .map(normalizeForDraft)
+          .filter((template) => template.name && template.subject && template.html_body)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalTemplate(template) {
+  if (typeof window === "undefined") return;
+
+  const existing = loadLocalTemplates();
+  const next = [template, ...existing.filter((item) => item.id !== template.id)];
+  window.localStorage.setItem(LOCAL_TEMPLATE_KEY, JSON.stringify(next));
+}
+
+function mergeTemplates(primary, secondary) {
+  const seen = new Set();
+  return [...primary, ...secondary].filter((template) => {
+    if (!template?.id || seen.has(template.id)) return false;
+    seen.add(template.id);
+    return true;
+  });
 }

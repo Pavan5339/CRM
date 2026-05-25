@@ -1,0 +1,310 @@
+- generic [ref=e1]:
+  - generic [ref=e14]:
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - heading "TasksFlow" [level=1] [ref=e19]
+          - button [ref=e20]:
+            - img [ref=e21]
+        - generic [ref=e23]:
+          - generic [ref=e25]: AL
+          - heading "Alice Admin" [level=2] [ref=e26]
+          - generic [ref=e27]: admin
+      - generic [ref=e28]:
+        - generic [ref=e29]: MAIN
+        - generic [ref=e30]:
+          - link "Dashboard" [ref=e31] [cursor=pointer]:
+            - /url: /CRM/dashboard
+            - img [ref=e32]
+            - generic [ref=e37]: Dashboard
+          - link "Lead Tracking" [ref=e38] [cursor=pointer]:
+            - /url: /CRM/leads
+            - img [ref=e39]
+            - generic [ref=e44]: Lead Tracking
+          - link "Activities" [ref=e45] [cursor=pointer]:
+            - /url: /CRM/activities
+            - img [ref=e46]
+            - generic [ref=e48]: Activities
+          - link "Tasks" [ref=e49] [cursor=pointer]:
+            - /url: /CRM/tasks
+            - img [ref=e50]
+            - generic [ref=e53]: Tasks
+          - link "Follow-ups" [ref=e54] [cursor=pointer]:
+            - /url: /CRM/followups
+            - img [ref=e55]
+            - generic [ref=e59]: Follow-ups
+          - link "Calendar" [ref=e60] [cursor=pointer]:
+            - /url: /CRM/calendar
+            - img [ref=e61]
+            - generic [ref=e63]: Calendar
+        - generic [ref=e65]:
+          - link "Products & Services" [ref=e66] [cursor=pointer]:
+            - /url: /CRM/products
+            - img [ref=e67]
+            - generic [ref=e71]: Products & Services
+          - link "Customers" [ref=e72] [cursor=pointer]:
+            - /url: /CRM/customers
+            - img [ref=e73]
+            - generic [ref=e77]: Customers
+          - link "Lead Sources" [ref=e78] [cursor=pointer]:
+            - /url: /CRM/sources
+            - img [ref=e79]
+            - generic [ref=e82]: Lead Sources
+          - link "Email Templates" [ref=e83] [cursor=pointer]:
+            - /url: /CRM/templates
+            - img [ref=e84]
+            - generic [ref=e87]: Email Templates
+          - link "Email Triggers" [ref=e88] [cursor=pointer]:
+            - /url: /CRM/triggers
+            - img [ref=e89]
+            - generic [ref=e91]: Email Triggers
+        - generic [ref=e93]:
+          - link "Settings" [ref=e94] [cursor=pointer]:
+            - /url: /CRM/settings
+            - img [ref=e95]
+            - generic [ref=e98]: Settings
+          - link "System Settings" [ref=e99] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e100]
+            - generic [ref=e103]: System Settings
+        - generic [ref=e105]:
+          - link "AI Assistant" [ref=e106] [cursor=pointer]:
+            - /url: /CRM/ai-assistant
+            - img [ref=e107]
+            - generic [ref=e110]: AI Assistant
+          - link "About App" [ref=e111] [cursor=pointer]:
+            - /url: "#"
+            - img [ref=e112]
+            - generic [ref=e114]: About App
+      - generic [ref=e116]:
+        - generic [ref=e117]: DARK MODE
+        - button "Toggle Dark Mode" [ref=e118]:
+          - img [ref=e119]
+    - main [ref=e121]:
+      - generic [ref=e122]:
+        - generic [ref=e123]:
+          - generic [ref=e124]:
+            - generic [ref=e125]:
+              - img [ref=e126]
+              - text: CRM Email Studio
+            - heading "Email Templates" [level=1] [ref=e129]
+            - paragraph [ref=e130]: Design professional outreach and follow-up emails with live HTML preview.
+          - generic [ref=e131]:
+            - button "New" [ref=e132]:
+              - img [ref=e133]
+              - text: New
+            - button "Copy HTML" [ref=e134]:
+              - img [ref=e135]
+              - text: Copy HTML
+            - button "Save" [active] [ref=e138]:
+              - img [ref=e139]
+              - text: Save
+        - generic [ref=e252]: Template name, subject, and HTML body are required before saving.
+        - generic [ref=e143]:
+          - complementary [ref=e144]:
+            - generic [ref=e145]:
+              - generic [ref=e146]:
+                - img
+                - textbox "Search templates" [ref=e147]
+              - generic [ref=e148]:
+                - button "All" [ref=e149]
+                - button "Outreach" [ref=e150]
+                - button "Follow-up" [ref=e151]
+                - button "Proposal" [ref=e152]
+                - button "Onboarding" [ref=e153]
+                - button "Reminder" [ref=e154]
+                - button "General" [ref=e155]
+            - generic [ref=e156]:
+              - 'button "Initial Outreach Helping {{CompanyName}} move faster this quarter Outreach Active" [ref=e253]':
+                - generic [ref=e254]:
+                  - generic [ref=e255]:
+                    - generic [ref=e256]: Initial Outreach
+                    - generic [ref=e257]: "Helping {{CompanyName}} move faster this quarter"
+                  - img [ref=e258]
+                - generic [ref=e263]:
+                  - generic [ref=e264]: Outreach
+                  - generic [ref=e265]: Active
+              - 'button "Initial Outreach Helping {{CompanyName}} move faster this quarter Outreach Active" [ref=e266]':
+                - generic [ref=e267]:
+                  - generic [ref=e268]:
+                    - generic [ref=e269]: Initial Outreach
+                    - generic [ref=e270]: "Helping {{CompanyName}} move faster this quarter"
+                  - img [ref=e271]
+                - generic [ref=e276]:
+                  - generic [ref=e277]: Outreach
+                  - generic [ref=e278]: Active
+              - 'button "Warm Follow-up Following up on {{CompanyName}} Follow-up Active" [ref=e279]':
+                - generic [ref=e280]:
+                  - generic [ref=e281]:
+                    - generic [ref=e282]: Warm Follow-up
+                    - generic [ref=e283]: "Following up on {{CompanyName}}"
+                  - img [ref=e284]
+                - generic [ref=e289]:
+                  - generic [ref=e290]: Follow-up
+                  - generic [ref=e291]: Active
+              - 'button "Post-demo Follow-up Demo recap for {{CompanyName}} Follow-up Active" [ref=e292]':
+                - generic [ref=e293]:
+                  - generic [ref=e294]:
+                    - generic [ref=e295]: Post-demo Follow-up
+                    - generic [ref=e296]: "Demo recap for {{CompanyName}}"
+                  - img [ref=e297]
+                - generic [ref=e302]:
+                  - generic [ref=e303]: Follow-up
+                  - generic [ref=e304]: Active
+              - 'button "Proposal Follow-up Proposal details for {{CompanyName}} Proposal Active" [ref=e305]':
+                - generic [ref=e306]:
+                  - generic [ref=e307]:
+                    - generic [ref=e308]: Proposal Follow-up
+                    - generic [ref=e309]: "Proposal details for {{CompanyName}}"
+                  - img [ref=e310]
+                - generic [ref=e315]:
+                  - generic [ref=e316]: Proposal
+                  - generic [ref=e317]: Active
+              - button "No-response Re-engagement Should I close the loop? Reminder Active" [ref=e318]:
+                - generic [ref=e319]:
+                  - generic [ref=e320]:
+                    - generic [ref=e321]: No-response Re-engagement
+                    - generic [ref=e322]: Should I close the loop?
+                  - img [ref=e323]
+                - generic [ref=e328]:
+                  - generic [ref=e329]: Reminder
+                  - generic [ref=e330]: Active
+              - 'button "Customer Onboarding Welcome to the next step, {{CompanyName}} Onboarding Active" [ref=e331]':
+                - generic [ref=e332]:
+                  - generic [ref=e333]:
+                    - generic [ref=e334]: Customer Onboarding
+                    - generic [ref=e335]: "Welcome to the next step, {{CompanyName}}"
+                  - img [ref=e336]
+                - generic [ref=e341]:
+                  - generic [ref=e342]: Onboarding
+                  - generic [ref=e343]: Active
+          - generic [ref=e160]:
+            - generic [ref=e161]:
+              - generic [ref=e162]:
+                - generic [ref=e163]:
+                  - heading "Template Details" [level=2] [ref=e164]
+                  - paragraph [ref=e165]: Edit content, variables, and fallback copy.
+                - button "Archive template" [ref=e166]:
+                  - img [ref=e167]
+              - generic [ref=e170]:
+                - generic [ref=e171]:
+                  - generic [ref=e172]: Template Name
+                  - textbox "Template Name" [ref=e173]: Initial Outreach
+                - generic [ref=e174]:
+                  - generic [ref=e175]: Category
+                  - combobox "Category" [ref=e176]:
+                    - option "Outreach" [selected]
+                    - option "Follow-up"
+                    - option "Proposal"
+                    - option "Onboarding"
+                    - option "Reminder"
+                    - option "General"
+                - generic [ref=e177]:
+                  - generic [ref=e178]: Status
+                  - combobox "Status" [ref=e179]:
+                    - option "Draft"
+                    - option "Active" [selected]
+                    - option "Archived"
+                - generic [ref=e180]:
+                  - generic [ref=e181]: Variables
+                  - textbox "Variables" [ref=e182]: ContactName, CompanyName, AgentName, ProductName
+              - generic [ref=e183]:
+                - generic [ref=e184]:
+                  - generic [ref=e185]: Subject
+                  - textbox "Subject" [ref=e186]: "Helping {{CompanyName}} move faster this quarter"
+                - generic [ref=e187]:
+                  - generic [ref=e188]: Preheader
+                  - textbox "Preheader" [ref=e189]: "A short note for {{ContactName}} about {{ProductName}}."
+                - generic [ref=e190]:
+                  - generic [ref=e191]: HTML Body
+                  - textbox "HTML Body" [ref=e192]: "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#e5e7eb;margin:0;padding:0;\"> <tr> <td align=\"center\" style=\"padding:28px 12px;\"> <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:680px;background:#ffffff;border:1px solid #dbe3ef;border-radius:8px;overflow:hidden;\"> <tr> <td style=\"background:#0f172a;padding:24px 28px;\"> <div style=\"font-size:12px;line-height:16px;color:#93c5fd;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;\">New conversation</div> <h1 style=\"margin:8px 0 0;font-size:26px;line-height:32px;color:#ffffff;font-family:Arial,Helvetica,sans-serif;\">A practical way to support {{CompanyName}}'s growth</h1> </td> </tr> <tr> <td style=\"padding:28px;color:#334155;font-size:15px;line-height:24px;font-family:Arial,Helvetica,sans-serif;\"> Hi {{ContactName}},<br><br>I wanted to reach out because teams like <strong>{{CompanyName}}</strong> often use <strong>{{ProductName}}</strong> to improve follow-up speed, visibility, and handoffs across the pipeline. <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-top:24px;\"> <tr> <td style=\"background:#2563eb;border-radius:6px;\"> <a href=\"#\" style=\"display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;\">Book a quick discussion</a> </td> </tr> </table> </td> </tr> <tr> <td style=\"padding:18px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;line-height:18px;font-family:Arial,Helvetica,sans-serif;\"> {{AgentName}} - TasksFlow CRM </td> </tr> </table> </td> </tr> </table>"
+                - generic [ref=e193]:
+                  - generic [ref=e194]: Plain-text Fallback
+                  - textbox "Plain-text Fallback" [ref=e195]: "Hi {{ContactName}}, I wanted to reach out because teams like {{CompanyName}} often use {{ProductName}} to improve follow-up speed and visibility. Would you be open to a short conversation this week?"
+            - generic [ref=e196]:
+              - generic [ref=e197]:
+                - img [ref=e198]
+                - heading "AI Template Designer" [level=2] [ref=e201]
+              - textbox "Describe the email you want OpenAI to design." [ref=e202]: Create a polished follow-up email after a product demo for an enterprise lead.
+              - generic [ref=e203]:
+                - combobox [ref=e204]:
+                  - option "Professional" [selected]
+                  - option "Warm"
+                  - option "Concise"
+                  - option "Premium"
+                  - option "Urgent"
+                - combobox [ref=e205]:
+                  - option "Outreach"
+                  - option "Follow-up" [selected]
+                  - option "Proposal"
+                  - option "Onboarding"
+                  - option "Reminder"
+                  - option "General"
+              - button "Generate with OpenAI" [ref=e206]:
+                - img [ref=e207]
+                - text: Generate with OpenAI
+          - generic [ref=e210]:
+            - generic [ref=e211]:
+              - generic [ref=e212]:
+                - generic [ref=e213]:
+                  - img [ref=e214]
+                  - text: Live Preview
+                - paragraph [ref=e217]: Helping Acme Corp move faster this quarter
+              - generic [ref=e218]:
+                - button "Desktop" [ref=e219]:
+                  - img [ref=e220]
+                  - text: Desktop
+                - button "Mobile" [ref=e222]:
+                  - img [ref=e223]
+                  - text: Mobile
+            - generic [ref=e225]:
+              - generic [ref=e226]:
+                - img [ref=e227]
+                - text: Preview Variables
+              - generic [ref=e231]:
+                - generic [ref=e232]:
+                  - text: ContactName
+                  - textbox "ContactName" [ref=e233]: John Doe
+                - generic [ref=e234]:
+                  - text: CompanyName
+                  - textbox "CompanyName" [ref=e235]: Acme Corp
+                - generic [ref=e236]:
+                  - text: AgentName
+                  - textbox "AgentName" [ref=e237]: Alice Admin
+                - generic [ref=e238]:
+                  - text: ProductName
+                  - textbox "ProductName" [ref=e239]: Enterprise Audit Package
+                - generic [ref=e240]:
+                  - text: EstimatedValue
+                  - textbox "EstimatedValue" [ref=e241]: $10,000
+                - generic [ref=e242]:
+                  - text: FollowupDate
+                  - textbox "FollowupDate" [ref=e243]: May 28, 2026
+            - iframe [ref=e246]:
+              - generic [ref=f11e2]:
+                - generic [ref=f11e3]:
+                  - generic [ref=f11e4]:
+                    - strong [ref=f11e5]: "Subject:"
+                    - text: Helping Acme Corp move faster this quarter
+                  - generic [ref=f11e6]:
+                    - strong [ref=f11e7]: "Preheader:"
+                    - text: A short note for John Doe about Enterprise Audit Package.
+                - generic [ref=f11e8]: New conversation
+                - heading "A practical way to support Acme Corp's growth" [level=1] [ref=f11e9]
+                - text: Hi John Doe,
+                - text: I wanted to reach out because teams like
+                - strong [ref=f11e10]: Acme Corp
+                - text: often use
+                - strong [ref=f11e11]: Enterprise Audit Package
+                - text: to improve follow-up speed, visibility, and handoffs across the pipeline.
+                - link "Book a quick discussion" [ref=f11e12] [cursor=pointer]:
+                  - /url: "#"
+                - text: Alice Admin - TasksFlow CRM
+            - generic [ref=e247]:
+              - generic [ref=e248]:
+                - img [ref=e249]
+                - text: Preview is sandboxed and variables are rendered locally.
+              - generic [ref=e251]: 4 variables
+  - button "Open Next.js Dev Tools" [ref=e8] [cursor=pointer]:
+    - img [ref=e9]
+  - alert [ref=e12]
