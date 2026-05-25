@@ -62,6 +62,28 @@ export function CrmProvider({ children }) {
     setFollowups(prev => prev.filter(f => f.id !== id));
   };
 
+  // NEW: Campaigns (Sequences) state
+  const [campaigns, setCampaigns] = useState(MOCK_DATA.campaigns || []);
+  const [enrollments, setEnrollments] = useState(MOCK_DATA.enrollments || []);
+
+  const addCampaign = (campaign) => setCampaigns(prev => [...prev, campaign]);
+  const updateCampaign = (id, updates) => setCampaigns(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  const deleteCampaign = (id) => setCampaigns(prev => prev.filter(c => c.id !== id));
+
+  const enrollLead = (leadId, campaignId) => {
+    const newEnrollment = {
+      id: `ENR-${Date.now()}`,
+      leadId,
+      campaignId,
+      currentStep: 1,
+      enrolledAt: new Date().toISOString(),
+      status: "Active"
+    };
+    setEnrollments(prev => [...prev, newEnrollment]);
+  };
+
+  const updateEnrollment = (id, updates) => setEnrollments(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+
   const updateTask = (taskId, updates) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
   };
@@ -110,6 +132,15 @@ export function CrmProvider({ children }) {
         addFollowup,
         updateFollowup,
         deleteFollowup,
+        campaigns,
+        setCampaigns,
+        addCampaign,
+        updateCampaign,
+        deleteCampaign,
+        enrollments,
+        setEnrollments,
+        enrollLead,
+        updateEnrollment,
         leads,
         setLeads,
         permissions: {

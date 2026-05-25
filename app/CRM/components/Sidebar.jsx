@@ -111,6 +111,7 @@ const Sidebar = () => {
           <SidebarItem icon={UserCircle} label="Customers" href="/CRM/customers" isCollapsed={isSidebarCollapsed} />
           <SidebarItem icon={LinkIcon} label="Lead Sources" href="/CRM/sources" isCollapsed={isSidebarCollapsed} />
           {permissions.canManageEmailTemplates && <SidebarItem icon={Mail} label="Email Templates" href="/CRM/templates" isCollapsed={isSidebarCollapsed} />}
+          {permissions.canManageEmailTemplates && <SidebarItem icon={Mail} label="Campaigns" href="/CRM/campaigns" isCollapsed={isSidebarCollapsed} />}
           {permissions.canManageEmailTemplates && <SidebarItem icon={Zap} label="Email Triggers" href="/CRM/triggers" isCollapsed={isSidebarCollapsed} />}
         </div>
 

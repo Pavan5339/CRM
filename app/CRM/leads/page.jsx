@@ -11,7 +11,7 @@ import GenericEditModal from '../components/GenericEditModal';
 import { Search, Filter } from 'lucide-react';
 
 export default function LeadsPage() {
-  const { currentUser, permissions, leads, setLeads, followups } = useCrm();
+  const { currentUser, permissions, leads, setLeads, followups, campaigns, enrollLead } = useCrm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
@@ -64,6 +64,11 @@ export default function LeadsPage() {
   };
 
   const handleSaveEdit = (updatedLead) => {
+    if (updatedLead.enrollCampaignId && updatedLead.enrollCampaignId !== 'None') {
+      enrollLead(updatedLead.id, updatedLead.enrollCampaignId);
+      delete updatedLead.enrollCampaignId;
+      alert(`Lead enrolled in campaign ${updatedLead.enrollCampaignId}!`);
+    }
     setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
   };
 
@@ -328,7 +333,8 @@ export default function LeadsPage() {
           { key: 'value', label: 'Value ($)', type: 'text' },
           { key: 'status', label: 'Status', type: 'select', options: ['New', 'Contacted', 'Qualified', 'Won', 'Lost'] },
           { key: 'priority', label: 'Priority', type: 'select', options: ['High', 'Medium', 'Low'] },
-          { key: 'source', label: 'Source', type: 'select', options: ['Service Enquiry', 'Expert Request', 'Voice Requirement', 'Partner Registration', 'Contact Form'] }
+          { key: 'source', label: 'Source', type: 'select', options: ['Service Enquiry', 'Expert Request', 'Voice Requirement', 'Partner Registration', 'Contact Form'] },
+          { key: 'enrollCampaignId', label: 'Enroll in Email Sequence', type: 'select', options: ['None', ...(campaigns?.map(c => c.id) || [])] }
         ]}
       />
     </div>

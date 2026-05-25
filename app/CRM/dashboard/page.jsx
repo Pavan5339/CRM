@@ -13,7 +13,7 @@ import {
 import { Clock, CheckSquare, Activity as ActivityIcon } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { currentUser } = useCrm();
+  const { currentUser, followups } = useCrm();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
@@ -72,6 +72,7 @@ export default function DashboardPage() {
 
   // Feeds
   const pendingTasks = MOCK_DATA.tasks.filter(t => t.status !== "Completed").slice(0, 4);
+  const activeFollowups = followups?.filter(f => f.status !== "Completed").sort((a,b) => new Date(a.dueDate) - new Date(b.dueDate)).slice(0, 4) || [];
   const recentActivities = [...MOCK_DATA.activities].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
   
   const getAssigneeName = (id) => MOCK_USERS[Object.keys(MOCK_USERS).find(k => MOCK_USERS[k].id === id)]?.name || "Unknown";
@@ -174,26 +175,34 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Upcoming Tasks */}
+        {/* Upcoming Tasks -> Follow-ups & Reminders */}
         <div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold dark:text-white flex items-center"><CheckSquare className="w-5 h-5 mr-2 text-amber-500" /> Upcoming Tasks</h2>
-            <button onClick={() => router.push('/CRM/tasks')} className="text-xs font-bold text-blue-500 hover:text-blue-600 uppercase tracking-widest">View All</button>
+            <h2 className="text-lg font-bold dark:text-white flex items-center"><CheckSquare className="w-5 h-5 mr-2 text-amber-500" /> Follow-ups & Reminders</h2>
+            <button onClick={() => router.push('/CRM/followups')} className="text-xs font-bold text-blue-500 hover:text-blue-600 uppercase tracking-widest">View All</button>
           </div>
           <div className="space-y-4">
-            {pendingTasks.map(task => (
-              <div key={task.id} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-700/50 last:border-0 last:pb-0">
+            {activeFollowups.map(fwp => (
+              <div key={fwp.id} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-700/50 last:border-0 last:pb-0">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{task.title}</h4>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{fwp.title}</h4>
                   <p className="text-xs font-semibold text-slate-500 flex items-center uppercase tracking-wide">
-                     {new Date(task.dueDate).toLocaleDateString()} • {getAssigneeName(task.assigneeId)}
+                     {new Date(fwp.dueDate).toLocaleDateString()} • {getAssigneeName(fwp.assigneeId)}
                   </p>
                 </div>
-                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${task.priority === 'High' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}`}>
-                  {task.priority}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${fwp.status === 'Overdue' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : fwp.status === 'New' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'}`}>
+                    {fwp.status}
+                  </span>
+                  <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${fwp.priority === 'High' ? 'text-red-600 border border-red-200' : 'text-slate-500 border border-slate-200'}`}>
+                    {fwp.priority}
+                  </span>
+                </div>
               </div>
             ))}
+            {activeFollowups.length === 0 && (
+              <p className="text-sm text-slate-500 text-center py-4">No pending follow-ups.</p>
+            )}
           </div>
         </div>
 
