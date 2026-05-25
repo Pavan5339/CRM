@@ -12,93 +12,157 @@ export const MOCK_USERS = {
 
 const CrmContext = createContext(null);
 
+// Helper: fetch with fallback
+async function fetchOrFallback(url, key, fallback) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("API error");
+    const json = await res.json();
+    const data = json[key];
+    return data?.length ? data : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// Mock fallback data
+const MOCK_LEADS = (() => {
+  const sources = ["Service Enquiry", "Expert Request", "Voice Requirement", "Partner Registration", "Contact Form"];
+  return MOCK_DATA.leads.map((l, i) => ({ ...l, source: sources[i % sources.length] }));
+})();
+
+const MOCK_ACTIVITIES = (() => {
+  const actionTypes = ['registered', 'logged in', 'profile updated', 'AI profile submitted', 'agreement signed', 'requirement submitted', 'WhatsApp sent', 'email sent', 'call completed', 'admin note added', 'status changed'];
+  return MOCK_DATA.activities.map((a, i) => ({ ...a, type: actionTypes[i % actionTypes.length] })).sort((x, y) => new Date(y.date) - new Date(x.date));
+})();
+
+const MOCK_FOLLOWUPS = [
+  { id: "FWP001", leadId: 1, type: "Service Enquiry", title: "New inquiry from Acme Corp", priority: "High", dueDate: "2026-05-24", dueTime: "10:00 AM", status: "New", assigneeId: "u1", notes: "Inquired about enterprise SLA", created: "May 24, 2026" },
+  { id: "FWP002", leadId: 3, type: "Expert Request", title: "Consultation request from Tony Stark", priority: "High", dueDate: "2026-05-24", dueTime: "11:30 AM", status: "In Progress", assigneeId: "u2", notes: "Needs details on integration APIs", created: "May 23, 2026" },
+  { id: "FWP003", leadId: 7, type: "Voice Requirement", title: "Cyberdyne voice prompt setup", priority: "Medium", dueDate: "2026-05-25", dueTime: "02:00 PM", status: "New", assigneeId: "u3", notes: "Submitted voice form with strict guidelines", created: "May 24, 2026" },
+  { id: "FWP004", leadId: 2, type: "Partner Registration", title: "Review Global Tech partner profile", priority: "Medium", dueDate: "2026-05-22", dueTime: "09:00 AM", status: "Overdue", assigneeId: "u1", notes: "Profile is 60% complete, missing agreement", created: "May 20, 2026" },
+  { id: "FWP005", leadId: 4, type: "Contact Form", title: "General inquiry from Bruce Wayne", priority: "Low", dueDate: "2026-05-26", dueTime: "-", status: "New", assigneeId: "u3", notes: "Questions about bulk pricing", created: "May 24, 2026" }
+];
+
 export function CrmProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(MOCK_USERS.admin);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [leads, setLeads] = useState(MOCK_LEADS);
   const [tasks, setTasks] = useState(MOCK_DATA.tasks);
-  
-  // NEW: Global Leads state (with Inquiry sources)
-  const [leads, setLeads] = useState(() => {
-    const sources = ["Service Enquiry", "Expert Request", "Voice Requirement", "Partner Registration", "Contact Form"];
-    return MOCK_DATA.leads.map((l, i) => ({
-      ...l,
-      source: sources[i % sources.length]
-    }));
-  });
-
-  // NEW: Global Activities state
-  const [activities, setActivities] = useState(() => {
-    const actionTypes = ['registered', 'logged in', 'profile updated', 'AI profile submitted', 'agreement signed', 'requirement submitted', 'WhatsApp sent', 'email sent', 'call completed', 'admin note added', 'status changed'];
-    const mapped = MOCK_DATA.activities.map((a, i) => ({
-      ...a,
-      type: actionTypes[i % actionTypes.length]
-    }));
-    return mapped.sort((x, y) => new Date(y.date) - new Date(x.date));
-  });
-
-  const addActivity = (newActivity) => {
-    setActivities(prev => [newActivity, ...prev]);
-  };
-
-  // NEW: Followups state
-  const [followups, setFollowups] = useState([
-    { id: "FWP001", leadId: 1, type: "Service Enquiry", title: "New inquiry from Acme Corp", priority: "High", dueDate: "2026-05-24", dueTime: "10:00 AM", status: "New", assigneeId: "u1", notes: "Inquired about enterprise SLA", created: "May 24, 2026" },
-    { id: "FWP002", leadId: 3, type: "Expert Request", title: "Consultation request from Tony Stark", priority: "High", dueDate: "2026-05-24", dueTime: "11:30 AM", status: "In Progress", assigneeId: "u2", notes: "Needs details on integration APIs", created: "May 23, 2026" },
-    { id: "FWP003", leadId: 7, type: "Voice Requirement", title: "Cyberdyne voice prompt setup", priority: "Medium", dueDate: "2026-05-25", dueTime: "02:00 PM", status: "New", assigneeId: "u3", notes: "Submitted voice form with strict guidelines", created: "May 24, 2026" },
-    { id: "FWP004", leadId: 2, type: "Partner Registration", title: "Review Global Tech partner profile", priority: "Medium", dueDate: "2026-05-22", dueTime: "09:00 AM", status: "Overdue", assigneeId: "u1", notes: "Profile is 60% complete, missing agreement", created: "May 20, 2026" },
-    { id: "FWP005", leadId: 4, type: "Contact Form", title: "General inquiry from Bruce Wayne", priority: "Low", dueDate: "2026-05-26", dueTime: "-", status: "New", assigneeId: "u3", notes: "Questions about bulk pricing", created: "May 24, 2026" }
-  ]);
-
-  const addFollowup = (newFollowup) => {
-    setFollowups(prev => [newFollowup, ...prev]);
-  };
-
-  const updateFollowup = (id, updates) => {
-    setFollowups(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
-  };
-
-  const deleteFollowup = (id) => {
-    setFollowups(prev => prev.filter(f => f.id !== id));
-  };
-
-  // NEW: Campaigns (Sequences) state
+  const [activities, setActivities] = useState(MOCK_ACTIVITIES);
+  const [followups, setFollowups] = useState(MOCK_FOLLOWUPS);
   const [campaigns, setCampaigns] = useState(MOCK_DATA.campaigns || []);
   const [enrollments, setEnrollments] = useState(MOCK_DATA.enrollments || []);
 
-  const addCampaign = (campaign) => setCampaigns(prev => [...prev, campaign]);
-  const updateCampaign = (id, updates) => setCampaigns(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-  const deleteCampaign = (id) => setCampaigns(prev => prev.filter(c => c.id !== id));
+  // Fetch from APIs on mount
+  useEffect(() => {
+    async function loadData() {
+      const [leadsData, tasksData, activitiesData, followupsData, campaignsData, enrollmentsData] = await Promise.all([
+        fetchOrFallback("/CRM/api/leads", "leads", MOCK_LEADS),
+        fetchOrFallback("/CRM/api/tasks", "tasks", MOCK_DATA.tasks),
+        fetchOrFallback("/CRM/api/activities", "activities", MOCK_ACTIVITIES),
+        fetchOrFallback("/CRM/api/followups", "followups", MOCK_FOLLOWUPS),
+        fetchOrFallback("/CRM/api/campaigns", "campaigns", MOCK_DATA.campaigns || []),
+        fetchOrFallback("/CRM/api/campaigns/enrollments", "enrollments", MOCK_DATA.enrollments || []),
+      ]);
+      setLeads(leadsData);
+      setTasks(tasksData);
+      setActivities(activitiesData);
+      setFollowups(followupsData);
+      setCampaigns(campaignsData);
+      setEnrollments(enrollmentsData);
+      setLoading(false);
+    }
+    loadData();
+  }, []);
 
-  const enrollLead = (leadId, campaignId) => {
-    const newEnrollment = {
-      id: `ENR-${Date.now()}`,
-      leadId,
-      campaignId,
-      currentStep: 1,
-      enrolledAt: new Date().toISOString(),
-      status: "Active"
-    };
-    setEnrollments(prev => [...prev, newEnrollment]);
+  // --- Mutation helpers (call API + update local state) ---
+
+  const addActivity = async (newActivity) => {
+    setActivities(prev => [newActivity, ...prev]);
+    try {
+      const res = await fetch("/CRM/api/activities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newActivity) });
+      if (res.ok) {
+        const { activity } = await res.json();
+        if (activity) setActivities(prev => [activity, ...prev.filter(a => a !== newActivity)]);
+      }
+    } catch (e) { console.error("addActivity API error:", e); }
   };
 
-  const updateEnrollment = (id, updates) => setEnrollments(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+  const addFollowup = async (newFollowup) => {
+    setFollowups(prev => [newFollowup, ...prev]);
+    try {
+      const res = await fetch("/CRM/api/followups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newFollowup) });
+      if (res.ok) {
+        const { followup } = await res.json();
+        if (followup) setFollowups(prev => [followup, ...prev.filter(f => f !== newFollowup)]);
+      }
+    } catch (e) { console.error("addFollowup API error:", e); }
+  };
 
-  const updateTask = (taskId, updates) => {
+  const updateFollowup = async (id, updates) => {
+    setFollowups(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+    try { await fetch("/CRM/api/followups", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...updates }) }); }
+    catch (e) { console.error("updateFollowup API error:", e); }
+  };
+
+  const deleteFollowup = async (id) => {
+    setFollowups(prev => prev.filter(f => f.id !== id));
+    try { await fetch(`/CRM/api/followups?id=${id}`, { method: "DELETE" }); }
+    catch (e) { console.error("deleteFollowup API error:", e); }
+  };
+
+  const addCampaign = async (campaign) => {
+    setCampaigns(prev => [...prev, campaign]);
+    try { await fetch("/CRM/api/campaigns", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(campaign) }); }
+    catch (e) { console.error("addCampaign API error:", e); }
+  };
+
+  const updateCampaign = async (id, updates) => {
+    setCampaigns(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    try { await fetch("/CRM/api/campaigns", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...updates }) }); }
+    catch (e) { console.error("updateCampaign API error:", e); }
+  };
+
+  const deleteCampaign = async (id) => {
+    setCampaigns(prev => prev.filter(c => c.id !== id));
+    try { await fetch(`/CRM/api/campaigns?id=${id}`, { method: "DELETE" }); }
+    catch (e) { console.error("deleteCampaign API error:", e); }
+  };
+
+  const enrollLead = async (leadId, campaignId) => {
+    const newEnrollment = { lead_id: leadId, campaign_id: campaignId, current_step: 1, status: "Active" };
+    setEnrollments(prev => [...prev, { id: `ENR-${Date.now()}`, ...newEnrollment, enrolled_at: new Date().toISOString() }]);
+    try { await fetch("/CRM/api/campaigns/enrollments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newEnrollment) }); }
+    catch (e) { console.error("enrollLead API error:", e); }
+  };
+
+  const updateEnrollment = async (id, updates) => {
+    setEnrollments(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+    try { await fetch("/CRM/api/campaigns/enrollments", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...updates }) }); }
+    catch (e) { console.error("updateEnrollment API error:", e); }
+  };
+
+  const updateTask = async (taskId, updates) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+    try { await fetch("/CRM/api/tasks", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: taskId, ...updates }) }); }
+    catch (e) { console.error("updateTask API error:", e); }
   };
 
-  const addTask = (newTask) => {
+  const addTask = async (newTask) => {
     setTasks(prev => [newTask, ...prev]);
+    try { await fetch("/CRM/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newTask) }); }
+    catch (e) { console.error("addTask API error:", e); }
   };
 
   const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
   const toggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
 
-  // Optional: check localStorage for theme on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem("crm-theme");
-    // eslint-disable-next-line
     if (savedTheme === "dark") setIsDarkMode(true);
   }, []);
 
@@ -120,6 +184,7 @@ export function CrmProvider({ children }) {
         toggleDarkMode,
         isSidebarCollapsed,
         toggleSidebar,
+        loading,
         tasks,
         setTasks,
         updateTask,
