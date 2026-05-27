@@ -58,3 +58,30 @@ SELECT cron.schedule(
   '0 * * * *',
   $$ select public.process_repeating_tasks(); $$
 );
+
+-- ============================================================
+-- Job 4: Import CRM followups from source Supabase project
+-- NOTE: Update vault secrets on the new project first!
+--       Required secrets: project_url, sync_shared_secret
+--       Required Edge Function secrets:
+--       SOURCE_SUPABASE_URL, SOURCE_SUPABASE_SERVICE_ROLE_KEY,
+--       SOURCE_PROJECT_REF, SYNC_SHARED_SECRET
+-- ============================================================
+SELECT cron.schedule(
+  'sync-followups',
+  '*/5 * * * *',
+  $$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/sync-followups',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'sync_shared_secret')
+    ),
+    body := jsonb_build_object(
+      'source', 'pg_cron',
+      'timestamp', timezone('utc'::text, now())
+    ),
+    timeout_milliseconds := 30000
+  );
+  $$
+);
