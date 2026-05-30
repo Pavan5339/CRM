@@ -40,3 +40,6 @@ migration_artifacts/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright
+.playwright-mcp

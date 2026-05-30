@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useCallback, useContext, useState, useEffect } from "react";
 import MOCK_DATA from "../data/mockData.json";
 
 export const MOCK_USERS = {
@@ -46,7 +46,10 @@ const MOCK_FOLLOWUPS = [
 
 export function CrmProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(MOCK_USERS.admin);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("crm-theme") === "dark";
+  });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -57,27 +60,32 @@ export function CrmProvider({ children }) {
   const [campaigns, setCampaigns] = useState(MOCK_DATA.campaigns || []);
   const [enrollments, setEnrollments] = useState(MOCK_DATA.enrollments || []);
 
+  const refreshCrmData = useCallback(async () => {
+    const [leadsData, tasksData, activitiesData, followupsData, campaignsData, enrollmentsData] = await Promise.all([
+      fetchOrFallback("/CRM/api/leads", "leads", MOCK_LEADS),
+      fetchOrFallback("/CRM/api/tasks", "tasks", MOCK_DATA.tasks),
+      fetchOrFallback("/CRM/api/activities", "activities", MOCK_ACTIVITIES),
+      fetchOrFallback("/CRM/api/followups", "followups", MOCK_FOLLOWUPS),
+      fetchOrFallback("/CRM/api/campaigns", "campaigns", MOCK_DATA.campaigns || []),
+      fetchOrFallback("/CRM/api/campaigns/enrollments", "enrollments", MOCK_DATA.enrollments || []),
+    ]);
+    setLeads(leadsData);
+    setTasks(tasksData);
+    setActivities(activitiesData);
+    setFollowups(followupsData);
+    setCampaigns(campaignsData);
+    setEnrollments(enrollmentsData);
+    setLoading(false);
+  }, []);
+
   // Fetch from APIs on mount
   useEffect(() => {
-    async function loadData() {
-      const [leadsData, tasksData, activitiesData, followupsData, campaignsData, enrollmentsData] = await Promise.all([
-        fetchOrFallback("/CRM/api/leads", "leads", MOCK_LEADS),
-        fetchOrFallback("/CRM/api/tasks", "tasks", MOCK_DATA.tasks),
-        fetchOrFallback("/CRM/api/activities", "activities", MOCK_ACTIVITIES),
-        fetchOrFallback("/CRM/api/followups", "followups", MOCK_FOLLOWUPS),
-        fetchOrFallback("/CRM/api/campaigns", "campaigns", MOCK_DATA.campaigns || []),
-        fetchOrFallback("/CRM/api/campaigns/enrollments", "enrollments", MOCK_DATA.enrollments || []),
-      ]);
-      setLeads(leadsData);
-      setTasks(tasksData);
-      setActivities(activitiesData);
-      setFollowups(followupsData);
-      setCampaigns(campaignsData);
-      setEnrollments(enrollmentsData);
-      setLoading(false);
-    }
-    loadData();
-  }, []);
+    const timer = window.setTimeout(() => {
+      refreshCrmData();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [refreshCrmData]);
 
   // --- Mutation helpers (call API + update local state) ---
 
@@ -162,11 +170,6 @@ export function CrmProvider({ children }) {
   const toggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("crm-theme");
-    if (savedTheme === "dark") setIsDarkMode(true);
-  }, []);
-
-  useEffect(() => {
     localStorage.setItem("crm-theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
@@ -208,6 +211,7 @@ export function CrmProvider({ children }) {
         updateEnrollment,
         leads,
         setLeads,
+        refreshCrmData,
         permissions: {
           canManageSystemSettings,
           canManageEmailTemplates,

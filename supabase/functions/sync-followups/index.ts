@@ -10,12 +10,15 @@ const SOURCE_SERVICE_ROLE_KEY = Deno.env.get('SOURCE_SUPABASE_SERVICE_ROLE_KEY')
 const SOURCE_PROJECT_REF = Deno.env.get('SOURCE_PROJECT_REF') ?? getProjectRef(SOURCE_SUPABASE_URL);
 const SYNC_SHARED_SECRET = Deno.env.get('SYNC_SHARED_SECRET') ?? '';
 const DEFAULT_ASSIGNEE_ID = Deno.env.get('SYNC_DEFAULT_ASSIGNEE_ID') ?? 'u1';
-const SOURCE_LIMIT = Number(Deno.env.get('SYNC_SOURCE_LIMIT') ?? '500');
+const MAX_SOURCE_LIMIT = 500;
+const DEFAULT_SOURCE_LIMIT = clampLimit(Number(Deno.env.get('SYNC_SOURCE_LIMIT') ?? '500'));
 
 const SOURCE_TABLES: Array<{ table: SourceTable; type: string }> = [
   { table: 'service_enquiries', type: 'Service Enquiry' },
   { table: 'voice_requirements', type: 'Voice Requirement' },
 ];
+
+const SOURCE_TABLE_MAP = new Map(SOURCE_TABLES.map((source) => [source.table, source]));
 
 function jsonResponse(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -30,6 +33,37 @@ function getProjectRef(url: string) {
   } catch {
     return 'source';
   }
+}
+
+function clampLimit(value: unknown) {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return 500;
+  return Math.min(Math.max(Math.trunc(numericValue), 1), MAX_SOURCE_LIMIT);
+}
+
+async function readSyncOptions(req: Request) {
+  if (!req.body) {
+    return { tables: SOURCE_TABLES, limit: DEFAULT_SOURCE_LIMIT };
+  }
+
+  let body: Record<string, unknown> = {};
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+
+  const requestedTables = Array.isArray(body.tables)
+    ? body.tables.filter((table): table is SourceTable => SOURCE_TABLE_MAP.has(table as SourceTable))
+    : [];
+  const tables = requestedTables.length
+    ? requestedTables.map((table) => SOURCE_TABLE_MAP.get(table)!)
+    : SOURCE_TABLES;
+
+  return {
+    tables,
+    limit: body.limit === undefined ? DEFAULT_SOURCE_LIMIT : clampLimit(body.limit),
+  };
 }
 
 function text(row: SourceRow, keys: string[], fallback = '') {
@@ -105,19 +139,19 @@ function followupPayload(row: SourceRow, sourceTable: SourceTable, sourceType: s
   };
 }
 
-async function fetchRows(source: ReturnType<typeof createClient>, table: SourceTable) {
+async function fetchRows(source: ReturnType<typeof createClient>, table: SourceTable, limit: number) {
   const orderCandidates = ['updated_at', 'created_at', 'submitted_at', 'id'];
   for (const column of orderCandidates) {
     const { data, error } = await source
       .from(table)
       .select('*')
       .order(column, { ascending: false })
-      .limit(SOURCE_LIMIT);
+      .limit(limit);
 
     if (!error) return data ?? [];
   }
 
-  const { data, error } = await source.from(table).select('*').limit(SOURCE_LIMIT);
+  const { data, error } = await source.from(table).select('*').limit(limit);
   if (error) throw new Error(`${table}: ${error.message}`);
   return data ?? [];
 }
@@ -143,18 +177,20 @@ Deno.serve(async (req) => {
   const source = createClient(SOURCE_SUPABASE_URL, SOURCE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+  const options = await readSyncOptions(req);
 
   const summary = {
     imported: 0,
     skipped: 0,
     errors: [] as Array<{ table: SourceTable; id?: string; error: string }>,
     tables: {} as Record<SourceTable, number>,
+    limit: options.limit,
   };
 
-  for (const { table, type } of SOURCE_TABLES) {
+  for (const { table, type } of options.tables) {
     let rows: SourceRow[] = [];
     try {
-      rows = (await fetchRows(source, table)) as SourceRow[];
+      rows = (await fetchRows(source, table, options.limit)) as SourceRow[];
       summary.tables[table] = rows.length;
     } catch (error) {
       summary.errors.push({ table, error: error instanceof Error ? error.message : 'Failed to fetch source rows' });
