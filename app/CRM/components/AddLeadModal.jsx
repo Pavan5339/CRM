@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X, User, Building2, Tag } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export default function AddLeadModal({ isOpen, onClose, onAdd }) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     leadName: '',
     email: '',
@@ -28,7 +30,7 @@ export default function AddLeadModal({ isOpen, onClose, onAdd }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.leadName) {
-      alert("Lead Name is required.");
+      toast.warning("Lead Name is required.");
       return;
     }
     

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X, Phone, FileText, Paperclip } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 import MOCK_DATA from '../data/mockData.json';
 
 export default function AddActivityModal({ isOpen, onClose, onAdd }) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     leadId: '',
     type: 'admin note added',
@@ -26,7 +28,7 @@ export default function AddActivityModal({ isOpen, onClose, onAdd }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.leadId || !formData.subject) {
-      alert("Lead and Subject are required.");
+      toast.warning("Lead and Subject are required.");
       return;
     }
     onAdd({

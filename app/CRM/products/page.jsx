@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react';
 import { useCrm } from '../context/CrmContext';
+import { useToast } from '../context/ToastContext';
 import MOCK_DATA from '../data/mockData.json';
 import ExcelImportButton from '../components/ExcelImportButton';
 import GenericEditModal from '../components/GenericEditModal';
 
 export default function ProductsPage() {
   const { currentUser } = useCrm();
+  const { toast } = useToast();
   const [products, setProducts] = useState(MOCK_DATA.products);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -17,7 +19,7 @@ export default function ProductsPage() {
 
   const handleEdit = (product) => {
     if (!canEditProducts) {
-      alert("Permission Denied: Only Admins and Managers can edit products.");
+      toast.error("Permission Denied: Only Admins and Managers can edit products.");
       return;
     }
     setEditingProduct(product);

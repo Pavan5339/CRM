@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { X, MessageSquareCode, CalendarIcon, Users, FileText, CheckCircle } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 import { MOCK_USERS } from '../context/CrmContext';
 import MOCK_DATA from '../data/mockData.json';
 
 export default function AddFollowupModal({ isOpen, onClose, onAdd }) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     type: 'Service Enquiry',
@@ -25,7 +27,7 @@ export default function AddFollowupModal({ isOpen, onClose, onAdd }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.title || !formData.dueDate) {
-      alert("Follow-up Title and Due Date are required.");
+      toast.warning("Follow-up Title and Due Date are required.");
       return;
     }
     
