@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X, Mail } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export default function AddTemplateModal({ isOpen, onClose, onAdd }) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -21,7 +23,7 @@ export default function AddTemplateModal({ isOpen, onClose, onAdd }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name || !formData.subject) {
-      alert("Template Name and Subject Line are required.");
+      toast.warning("Template Name and Subject Line are required.");
       return;
     }
     onAdd({

@@ -5,7 +5,7 @@ import { useCrm, MOCK_USERS } from '../context/CrmContext';
 
 const COLUMNS = ['New', 'Contacted', 'Qualified', 'Won'];
 
-export default function KanbanBoard({ leads, setLeads }) {
+export default function KanbanBoard({ leads, setLeads, onLeadClick }) {
   const { currentUser, permissions } = useCrm();
 
   const handleDragStart = (e, leadId) => {
@@ -67,8 +67,9 @@ export default function KanbanBoard({ leads, setLeads }) {
                       key={lead.id}
                       draggable={canDrag}
                       onDragStart={(e) => handleDragStart(e, lead.id)}
-                      className={`bg-white dark:bg-slate-800 p-4 rounded shadow-sm border border-slate-200 dark:border-slate-700 relative transition ${
-                        canDrag ? 'cursor-grab active:cursor-grabbing hover:border-blue-400 dark:hover:border-slate-500' : 'cursor-not-allowed opacity-80'
+                      onClick={(e) => { e.stopPropagation(); onLeadClick?.(lead); }}
+                      className={`bg-white dark:bg-slate-800 p-4 rounded shadow-sm border border-slate-200 dark:border-slate-700 relative transition hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 ${
+                        canDrag ? 'cursor-pointer active:cursor-grabbing' : 'cursor-pointer opacity-90'
                       }`}
                     >
                       <div className="font-bold text-slate-800 dark:text-white mb-1 transition-colors">

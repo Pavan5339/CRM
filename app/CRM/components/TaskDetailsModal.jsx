@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { X, ListChecks, Edit3 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 import { MOCK_USERS } from '../context/CrmContext';
 import MOCK_DATA from '../data/mockData.json';
 
 export default function TaskDetailsModal({ isOpen, task, onClose, onEditTask }) {
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
 
@@ -142,7 +144,7 @@ export default function TaskDetailsModal({ isOpen, task, onClose, onEditTask }) 
         <div className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 p-4 flex justify-between shrink-0">
           {!isEditing ? (
             <>
-              <button onClick={() => alert("Navigate to Lead page")} className="px-4 py-2 text-sm font-medium bg-[#0b1f3d] hover:bg-[#16345e] text-white rounded transition shadow flex items-center">
+              <button onClick={() => toast.info('Navigating to lead...')} className="px-4 py-2 text-sm font-medium bg-[#0b1f3d] hover:bg-[#16345e] text-white rounded transition shadow flex items-center">
                 <Edit3 className="w-3 h-3 mr-1" /> Edit Lead
               </button>
               <button onClick={startEditing} className="px-4 py-2 text-sm font-medium bg-green-500 hover:bg-green-600 text-white rounded transition shadow flex items-center">

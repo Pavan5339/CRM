@@ -2,19 +2,21 @@
 
 import React, { useState } from 'react';
 import { useCrm, MOCK_USERS } from '../context/CrmContext';
+import { useToast } from '../context/ToastContext';
 import MOCK_DATA from '../data/mockData.json';
 import KanbanBoard from '../components/KanbanBoard';
 import AddLeadModal from '../components/AddLeadModal';
+import LeadProfilePanel from '../components/LeadProfilePanel';
 import { exportToExcel } from '../utils/excel-helpers';
 import ExcelImportButton from '../components/ExcelImportButton';
-import GenericEditModal from '../components/GenericEditModal';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, Phone, Mail, MessageSquarePlus, CalendarPlus } from 'lucide-react';
 
 export default function LeadsPage() {
   const { currentUser, permissions, leads, setLeads, followups, campaigns, enrollLead } = useCrm();
+  const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingLead, setEditingLead] = useState(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState("");
@@ -26,7 +28,7 @@ export default function LeadsPage() {
 
   const handleDelete = (id) => {
     if (!permissions.canDeleteLeads) {
-      alert("Permission Denied: You cannot delete leads.");
+      toast.error("Permission Denied: You cannot delete leads.");
       return;
     }
     setLeads(leads.filter(l => l.id !== id));
@@ -51,24 +53,12 @@ export default function LeadsPage() {
     }
   };
 
-  const handleEdit = (lead) => {
-    const isOwner = lead.assigneeId === currentUser.id;
-    const canEdit = !permissions.isReadOnly && (["admin", "manager"].includes(currentUser.role) || (currentUser.role === "sales" && isOwner));
-
-    if (!canEdit) {
-      alert("Permission Denied: You can only edit your own assigned leads.");
-      return;
-    }
-    setEditingLead(lead);
-    setIsEditModalOpen(true);
+  const handleOpenProfile = (lead) => {
+    setSelectedLead(lead);
+    setIsProfileOpen(true);
   };
 
-  const handleSaveEdit = (updatedLead) => {
-    if (updatedLead.enrollCampaignId && updatedLead.enrollCampaignId !== 'None') {
-      enrollLead(updatedLead.id, updatedLead.enrollCampaignId);
-      delete updatedLead.enrollCampaignId;
-      alert(`Lead enrolled in campaign ${updatedLead.enrollCampaignId}!`);
-    }
+  const handleSaveFromProfile = (updatedLead) => {
     setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
   };
 
@@ -244,8 +234,8 @@ export default function LeadsPage() {
               if (lead.status === "Contacted") statusColor = "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400";
 
               return (
-                <tr key={lead.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                  <td className="py-3 px-4 font-medium dark:text-slate-200">{lead.company}</td>
+                <tr key={lead.id} onClick={() => handleOpenProfile(lead)} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-blue-50/60 dark:hover:bg-slate-700/50 transition-colors cursor-pointer group">
+                  <td className="py-3 px-4 font-medium dark:text-slate-200 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">{lead.company}</td>
                   <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">{lead.contact}</td>
                   <td className="py-3 px-4 text-sm">
                     <span className={`px-2 py-1 rounded font-medium text-xs ${statusColor}`}>
@@ -274,30 +264,54 @@ export default function LeadsPage() {
                        {isOwner && <span className="ml-2 text-[9px] bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-1 py-0.5 rounded font-bold uppercase transition">You</span>}
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-right space-x-2 whitespace-nowrap">
-                     {!permissions.isReadOnly && (
+                  <td className="py-3 px-4 text-right whitespace-nowrap">
+                     <div className="flex items-center justify-end gap-1">
+                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                         <button
+                           onClick={(e) => { e.stopPropagation(); handleOpenProfile(lead); }}
+                           className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/30 transition-all"
+                           title="Log Call"
+                         >
+                           <Phone className="w-4 h-4" />
+                         </button>
+                         <button
+                           onClick={(e) => { e.stopPropagation(); handleOpenProfile(lead); }}
+                           className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/30 transition-all"
+                           title="Send Email"
+                         >
+                           <Mail className="w-4 h-4" />
+                         </button>
+                         <button
+                           onClick={(e) => { e.stopPropagation(); handleOpenProfile(lead); }}
+                           className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/30 transition-all"
+                           title="Add Note"
+                         >
+                           <MessageSquarePlus className="w-4 h-4" />
+                         </button>
+                         <button
+                           onClick={(e) => { e.stopPropagation(); handleOpenProfile(lead); }}
+                           className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/30 transition-all"
+                           title="Schedule Follow-up"
+                         >
+                           <CalendarPlus className="w-4 h-4" />
+                         </button>
+                       </div>
                        <button 
-                         onClick={() => handleEdit(lead)}
-                         disabled={!canEdit}
-                         className={`text-sm px-3 py-1 rounded font-medium transition ${
-                           canEdit 
-                             ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200' 
-                             : 'bg-slate-50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-500 cursor-not-allowed border border-transparent dark:border-slate-800'
-                         }`}
-                         title={!canEdit ? "You can only edit assigned leads" : "Edit Lead"}
+                         onClick={(e) => { e.stopPropagation(); handleOpenProfile(lead); }}
+                         className="text-sm px-3 py-1 rounded font-medium transition bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                         title="View Lead Profile"
                        >
-                         Edit
+                         View
                        </button>
-                     )}
-                     
-                     {permissions.canDeleteLeads && (
-                       <button 
-                         onClick={() => handleDelete(lead.id)}
-                         className="text-sm px-3 py-1 bg-white border border-red-200 hover:bg-red-50 text-red-600 dark:bg-slate-800 dark:border-red-900/50 dark:hover:bg-red-900/30 dark:text-red-400 rounded font-medium transition"
-                       >
-                         Delete
-                       </button>
-                     )}
+                       {permissions.canDeleteLeads && (
+                         <button 
+                           onClick={(e) => { e.stopPropagation(); handleDelete(lead.id); }}
+                           className="text-sm px-3 py-1 bg-white border border-red-200 hover:bg-red-50 text-red-600 dark:bg-slate-800 dark:border-red-900/50 dark:hover:bg-red-900/30 dark:text-red-400 rounded font-medium transition opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                         >
+                           Delete
+                         </button>
+                       )}
+                     </div>
                   </td>
                 </tr>
               );
@@ -313,7 +327,7 @@ export default function LeadsPage() {
         </table>
       </div>
 
-      <KanbanBoard leads={leads} setLeads={setLeads} />
+      <KanbanBoard leads={leads} setLeads={setLeads} onLeadClick={handleOpenProfile} />
 
       <AddLeadModal 
         isOpen={isModalOpen} 
@@ -321,21 +335,11 @@ export default function LeadsPage() {
         onAdd={handleAddLeadSubmit} 
       />
 
-      <GenericEditModal 
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        itemData={editingLead}
-        onSave={handleSaveEdit}
-        title="Edit Lead"
-        fields={[
-          { key: 'company', label: 'Company', type: 'text' },
-          { key: 'contact', label: 'Contact', type: 'text' },
-          { key: 'value', label: 'Value ($)', type: 'text' },
-          { key: 'status', label: 'Status', type: 'select', options: ['New', 'Contacted', 'Qualified', 'Won', 'Lost'] },
-          { key: 'priority', label: 'Priority', type: 'select', options: ['High', 'Medium', 'Low'] },
-          { key: 'source', label: 'Source', type: 'select', options: ['Service Enquiry', 'Expert Request', 'Voice Requirement', 'Partner Registration', 'Contact Form'] },
-          { key: 'enrollCampaignId', label: 'Enroll in Email Sequence', type: 'select', options: ['None', ...(campaigns?.map(c => c.id) || [])] }
-        ]}
+      <LeadProfilePanel 
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        leadData={selectedLead}
+        onSave={handleSaveFromProfile}
       />
     </div>
   );

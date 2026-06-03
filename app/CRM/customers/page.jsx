@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useCrm } from '../context/CrmContext';
+import { useToast } from '../context/ToastContext';
 import MOCK_DATA from '../data/mockData.json';
 import { exportToCsv } from '../utils/export';
 import ExcelImportButton from '../components/ExcelImportButton';
@@ -9,13 +10,14 @@ import GenericEditModal from '../components/GenericEditModal';
 
 export default function CustomersPage() {
   const { permissions, currentUser } = useCrm();
+  const { toast } = useToast();
   const [customers, setCustomers] = useState(MOCK_DATA.customers);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
 
   const handleEdit = (customer) => {
     if (permissions.isReadOnly) {
-      alert("Permission Denied: Viewers cannot edit customers.");
+      toast.error("Permission Denied: Viewers cannot edit customers.");
       return;
     }
     setEditingCustomer(customer);

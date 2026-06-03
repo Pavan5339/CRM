@@ -3,8 +3,10 @@
 import React, { useRef } from 'react';
 import * as xlsx from 'xlsx';
 import { Upload } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export default function ExcelImportButton({ onImport }) {
+  const { toast } = useToast();
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -27,11 +29,11 @@ export default function ExcelImportButton({ onImport }) {
         if (jsonData && jsonData.length > 0) {
           onImport(jsonData);
         } else {
-          alert("The Excel sheet appears to be empty.");
+          toast.warning("The Excel sheet appears to be empty.");
         }
       } catch (error) {
         console.error("Error reading Excel file:", error);
-        alert("Failed to parse the file. Please ensure it's a valid Excel or CSV file.");
+        toast.error("Failed to parse the file. Please ensure it's a valid Excel or CSV file.");
       }
       
       // Reset input so the same file can be selected again

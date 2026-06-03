@@ -2,11 +2,13 @@
 
 import React, { useState } from 'react';
 import { useCrm } from '../context/CrmContext';
+import { useToast } from '../context/ToastContext';
 import { Play, Pause, Trash2, Plus, Clock, Mail, Users, Settings } from 'lucide-react';
 import GenericEditModal from '../components/GenericEditModal';
 
 export default function CampaignsPage() {
   const { campaigns, enrollments, addCampaign, updateCampaign, deleteCampaign, leads, addActivity } = useCrm();
+  const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
@@ -54,7 +56,7 @@ export default function CampaignsPage() {
           }
         }
       });
-      alert(`Simulation Complete: Triggered ${activitiesGenerated} automated emails.`);
+      toast.success(`Simulation Complete: Triggered ${activitiesGenerated} automated emails.`);
       setIsProcessing(false);
     }, 1000);
   };

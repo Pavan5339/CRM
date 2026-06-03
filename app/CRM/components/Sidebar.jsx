@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { useCrm } from '../context/CrmContext';
 
-const SidebarItem = ({ icon: Icon, label, href, isCollapsed }) => {
+const SidebarItem = ({ icon: Icon, label, href, isCollapsed, badge }) => {
   const pathname = usePathname();
   const isActive = href ? pathname === href : false;
 
@@ -41,8 +41,22 @@ const SidebarItem = ({ icon: Icon, label, href, isCollapsed }) => {
       } ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}
       title={isCollapsed ? label : undefined}
     >
-      <Icon className={`w-5 h-5 flex-shrink-0 ${isCollapsed ? '' : 'mr-3'}`} />
-      {!isCollapsed && <span className="text-sm font-medium truncate">{label}</span>}
+      <div className={`${badge ? 'relative' : ''} flex-shrink-0`}>
+        <Icon className={`w-5 h-5 ${isCollapsed ? '' : 'mr-3'}`} />
+        {isCollapsed && badge > 0 && (
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full" />
+        )}
+      </div>
+      {!isCollapsed && (
+        <>
+          <span className="text-sm font-medium truncate flex-1">{label}</span>
+          {badge > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-bold min-w-[20px] h-5 flex items-center justify-center px-1.5 rounded-full ml-auto">
+              {badge}
+            </span>
+          )}
+        </>
+      )}
     </Link>
   );
 };
@@ -52,7 +66,11 @@ const Divider = () => (
 );
 
 const Sidebar = () => {
-  const { currentUser, isDarkMode, toggleDarkMode, permissions, isSidebarCollapsed, toggleSidebar } = useCrm();
+  const { currentUser, isDarkMode, toggleDarkMode, permissions, isSidebarCollapsed, toggleSidebar, followups, tasks } = useCrm();
+  const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
+
+  const pendingFollowups = followups.filter(f => f.status !== 'Completed').length;
+  const pendingTasks = tasks.filter(t => t.status !== 'Completed' && t.status !== 'Cancelled').length;
 
   // "Admin" and "Manager" are the only roles that see the dashboard link
   const canViewDashboard = ["admin", "manager"].includes(currentUser.role);
@@ -102,8 +120,8 @@ const Sidebar = () => {
           {canImportData && <SidebarItem icon={Database} label="Import Data" href="/CRM/import-data" isCollapsed={isSidebarCollapsed} />}
           <SidebarItem icon={Users} label="Lead Tracking" href="/CRM/leads" isCollapsed={isSidebarCollapsed} />
           <SidebarItem icon={Activity} label="Activities" href="/CRM/activities" isCollapsed={isSidebarCollapsed} />
-          <SidebarItem icon={CheckSquare} label="Tasks" href="/CRM/tasks" isCollapsed={isSidebarCollapsed} />
-          <SidebarItem icon={MessageSquareCode} label="Follow-ups" href="/CRM/followups" isCollapsed={isSidebarCollapsed} />
+          <SidebarItem icon={CheckSquare} label="Tasks" href="/CRM/tasks" isCollapsed={isSidebarCollapsed} badge={pendingTasks} />
+          <SidebarItem icon={MessageSquareCode} label="Follow-ups" href="/CRM/followups" isCollapsed={isSidebarCollapsed} badge={pendingFollowups} />
           <SidebarItem icon={CalendarIcon} label="Calendar" href="/CRM/calendar" isCollapsed={isSidebarCollapsed} />
         </div>
 

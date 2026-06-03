@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { X, ListChecks, CalendarIcon, RefreshCw, Users, FileText } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 import { MOCK_USERS } from '../context/CrmContext';
 import MOCK_DATA from '../data/mockData.json';
 
 export default function AddTaskModal({ isOpen, onClose, onAdd }) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     title: '',
     type: 'Follow Up Call',
@@ -28,7 +30,7 @@ export default function AddTaskModal({ isOpen, onClose, onAdd }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.title || !formData.dueDate) {
-      alert("Task Title and Due Date are required.");
+      toast.warning("Task Title and Due Date are required.");
       return;
     }
     onAdd({
