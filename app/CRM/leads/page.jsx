@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useCrm, MOCK_USERS } from '../context/CrmContext';
+import { useCrm } from '../context/CrmContext';
 import { useToast } from '../context/ToastContext';
 import MOCK_DATA from '../data/mockData.json';
 import KanbanBoard from '../components/KanbanBoard';
@@ -23,7 +23,6 @@ export default function LeadsPage() {
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterPriority, setFilterPriority] = useState("All");
   const [filterSource, setFilterSource] = useState("All");
-  const [filterAssignee, setFilterAssignee] = useState("All");
   const [filterDate, setFilterDate] = useState("");
 
   const handleDelete = (id) => {
@@ -77,15 +76,10 @@ export default function LeadsPage() {
     setLeads(prev => [...mappedLeads, ...prev]);
   };
 
-  const assigneeName = (id) => {
-    const user = Object.values(MOCK_USERS).find(u => u.id === id);
-    return user ? user.name : "Unassigned";
-  };
-
   const totalLeads = leads.length;
   const activeCustomers = leads.filter(l => l.status === "Won").length;
   const computedRevenue = leads.filter(l => l.status === "Won").reduce((acc, l) => {
-    const numericStr = l.value.replace(/[^0-9.-]+/g,"");
+    const numericStr = String(l.value ?? "").replace(/[^0-9.-]+/g,"");
     return acc + (parseFloat(numericStr) || 0);
   }, 0);
 
@@ -95,10 +89,9 @@ export default function LeadsPage() {
     const matchesStatus = filterStatus === "All" || lead.status === filterStatus;
     const matchesPriority = filterPriority === "All" || lead.priority === filterPriority;
     const matchesSource = filterSource === "All" || lead.source === filterSource;
-    const matchesAssignee = filterAssignee === "All" || lead.assigneeId === filterAssignee;
     const matchesDate = !filterDate || (lead.date && lead.date === filterDate);
-    
-    return matchesSearch && matchesStatus && matchesPriority && matchesSource && matchesAssignee && matchesDate;
+
+    return matchesSearch && matchesStatus && matchesPriority && matchesSource && matchesDate;
   });
 
   return (
@@ -182,27 +175,20 @@ export default function LeadsPage() {
               <option value="Partner Registration">Partner Registration</option>
               <option value="Contact Form">Contact Form</option>
            </select>
-           <select value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)} className="border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-200 text-sm focus:outline-none">
-              <option value="All">All Assignees</option>
-              {Object.values(MOCK_USERS).map(u => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-           </select>
-           <input 
+           <input
              type="date" 
              value={filterDate} 
              onChange={(e) => setFilterDate(e.target.value)} 
              className="border border-slate-300 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-700 dark:text-slate-200 text-sm focus:outline-none" 
            />
            {/* Clear Filters */}
-           {(searchTerm || filterStatus !== "All" || filterPriority !== "All" || filterSource !== "All" || filterAssignee !== "All" || filterDate) && (
+           {(searchTerm || filterStatus !== "All" || filterPriority !== "All" || filterSource !== "All" || filterDate) && (
              <button 
                onClick={() => {
                  setSearchTerm("");
                  setFilterStatus("All");
                  setFilterPriority("All");
                  setFilterSource("All");
-                 setFilterAssignee("All");
                  setFilterDate("");
                }}
                className="px-3 py-2 text-sm text-slate-500 hover:text-red-500 transition font-medium flex items-center"
@@ -220,7 +206,6 @@ export default function LeadsPage() {
               <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400">Status</th>
               <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400">Value</th>
               <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400">Follow-ups</th>
-              <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400">Assignee</th>
               <th className="py-3 px-4 font-semibold text-sm text-slate-600 dark:text-slate-400 text-right">Actions</th>
             </tr>
           </thead>
@@ -254,15 +239,6 @@ export default function LeadsPage() {
                         <span className="text-slate-400 dark:text-slate-500 text-xs">-</span>
                       );
                     })()}
-                  </td>
-                  <td className="py-3 px-4 text-sm dark:text-slate-300">
-                    <div className="flex items-center space-x-2">
-                       <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300 relative">
-                         {assigneeName(lead.assigneeId).substring(0,2).toUpperCase()}
-                       </div>
-                       <span>{assigneeName(lead.assigneeId)}</span>
-                       {isOwner && <span className="ml-2 text-[9px] bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-1 py-0.5 rounded font-bold uppercase transition">You</span>}
-                    </div>
                   </td>
                   <td className="py-3 px-4 text-right whitespace-nowrap">
                      <div className="flex items-center justify-end gap-1">
